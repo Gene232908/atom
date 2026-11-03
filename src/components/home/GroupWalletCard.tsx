@@ -79,7 +79,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
 /** Stacked like Apple Wallet on phones, a neat grid on tablets and laptops */
 export function WalletStack({ groups, uid }: { groups: Group[]; uid: string }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {groups.map((g, i) => (
         <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[124px]' : ''}`} style={{ zIndex: i }}>
           <GroupWalletCard group={g} uid={uid} index={i} />

@@ -163,115 +163,131 @@ export function HomePage() {
       />
 
       <PageBody>
-        <LargeTitle eyebrow={`${greeting()}, ${firstName(name)}`} title="Wallet" />
+        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
+          {/* Left Column: Sticky overview on iPad / Laptop / Desktop */}
+          <div className="space-y-4 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
+            <LargeTitle eyebrow={`${greeting()}, ${firstName(name)}`} title="Wallet" />
 
-        <div className="grid grid-cols-2 gap-3">
-          <SummaryTile label="You owe" amount={youOwe} tone="bad" />
-          <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <Button size="lg" icon={<Plus className="size-5" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
-            New list
-          </Button>
-          <Button size="lg" variant="white" icon={<KeyRound className="size-[18px]" />} onClick={() => setPanel('join')}>
-            Join
-          </Button>
-        </div>
-
-        <div className="mt-8 space-y-4">
-          {/* Toggle Switch between You lend & You owe + Settings icon */}
-          <div className="flex items-center justify-between gap-2.5">
-            <div className="flex flex-1 rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
-              <button
-                type="button"
-                onClick={() => setTab('lend')}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-[14px] font-semibold transition active:scale-95 ${
-                  tab === 'lend'
-                    ? 'bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
-                    : 'text-muted hover:text-ink'
-                }`}
-              >
-                <span>You lend</span>
-                {lending.length > 0 && (
-                  <span
-                    className={`grid min-w-5 h-5 place-items-center rounded-full px-1.5 text-[11px] font-bold ${
-                      tab === 'lend' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
-                    }`}
-                  >
-                    {lending.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTab('owe')}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-[14px] font-semibold transition active:scale-95 ${
-                  tab === 'owe'
-                    ? 'bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
-                    : 'text-muted hover:text-ink'
-                }`}
-              >
-                <span>You owe</span>
-                {owing.length > 0 && (
-                  <span
-                    className={`grid min-w-5 h-5 place-items-center rounded-full px-1.5 text-[11px] font-bold ${
-                      tab === 'owe' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
-                    }`}
-                  >
-                    {owing.length}
-                  </span>
-                )}
-              </button>
+            <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+              <SummaryTile label="You owe" amount={youOwe} tone="bad" />
+              <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setDefaultViewOpen(true)}
-              title="Which tab to see first"
-              aria-label="Default view settings"
-              className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-muted shadow-sm ring-1 ring-hairline transition hover:text-ink active:scale-90"
-            >
-              <SlidersHorizontal className="size-4" strokeWidth={2.2} />
-            </button>
+            {/* Compact action buttons: sized naturally, not stretched */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button
+                size="sm"
+                icon={<Plus className="size-4" strokeWidth={2.5} />}
+                onClick={() => setPanel('create')}
+              >
+                New list
+              </Button>
+              <Button
+                size="sm"
+                variant="white"
+                icon={<KeyRound className="size-3.5" />}
+                onClick={() => setPanel('join')}
+              >
+                Join
+              </Button>
+            </div>
           </div>
 
-          {error && <ErrorBanner message={error} onRetry={retry} />}
+          {/* Right Column: Cards & Toggle Switch */}
+          <div className="mt-7 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
+            {/* Compact Segmented Control between You lend & You owe + Settings icon */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => setTab('lend')}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                    tab === 'lend'
+                      ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  <span>You lend</span>
+                  {lending.length > 0 && (
+                    <span
+                      className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
+                        tab === 'lend' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
+                      }`}
+                    >
+                      {lending.length}
+                    </span>
+                  )}
+                </button>
 
-          {loading ? (
-            <div className="flex justify-center py-16 text-muted">
-              <Spinner className="size-7" />
+                <button
+                  type="button"
+                  onClick={() => setTab('owe')}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                    tab === 'owe'
+                      ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  <span>You owe</span>
+                  {owing.length > 0 && (
+                    <span
+                      className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
+                        tab === 'owe' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
+                      }`}
+                    >
+                      {owing.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDefaultViewOpen(true)}
+                title="Display & default view settings"
+                aria-label="Default view settings"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-muted shadow-sm ring-1 ring-hairline transition hover:text-ink active:scale-90"
+              >
+                <SlidersHorizontal className="size-4" strokeWidth={2.2} />
+              </button>
             </div>
-          ) : tab === 'lend' ? (
-            lending.length > 0 ? (
-              <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
+
+            {error && <ErrorBanner message={error} onRetry={retry} />}
+
+            {loading ? (
+              <div className="flex justify-center py-16 text-muted">
+                <Spinner className="size-7" />
+              </div>
+            ) : tab === 'lend' ? (
+              lending.length > 0 ? (
+                <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
+              ) : (
+                <EmptyState
+                  icon={<WalletCards className="size-7" />}
+                  title="No lending lists yet"
+                  text="Create a list if people owe you money, or if you paid for shared orders."
+                  action={
+                    <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
+                      New list
+                    </Button>
+                  }
+                />
+              )
+            ) : owing.length > 0 ? (
+              <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
             ) : (
               <EmptyState
                 icon={<WalletCards className="size-7" />}
-                title="No lending lists yet"
-                text="Create a list if people owe you money, or if you paid for shared orders."
+                title="You don't owe anyone right now"
+                text="When someone lends you money or splits a bill with you, tap Join to enter their code."
                 action={
-                  <Button icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
-                    New list
+                  <Button size="sm" variant="white" icon={<KeyRound className="size-4" />} onClick={() => setPanel('join')}>
+                    Join a list
                   </Button>
                 }
               />
-            )
-          ) : owing.length > 0 ? (
-            <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
-          ) : (
-            <EmptyState
-              icon={<WalletCards className="size-7" />}
-              title="You don't owe anyone right now"
-              text="When someone lends you money or splits a bill with you, tap Join to enter their code."
-              action={
-                <Button variant="white" icon={<KeyRound className="size-4" />} onClick={() => setPanel('join')}>
-                  Join a list
-                </Button>
-              }
-            />
-          )}
+            )}
+          </div>
         </div>
       </PageBody>
 
