@@ -30,6 +30,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'GCash' | 'Maya' | 'Bank Transfer' | 'Cash'>('GCash');
   const [refNumber, setRefNumber] = useState('');
   const [note, setNote] = useState('');
   const [payMode, setPayMode] = useState<'full' | 'custom'>('full');
@@ -87,7 +88,12 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
   const canMark = item ? remainingCents > 0 : unpaidCount > 0;
 
   const handlePaidSubmit = () => {
-    onPaid(item, amountToPay, refNumber.trim(), note.trim());
+    const cleanRef = refNumber.trim();
+    const finalRef = cleanRef
+      ? (cleanRef.toLowerCase().includes(paymentMethod.toLowerCase()) ? cleanRef : `${paymentMethod} · Ref: ${cleanRef}`)
+      : `${paymentMethod} payment`;
+    const finalNote = note.trim() || `Paid via ${paymentMethod}`;
+    onPaid(item, amountToPay, finalRef, finalNote);
   };
 
   return (
@@ -191,30 +197,54 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
         </div>
       )}
 
-      {/* Reference Number Input */}
+      {/* Reference Number & Payment Method Input */}
       <div className="mt-4 rounded-[20px] bg-white p-4">
         <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
           <ReceiptText className="size-4 text-accent" />
-          <span>Payment Reference Number</span>
+          <span>Payment Details for Verification</span>
         </div>
         <p className="mt-0.5 text-[12px] text-muted">
-          Type the reference number from your GCash, Maya, or bank receipt (e.g. 1002938491, MP24-A821).
+          Select what payment method you used and enter the receipt reference number so {ownerName} can easily verify it.
         </p>
-        <input
-          type="text"
-          value={refNumber}
-          onChange={(e) => setRefNumber(e.target.value)}
-          placeholder="e.g. GCash Ref # 100492817291"
-          className="mt-2.5 w-full rounded-xl bg-fill px-3.5 py-2.5 font-mono text-[14px] font-medium text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
-        />
+
+        {/* Quick Payment Method Selector */}
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {(['GCash', 'Maya', 'Bank Transfer', 'Cash'] as const).map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPaymentMethod(method)}
+              className={`rounded-full px-3 py-1 text-[12px] font-semibold transition active:scale-95 ${
+                paymentMethod === method
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'bg-fill text-muted hover:text-ink'
+              }`}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-3">
-          <label className="block text-[12px] font-medium text-muted">Note or Cut-off (optional)</label>
+          <label className="block text-[11px] font-semibold text-muted uppercase">
+            {paymentMethod} Reference Number
+          </label>
+          <input
+            type="text"
+            value={refNumber}
+            onChange={(e) => setRefNumber(e.target.value)}
+            placeholder={`e.g. ${paymentMethod} ref # (e.g. 100238491)`}
+            className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 font-mono text-[14px] font-medium text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+          />
+        </div>
+
+        <div className="mt-3">
+          <label className="block text-[11px] font-semibold text-muted uppercase">Note (optional)</label>
           <input
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. Cut-off payment (15th), Installment 1 of 6"
+            placeholder="e.g. 1st cutoff, May 15 installment"
             className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2 text-[13px] text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
           />
         </div>

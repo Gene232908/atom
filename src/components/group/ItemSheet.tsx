@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   CalendarClock,
-  Check,
   CheckCircle2,
   Clock,
   Pencil,
@@ -12,7 +11,7 @@ import {
 import { storeGradient } from '../../lib/cardTheme';
 import { formatMoney, toCents, centsToInput } from '../../lib/money';
 import { dueInfo, isItemDone, itemProgress } from '../../lib/items';
-import { confirmPayment, recordPayment } from '../../services/items';
+import { recordPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
 import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
@@ -60,6 +59,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
     if (!item) return [];
     const list: PaymentRecord[] = Array.isArray(item.payments) ? [...item.payments] : [];
     const existingUidsWithPending = new Set(list.filter((p) => p && p.status === 'pending').map((p) => p.uid));
+    const existingUidsWithConfirmed = new Set(list.filter((p) => p && p.status === 'confirmed').map((p) => p.uid));
 
     const shares = item.shares ?? {};
     for (const [pid, share] of Object.entries(shares)) {
@@ -76,9 +76,22 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
           payerName: borrowerName,
           amountCents: amt,
           refNumber: share.refNumber || 'Pending verification',
-          note: 'Submitted via Pay now',
+          note: share.refNumber ? `Ref: ${share.refNumber}` : 'Submitted via Pay now',
           status: 'pending',
           paidAt: share.updatedAt && !isNaN(share.updatedAt) && share.updatedAt > 0 ? share.updatedAt : Date.now(),
+        });
+      } else if (share.status === 'paid' && !existingUidsWithConfirmed.has(pid)) {
+        const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
+        const amt = share.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
+        list.push({
+          id: `confirmed-${pid}`,
+          uid: pid,
+          payerName: borrowerName,
+          amountCents: amt,
+          refNumber: share.refNumber || 'Paid in full',
+          note: share.refNumber ? `Ref: ${share.refNumber}` : 'Payment confirmed',
+          status: 'confirmed',
+          paidAt: share.updatedAt && !isNaN(share.updatedAt) && share.updatedAt > 0 ? share.updatedAt : (item.updatedAt || Date.now()),
         });
       }
     }
@@ -423,18 +436,6 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                       <p className="text-[15px] font-bold text-ok-ink tabular-nums">
                         +{formatMoney(p.amountCents)}
                       </p>
-                      {isOwner && !isConfirmed && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            write(confirmPayment(group.id, item, p.id, p.uid), 'Payment confirmed!');
-                          }}
-                          className="mt-1 inline-flex items-center gap-1 rounded-full bg-ok px-2.5 py-1 text-[11px] font-bold text-white shadow-sm transition active:scale-95"
-                        >
-                          <Check className="size-3" strokeWidth={3} />
-                          <span>Confirm</span>
-                        </button>
-                      )}
                     </div>
                   </div>
                 );

@@ -17,7 +17,7 @@ import { useSafeWrite, useToast } from '../../hooks/useToast';
 import { useTotalsSync } from '../../hooks/useTotalsSync';
 import { navigate } from '../../hooks/useRoute';
 import { removeMember } from '../../services/groups';
-import { claimAll, recordPayment, setShareStatus } from '../../services/items';
+import { claimAll, confirmPayment, recordPayment, setShareStatus, undoPayment } from '../../services/items';
 import { friendlyError } from '../../lib/errors';
 import { formatMoney } from '../../lib/money';
 import { firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
@@ -103,15 +103,23 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const onSetStatus = useCallback(
     (item: Item, personUid: string, status: ShareStatus) => {
       const who = firstName(group.members[personUid]?.name ?? item.shares[personUid]?.name ?? 'They');
-      const message =
-        status === 'paid'
-          ? `Marked ${who} as paid`
-          : status === 'claimed'
-            ? `Sent! ${ownerName} will confirm it.`
-            : 'Changed back to not paid';
-      write(setShareStatus(group.id, item.id, personUid, status), message);
+      if (status === 'paid') {
+        const pendingPayment = item.payments?.find((p) => p.uid === personUid && p.status === 'pending');
+        const paymentId = pendingPayment?.id || `claim-${personUid}`;
+        write(
+          confirmPayment(group.id, item, paymentId, personUid),
+          `Payment for ${who} confirmed and recorded!`,
+        );
+      } else if (status === 'unpaid') {
+        write(
+          undoPayment(group.id, item, personUid),
+          `Reverted ${who} to unpaid`,
+        );
+      } else {
+        write(setShareStatus(group.id, item.id, personUid, status), `Status updated for ${who}`);
+      }
     },
-    [group.id, group.members, ownerName, write],
+    [group.id, group.members, write],
   );
 
   const onPaid = (item: Item | null, amountCents?: number, refNumber?: string, note?: string) => {

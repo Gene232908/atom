@@ -133,12 +133,12 @@ export async function recordPayment(
     });
   } catch (err) {
     // Fallback: If deployed Firestore rules only allow status update for non-owners,
-    // safely update status so payment claim is recorded and succeeds without permission error!
-    await setShareStatus(groupId, item.id, payment.uid, nextStatus);
+    // safely update status and refNumber so payment claim is recorded and succeeds without permission error!
+    await setShareStatus(groupId, item.id, payment.uid, nextStatus, payment.refNumber);
   }
 }
 
-/** Lender confirms a pending payment record. */
+/** Lender confirms a pending payment record or marks a member as paid. */
 export async function confirmPayment(
   groupId: string,
   item: Item,
@@ -147,24 +147,35 @@ export async function confirmPayment(
 ): Promise<void> {
   const now = Date.now();
   let payments = item.payments ? [...item.payments] : [];
-  const found = payments.some((p) => p.id === paymentId);
+  const uid = targetUid || payments.find((p) => p.id === paymentId)?.uid;
+  if (!uid) return;
 
-  if (found) {
-    payments = payments.map((p) =>
-      p.id === paymentId ? { ...p, status: 'confirmed' as const } : p,
-    );
-  } else if (targetUid) {
-    const share = item.shares[targetUid];
-    const borrowerName = item.shares[targetUid]?.name ?? 'Borrower';
-    const amt = share?.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
+  const share = item.shares[uid];
+  const borrowerName = share?.name ?? 'Borrower';
+  const amt = share?.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
+  const refNum = share?.refNumber || 'Verified by lender';
+
+  // Check if there is an existing pending record or claim
+  const foundIndex = payments.findIndex(
+    (p) => p.id === paymentId || (p.uid === uid && p.status === 'pending'),
+  );
+
+  if (foundIndex >= 0) {
+    payments[foundIndex] = {
+      ...payments[foundIndex],
+      status: 'confirmed',
+      refNumber: payments[foundIndex].refNumber || refNum,
+      paidAt: payments[foundIndex].paidAt || now,
+    };
+  } else {
     payments = [
       {
-        id: paymentId,
-        uid: targetUid,
+        id: `pay-${uid}-${now}`,
+        uid,
         payerName: borrowerName,
         amountCents: amt,
-        refNumber: share?.refNumber || 'Confirmed by lender',
-        note: 'Cut-off payment',
+        refNumber: refNum,
+        note: share?.refNumber ? `Ref: ${share.refNumber}` : 'Payment confirmed',
         status: 'confirmed',
         paidAt: now,
       },
@@ -172,18 +183,31 @@ export async function confirmPayment(
     ];
   }
 
-  const uid = targetUid || payments.find((p) => p.id === paymentId)?.uid;
   const updates: Record<string, unknown> = {
     payments,
+    [`shares.${uid}.status`]: 'paid',
+    [`shares.${uid}.paidCents`]: amt,
+    [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   };
 
-  if (uid) {
-    updates[`shares.${uid}.status`] = 'paid';
-    updates[`shares.${uid}.updatedAt`] = now;
-  }
-
   await updateDoc(doc(db, 'groups', groupId, 'items', item.id), updates);
+}
+
+/** Lender undoes payment for a member, reverting status to unpaid and updating history. */
+export async function undoPayment(groupId: string, item: Item, uid: string): Promise<void> {
+  const now = Date.now();
+  const existingPayments = item.payments ? [...item.payments] : [];
+  const updatedPayments = existingPayments.filter((p) => p.uid !== uid);
+
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
+    payments: updatedPayments,
+    [`shares.${uid}.status`]: 'unpaid',
+    [`shares.${uid}.paidCents`]: 0,
+    [`shares.${uid}.refNumber`]: '',
+    [`shares.${uid}.updatedAt`]: now,
+    updatedAt: now,
+  });
 }
 
 /** Lender only: marks every unpaid share of one person as paid. */
