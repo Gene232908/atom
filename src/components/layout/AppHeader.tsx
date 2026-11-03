@@ -82,7 +82,7 @@ export function LargeTitle({ title, eyebrow, right }: TitleProps) {
 
 export function PageBody({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <main className={`mx-auto w-full max-w-5xl px-4 pt-1 pb-32 sm:px-5 select-none ${className}`}>
+    <main className={`mx-auto w-full max-w-5xl px-4 pt-1 pb-10 sm:px-5 sm:pb-12 lg:pb-16 select-none ${className}`}>
       {children}
     </main>
   );
