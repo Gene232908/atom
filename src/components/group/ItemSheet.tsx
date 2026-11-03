@@ -263,6 +263,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                   key={pid}
                   personUid={pid}
                   share={share}
+                  item={item}
                   group={group}
                   viewerUid={uid}
                   onSetStatus={(personUid, status) => onSetStatus(item, personUid, status)}

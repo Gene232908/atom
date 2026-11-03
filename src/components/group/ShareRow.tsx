@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Check, Clock, Copy } from 'lucide-react';
 import { formatMoney } from '../../lib/money';
 import { copyText } from '../../lib/clipboard';
-import type { Group, Share, ShareStatus } from '../../lib/types';
+import type { Group, Item, Share, ShareStatus } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/StatusBadge';
 
 interface Props {
   personUid: string;
   share?: Share;
+  item: Item;
   group: Group;
   viewerUid: string;
   onSetStatus: (personUid: string, status: ShareStatus) => void;
@@ -35,7 +36,7 @@ function actionFor(ownerViewing: boolean, personUid: string, ownerId: string, st
   return null;
 }
 
-export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Props) {
+export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus }: Props) {
   const [copied, setCopied] = useState(false);
   const ownerViewing = group.ownerId === viewerUid;
   const member = group.members[personUid];
@@ -43,6 +44,13 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
   const isLender = personUid === group.ownerId;
   const status: ShareStatus = share?.status ?? 'unpaid';
   const action = actionFor(ownerViewing, personUid, group.ownerId, status);
+
+  const expectedCutoff =
+    item.monthlyCents ||
+    (item.installmentsCount && item.installmentsCount > 1
+      ? Math.round(item.splitCents / item.installmentsCount)
+      : item.splitCents);
+  const claimAmount = share?.paidCents && share.paidCents > 0 ? share.paidCents : expectedCutoff;
 
   let note = '';
   if (isLender) note = 'Lender’s own share';
@@ -84,9 +92,7 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
               <Clock className="size-3.5 text-warn" />
               Payee submitted payment for verification
             </span>
-            {share?.paidCents && share.paidCents > 0 && (
-              <span className="font-bold text-ink">{formatMoney(share.paidCents)}</span>
-            )}
+            <span className="font-bold text-ink">{formatMoney(claimAmount)}</span>
           </div>
           {share?.refNumber ? (
             <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-white/80 px-2.5 py-1.5 ring-1 ring-hairline">
@@ -108,7 +114,10 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
               </button>
             </div>
           ) : (
-            <p className="mt-1 text-[11px] text-muted italic">No reference number submitted</p>
+            <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1 text-muted">
+              <span className="text-[11px] italic">Ref: Pending verification</span>
+              <span className="text-[11px] font-medium">Cut-off payment ({formatMoney(claimAmount)})</span>
+            </div>
           )}
         </div>
       )}
