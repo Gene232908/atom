@@ -64,7 +64,6 @@ export function HomePage() {
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
   const [tab, setTab] = useState<'lend' | 'owe'>('lend');
-  const [selectedStore, setSelectedStore] = useState<string>('all');
   const [hasResolvedDefault, setHasResolvedDefault] = useState(false);
 
   // Modal sheet states
@@ -129,30 +128,6 @@ export function HomePage() {
     return { youOwe: owe, owedToYou: owed };
   }, [items, user.uid]);
 
-  // Unique stores for filter chips based on current tab
-  const storeList = useMemo(() => {
-    const currentList = tab === 'lend' ? lendingItems : owingItems;
-    const map = new Map<string, number>();
-    for (const it of currentList) {
-      const s = (it.store || '').trim() || 'Credit Card';
-      map.set(s, (map.get(s) ?? 0) + 1);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [tab, lendingItems, owingItems]);
-
-  // Filtered items based on selected store
-  const displayItems = useMemo(() => {
-    const currentList = tab === 'lend' ? lendingItems : owingItems;
-    if (selectedStore === 'all') return currentList;
-    return currentList.filter((it) => ((it.store || '').trim() || 'Credit Card') === selectedStore);
-  }, [tab, lendingItems, owingItems, selectedStore]);
-
-  // When tab changes, reset store filter to 'all'
-  const handleTabChange = (newTab: 'lend' | 'owe') => {
-    setTab(newTab);
-    setSelectedStore('all');
-  };
-
   // Automatically determine the initial tab on open/login
   useEffect(() => {
     if (hasResolvedDefault) return;
@@ -183,12 +158,12 @@ export function HomePage() {
       // ignore
     }
 
-    if (newPref === 'lend') handleTabChange('lend');
-    else if (newPref === 'owe') handleTabChange('owe');
+    if (newPref === 'lend') setTab('lend');
+    else if (newPref === 'owe') setTab('owe');
     else {
-      if (lendingItems.length > 0) handleTabChange('lend');
-      else if (owingItems.length > 0) handleTabChange('owe');
-      else handleTabChange('lend');
+      if (lendingItems.length > 0) setTab('lend');
+      else if (owingItems.length > 0) setTab('owe');
+      else setTab('lend');
     }
 
     toast(
@@ -369,7 +344,7 @@ export function HomePage() {
                 <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
                   <button
                     type="button"
-                    onClick={() => handleTabChange('lend')}
+                    onClick={() => setTab('lend')}
                     className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
                       tab === 'lend'
                         ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
@@ -390,7 +365,7 @@ export function HomePage() {
 
                   <button
                     type="button"
-                    onClick={() => handleTabChange('owe')}
+                    onClick={() => setTab('owe')}
                     className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
                       tab === 'owe'
                         ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
@@ -421,69 +396,17 @@ export function HomePage() {
                 </button>
               </div>
 
-              {/* Store Filter Chips (All cards vs Individual Card/Store) */}
-              {storeList.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedStore('all')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition active:scale-95 shrink-0 ${
-                      selectedStore === 'all'
-                        ? 'bg-ink text-white shadow-sm'
-                        : 'bg-white text-muted hover:bg-black/[0.04] hover:text-ink ring-1 ring-hairline'
-                    }`}
-                  >
-                    <span>All cards</span>
-                    <span
-                      className={`rounded-full px-1.5 text-[10px] ${
-                        selectedStore === 'all' ? 'bg-white/20 text-white' : 'bg-black/10 text-muted'
-                      }`}
-                    >
-                      {tab === 'lend' ? lendingItems.length : owingItems.length}
-                    </span>
-                  </button>
-
-                  {storeList.map(([store, count]) => (
-                    <button
-                      key={store}
-                      type="button"
-                      onClick={() => setSelectedStore(store)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition active:scale-95 shrink-0 ${
-                        selectedStore === store
-                          ? 'bg-ink text-white shadow-sm'
-                          : 'bg-white text-muted hover:bg-black/[0.04] hover:text-ink ring-1 ring-hairline'
-                      }`}
-                    >
-                      <span>{store}</span>
-                      <span
-                        className={`rounded-full px-1.5 text-[10px] ${
-                          selectedStore === store ? 'bg-white/20 text-white' : 'bg-black/10 text-muted'
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {error && <ErrorBanner message={error} onRetry={retry} />}
 
               {/* Cards Display */}
               {tab === 'lend' ? (
                 lendingItems.length > 0 ? (
-                  displayItems.length > 0 ? (
-                    <ItemCardsView
-                      items={displayItems}
-                      uid={user.uid}
-                      mode={cardLayout}
-                      onOpen={(it) => setViewingItemId(it.id)}
-                    />
-                  ) : (
-                    <p className="rounded-[20px] bg-white px-4 py-10 text-center text-[14px] text-muted shadow-sm">
-                      No cards found under "{selectedStore}". Tap "All cards" to see all items.
-                    </p>
-                  )
+                  <ItemCardsView
+                    items={lendingItems}
+                    uid={user.uid}
+                    mode={cardLayout}
+                    onOpen={(it) => setViewingItemId(it.id)}
+                  />
                 ) : (
                   <EmptyState
                     icon={<WalletCards className="size-7" />}
@@ -501,18 +424,12 @@ export function HomePage() {
                   />
                 )
               ) : owingItems.length > 0 ? (
-                displayItems.length > 0 ? (
-                  <ItemCardsView
-                    items={displayItems}
-                    uid={user.uid}
-                    mode={cardLayout}
-                    onOpen={(it) => setViewingItemId(it.id)}
-                  />
-                ) : (
-                  <p className="rounded-[20px] bg-white px-4 py-10 text-center text-[14px] text-muted shadow-sm">
-                    No cards found under "{selectedStore}". Tap "All cards" to see all items.
-                  </p>
-                )
+                <ItemCardsView
+                  items={owingItems}
+                  uid={user.uid}
+                  mode={cardLayout}
+                  onOpen={(it) => setViewingItemId(it.id)}
+                />
               ) : (
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
@@ -620,18 +537,18 @@ export function HomePage() {
 function SummaryTile({ label, amount, tone }: { label: string; amount: number; tone: 'ok' | 'bad' }) {
   const Icon = tone === 'ok' ? ArrowDownLeft : ArrowUpRight;
   return (
-    <div className="min-w-0 rounded-[20px] bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-[18px] sm:rounded-[20px] bg-white p-3.5 sm:p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <span
-          className={`grid size-7 place-items-center rounded-full ${
+          className={`grid size-6 sm:size-7 place-items-center rounded-full ${
             tone === 'ok' ? 'bg-ok/12 text-ok-ink' : 'bg-bad/10 text-bad-ink'
           }`}
         >
-          <Icon className="size-4" strokeWidth={2.5} />
+          <Icon className="size-3.5 sm:size-4" strokeWidth={2.5} />
         </span>
-        <p className="truncate text-[13px] font-medium text-muted">{label}</p>
+        <p className="truncate text-[12px] sm:text-[13px] font-medium text-muted">{label}</p>
       </div>
-      <p className="mt-2 truncate text-[20px] font-bold tracking-tight text-ink tabular-nums sm:text-[24px]">
+      <p className="mt-1.5 sm:mt-2 truncate text-[18px] sm:text-[22px] font-bold tracking-tight text-ink tabular-nums">
         {formatMoney(amount)}
       </p>
     </div>

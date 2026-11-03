@@ -56,20 +56,20 @@ export function ItemWalletCard({ item, uid, index = 0, onOpen, interactive = tru
         seed={item.id}
         background={storeGradient(store, item.id, item.color)}
         interactive={interactive}
-        className="flex min-h-[210px] sm:min-h-[224px] flex-col p-5"
+        className="flex min-h-[200px] sm:min-h-[224px] flex-col p-4 sm:p-5"
       >
         {/* Top Header: Store Name on Left, Due Date & Cycle Pills on Right */}
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2.5">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/20 backdrop-blur">
-              <ShoppingBag className="size-3.5 text-white" />
+            <span className="grid size-6 sm:size-7 shrink-0 place-items-center rounded-full bg-white/20 backdrop-blur">
+              <ShoppingBag className="size-3 sm:size-3.5 text-white" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-bold tracking-[0.08em] text-white uppercase drop-shadow-sm">
+              <p className="truncate text-[12.5px] sm:text-[14px] font-bold tracking-[0.06em] text-white uppercase drop-shadow-sm">
                 {store}
               </p>
               {item.installmentsCount && item.installmentsCount > 1 && (
-                <p className="text-[11px] font-medium text-white/80">
+                <p className="text-[10px] sm:text-[11px] font-medium text-white/80 leading-tight">
                   {item.installmentsCount} mos installment
                 </p>
               )}
@@ -79,16 +79,16 @@ export function ItemWalletCard({ item, uid, index = 0, onOpen, interactive = tru
           <div className="flex flex-col items-end gap-1 shrink-0 text-right">
             {due && (
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold ${
                   due.tone === 'slate' ? 'bg-white/15 text-white' : 'bg-white text-bad-ink shadow-sm'
                 }`}
               >
-                <CalendarClock className="size-3" />
+                <CalendarClock className="size-2.5 sm:size-3" />
                 {due.text}
               </span>
             )}
             {item.billingCycle && (
-              <span className="inline-flex items-center rounded-full bg-black/25 px-2.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur">
+              <span className="inline-flex items-center rounded-full bg-black/25 px-2 py-0.5 text-[9px] sm:text-[10px] font-medium text-white/95 backdrop-blur">
                 {item.billingCycle}
               </span>
             )}
@@ -96,37 +96,37 @@ export function ItemWalletCard({ item, uid, index = 0, onOpen, interactive = tru
         </div>
 
         {/* Item Title */}
-        <p className="mt-3 truncate text-[16px] font-bold text-white drop-shadow-sm">
+        <p className="mt-2.5 sm:mt-3 truncate text-[14.5px] sm:text-[16px] font-semibold text-white drop-shadow-sm">
           {item.description}
         </p>
 
         {/* Amounts & Monthly Breakdown */}
-        <div className="mt-auto pt-3">
+        <div className="mt-auto pt-2.5 sm:pt-3">
           <div className="flex items-end justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-wider text-white/70 uppercase">
+              <p className="text-[9.5px] sm:text-[10px] font-semibold tracking-wider text-white/70 uppercase">
                 {isOwner ? 'Total Charge' : myPaid > 0 && !isMyShareDone ? 'Remaining' : 'Your Share'}
               </p>
-              <p className="truncate text-[26px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[30px]">
+              <p className="truncate text-[22px] sm:text-[26px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums">
                 {formatMoney(isOwner ? item.priceCents : myPaid > 0 && !isMyShareDone ? myRemaining : item.splitCents)}
               </p>
             </div>
 
             {(item.monthlyCents || installmentMonthly) && (
               <div className="shrink-0 text-right">
-                <p className="text-[10px] font-semibold tracking-wider text-white/70 uppercase">Cut-off</p>
-                <p className="text-[15px] font-bold text-white tabular-nums">
+                <p className="text-[9.5px] sm:text-[10px] font-semibold tracking-wider text-white/70 uppercase">Cut-off</p>
+                <p className="text-[13px] sm:text-[15px] font-bold text-white tabular-nums">
                   {formatMoney(item.monthlyCents || installmentMonthly!)}
-                  <span className="text-[11px] font-normal text-white/80">/mo</span>
+                  <span className="text-[10px] sm:text-[11px] font-normal text-white/80">/mo</span>
                 </p>
               </div>
             )}
           </div>
 
           {/* Progress Bar & Subtext */}
-          <div className="mt-2.5">
-            <div className="flex items-center justify-between text-[11px] font-medium text-white/80">
-              <span>
+          <div className="mt-2 sm:mt-2.5">
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-medium text-white/85">
+              <span className="truncate">
                 {isOwner
                   ? total === 0
                     ? 'Waiting for members'
@@ -141,7 +141,7 @@ export function ItemWalletCard({ item, uid, index = 0, onOpen, interactive = tru
                         ? `Paid ${formatMoney(myPaid)} of ${formatMoney(item.splitCents)}`
                         : 'Not paid'}
               </span>
-              <span>{progressPercent}%</span>
+              <span className="shrink-0 ml-1.5">{progressPercent}%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
               <div
@@ -152,8 +152,8 @@ export function ItemWalletCard({ item, uid, index = 0, onOpen, interactive = tru
           </div>
 
           {/* Bottom Card Footer: Last 4 digits + Member Avatars */}
-          <div className="mt-2.5 flex items-center justify-between text-white/70">
-            <span className="font-mono text-[12px] tracking-[0.16em]">•••• {last4}</span>
+          <div className="mt-2 sm:mt-2.5 flex items-center justify-between text-white/70">
+            <span className="font-mono text-[11px] sm:text-[12px] tracking-[0.14em]">•••• {last4}</span>
             {people.length > 0 && <AvatarStack people={people} />}
           </div>
         </div>
@@ -277,7 +277,7 @@ export function SingleItemCarousel({
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
       >
-        <div className="relative h-[240px] sm:h-[250px] w-full">
+        <div className="relative h-[210px] sm:h-[235px] w-full">
           {items.map((item, idx) => {
             const rel = ((idx - activeIndex + total) % total);
             if (rel > 2 && rel < total - 1) return null;
@@ -339,22 +339,6 @@ export function SingleItemCarousel({
           })}
         </div>
       </div>
-
-      {total > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-1.5">
-          {items.map((it, i) => (
-            <button
-              key={it.id}
-              type="button"
-              onClick={() => setCurrent(i)}
-              aria-label={`Go to card ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === activeIndex ? 'w-6 bg-ink' : 'w-1.5 bg-black/20 hover:bg-black/40'
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
