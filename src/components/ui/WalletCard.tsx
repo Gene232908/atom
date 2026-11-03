@@ -36,13 +36,8 @@ export function WalletCard({
       ref={tilt.ref}
       onPointerDown={tilt.onPointerDown}
       onPointerMove={tilt.onPointerMove}
-      onPointerUp={tilt.onPointerUp}
-      onPointerCancel={tilt.onPointerCancel}
-      onTouchStart={tilt.onTouchStart}
-      onTouchMove={tilt.onTouchMove}
-      onTouchEnd={tilt.onTouchEnd}
-      onTouchCancel={tilt.onTouchCancel}
-      className="relative select-none touch-none perspective-[1000px] [-webkit-touch-callout:none] [-webkit-user-select:none] rounded-[22px]"
+      onPointerLeave={tilt.onPointerLeave}
+      className="relative select-none touch-manipulation perspective-[1000px] [-webkit-touch-callout:none] [-webkit-user-select:none] rounded-[22px]"
       style={{
         ...style,
         ...(interactive ? tilt.style : {}),

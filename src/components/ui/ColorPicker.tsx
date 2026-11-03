@@ -24,7 +24,7 @@ export function ColorPicker({ label, value, onChange, autoBackground, hint }: Pr
         <span className="text-[13px] font-semibold">{current.name}</span>
       </div>
       <div
-        className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-5 py-1.5 sm:-mx-5 sm:px-6"
+        className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1 sm:-mx-5 sm:px-5"
         role="radiogroup"
         aria-label={label}
       >
@@ -39,15 +39,15 @@ export function ColorPicker({ label, value, onChange, autoBackground, hint }: Pr
               aria-label={o.name}
               title={o.name}
               onClick={() => onChange(o.key)}
-              className={`grid size-10 shrink-0 place-items-center rounded-full text-white transition active:scale-90 ${
-                on ? 'ring-[3px] ring-accent ring-offset-2 ring-offset-canvas' : ''
+              className={`grid size-[30px] shrink-0 place-items-center rounded-full text-white transition active:scale-90 ${
+                on ? 'ring-2 ring-accent ring-offset-2 ring-offset-canvas' : ''
               }`}
               style={{ backgroundImage: o.bg }}
             >
               {on ? (
-                <Check className="size-4 drop-shadow" strokeWidth={3} />
+                <Check className="size-3.5 drop-shadow" strokeWidth={3} />
               ) : (
-                o.key === '' && <Sparkles className="size-4 drop-shadow" />
+                o.key === '' && <Sparkles className="size-3.5 drop-shadow" />
               )}
             </button>
           );

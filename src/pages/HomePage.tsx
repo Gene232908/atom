@@ -6,11 +6,11 @@ import { useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
 import { firstName, sumOwed } from '../lib/items';
 import { LargeTitle, NavBar, PageBody } from '../components/layout/AppHeader';
-import { WalletStack } from '../components/home/GroupWalletCard';
+import { WalletCardsView } from '../components/home/GroupWalletCard';
 import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { AccountSheet } from '../components/home/AccountSheet';
-import { DefaultViewSheet, type DefaultViewPref } from '../components/home/DefaultViewSheet';
+import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
@@ -21,6 +21,7 @@ import { Spinner } from '../components/ui/Spinner';
 type Panel = 'create' | 'join' | 'account' | null;
 
 const PREF_KEY = 'atom_default_home_tab';
+const LAYOUT_KEY = 'atom_card_layout_mode';
 
 function getStoredPref(): DefaultViewPref {
   try {
@@ -30,6 +31,16 @@ function getStoredPref(): DefaultViewPref {
     // ignore
   }
   return 'auto';
+}
+
+function getStoredLayout(): CardLayoutMode {
+  try {
+    const val = localStorage.getItem(LAYOUT_KEY);
+    if (val === 'stack' || val === 'single') return val;
+  } catch {
+    // ignore
+  }
+  return 'stack';
 }
 
 function greeting(): string {
@@ -46,8 +57,23 @@ export function HomePage() {
   const [panel, setPanel] = useState<Panel>(null);
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
+  const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
   const [tab, setTab] = useState<'lend' | 'owe'>('lend');
   const [hasResolvedDefault, setHasResolvedDefault] = useState(false);
+
+  const onSelectLayoutMode = (mode: CardLayoutMode) => {
+    setCardLayout(mode);
+    try {
+      localStorage.setItem(LAYOUT_KEY, mode);
+    } catch {
+      // ignore
+    }
+    toast(
+      mode === 'single'
+        ? 'Card view set to 1 at a time (Swipe left/right).'
+        : 'Card view set to All cards (Stacked).',
+    );
+  };
 
   const close = () => setPanel(null);
   const name = user.displayName || 'there';
@@ -219,7 +245,7 @@ export function HomePage() {
             </div>
           ) : tab === 'lend' ? (
             lending.length > 0 ? (
-              <WalletStack groups={lending} uid={user.uid} />
+              <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
             ) : (
               <EmptyState
                 icon={<WalletCards className="size-7" />}
@@ -233,7 +259,7 @@ export function HomePage() {
               />
             )
           ) : owing.length > 0 ? (
-            <WalletStack groups={owing} uid={user.uid} />
+            <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
           ) : (
             <EmptyState
               icon={<WalletCards className="size-7" />}
@@ -257,6 +283,8 @@ export function HomePage() {
         onClose={() => setDefaultViewOpen(false)}
         preference={pref}
         onSelect={onSelectPref}
+        layoutMode={cardLayout}
+        onSelectLayoutMode={onSelectLayoutMode}
       />
     </>
   );

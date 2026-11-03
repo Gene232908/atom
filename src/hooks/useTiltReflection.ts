@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 
 interface TiltState {
   rotateX: number;
@@ -18,7 +18,6 @@ const REST_STATE: TiltState = {
   glareOpacity: 0.25,
 };
 
-// Global tracker for iOS DeviceOrientation permission
 let hasRequestedIosPermission = false;
 
 export function requestGyroPermission() {
@@ -38,23 +37,18 @@ export function requestGyroPermission() {
 }
 
 /**
- * 3D Card Tilt & Holographic Specular Shine Hook.
- * ONLY reacts when physically tilting the phone (gyroscope) or moving/dragging the card.
- * NO automatic/idle live animation.
- *
- * - Tilting phone left: card tilts left and specular shine glides to the LEFT.
- * - Tilting phone right: card tilts right and specular shine glides to the RIGHT.
- * - Tilting phone up/down: card tilts vertically.
- * - Touching/Swiping on mobile: follows the user's finger directly.
+ * High-performance 3D Card Tilt & Holographic Specular Shine Hook.
+ * - Mobile: Uses phone gyroscope (DeviceOrientation) automatically without intercepting page scroll.
+ * - Desktop: Responds to mouse hover smoothly.
+ * - Scrolling: 100% natural, never blocks or traps touch scrolling on iPhone or Android.
  */
 export function useTiltReflection(enabled = true) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<TiltState>(REST_STATE);
   const targetRef = useRef<TiltState>(REST_STATE);
   const rafRef = useRef<number | null>(null);
-  const isInteractingRef = useRef(false);
 
-  // Smooth lerp loop strictly towards physical targets
+  // Smooth lerp loop towards target orientation
   useEffect(() => {
     if (!enabled) return;
 
@@ -66,14 +60,12 @@ export function useTiltReflection(enabled = true) {
 
       setState((prev) => {
         const target = targetRef.current;
-        const speed = isInteractingRef.current ? 0.25 : 0.12;
-
-        const rx = lerp(prev.rotateX, target.rotateX, speed);
-        const ry = lerp(prev.rotateY, target.rotateY, speed);
-        const sx = lerp(prev.shineX, target.shineX, speed + 0.04);
-        const sy = lerp(prev.shineY, target.shineY, speed + 0.04);
-        const sa = lerp(prev.shineAngle, target.shineAngle, speed);
-        const go = lerp(prev.glareOpacity, target.glareOpacity, speed);
+        const rx = lerp(prev.rotateX, target.rotateX, 0.12);
+        const ry = lerp(prev.rotateY, target.rotateY, 0.12);
+        const sx = lerp(prev.shineX, target.shineX, 0.14);
+        const sy = lerp(prev.shineY, target.shineY, 0.14);
+        const sa = lerp(prev.shineAngle, target.shineAngle, 0.12);
+        const go = lerp(prev.glareOpacity, target.glareOpacity, 0.12);
 
         if (
           Math.abs(rx - target.rotateX) < 0.03 &&
@@ -104,32 +96,28 @@ export function useTiltReflection(enabled = true) {
     };
   }, [enabled]);
 
-  // Physical Phone Tilt (Gyroscope / DeviceOrientation)
+  // Physical Phone Tilt (Gyroscope)
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
 
     const handleOrientation = (e: DeviceOrientationEvent) => {
-      // If user is directly dragging on screen with finger, finger takes priority
-      if (isInteractingRef.current) return;
       if (e.gamma === null && e.beta === null) return;
 
       const gamma = e.gamma ?? 0; // Left (-90) to Right (+90)
-      const beta = e.beta ?? 45;   // Normal portrait phone hold is ~45deg
+      const beta = e.beta ?? 45;   // Normal portrait hold ~45deg
 
-      // Clamp to natural phone holding angles
       const clampedGamma = Math.max(-45, Math.min(45, gamma));
       const clampedBeta = Math.max(10, Math.min(80, beta)) - 45;
 
-      // Tilting left (negative gamma) -> shine moves left (lower X%), tilts left
-      // Tilting right (positive gamma) -> shine moves right (higher X%), tilts right
-      const ratioX = clampedGamma / 45; // -1 (full left) to +1 (full right)
+      const ratioX = clampedGamma / 45; // -1 (tilt left) to +1 (tilt right)
       const ratioY = clampedBeta / 35;  // -1 to +1
 
-      const rotateY = ratioX * 16;
-      const rotateX = -ratioY * 14;
+      const rotateY = ratioX * 15;
+      const rotateX = -ratioY * 12;
 
-      const shineX = 50 + ratioX * 45; // 5% to 95%
-      const shineY = 50 + ratioY * 45; // 5% to 95%
+      // When tilting left, shine shifts left; when tilting right, shine shifts right
+      const shineX = 50 + ratioX * 45;
+      const shineY = 50 + ratioY * 45;
       const shineAngle = 125 + ratioX * 45;
       const glareOpacity = 0.35 + Math.min(0.5, (Math.abs(ratioX) + Math.abs(ratioY)) * 0.4);
 
@@ -144,7 +132,6 @@ export function useTiltReflection(enabled = true) {
     };
 
     window.addEventListener('deviceorientation', handleOrientation, true);
-    // Also listen to deviceorientationabsolute if available
     window.addEventListener('deviceorientationabsolute' as unknown as keyof WindowEventMap, handleOrientation as EventListener, true);
 
     return () => {
@@ -153,18 +140,18 @@ export function useTiltReflection(enabled = true) {
     };
   }, [enabled]);
 
-  // Map coordinates from user touch or mouse drag
-  const updateFromCoords = (clientX: number, clientY: number) => {
-    if (!containerRef.current) return;
+  // Desktop Mouse Hover (only fires for mouse, NEVER blocks touch scroll)
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!enabled || !containerRef.current || e.pointerType === 'touch') return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
     const px = Math.max(0, Math.min(1, x / rect.width));
     const py = Math.max(0, Math.min(1, y / rect.height));
 
-    const rotateX = (0.5 - py) * 20;
-    const rotateY = (px - 0.5) * 22;
+    const rotateX = (0.5 - py) * 16;
+    const rotateY = (px - 0.5) * 18;
     const shineX = px * 100;
     const shineY = py * 100;
     const shineAngle = 90 + px * 90;
@@ -175,51 +162,17 @@ export function useTiltReflection(enabled = true) {
       shineX,
       shineY,
       shineAngle,
-      glareOpacity: 0.85,
+      glareOpacity: 0.75,
     };
   };
 
-  // Pointer & Touch handlers
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    requestGyroPermission();
-    isInteractingRef.current = true;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
-    updateFromCoords(e.clientX, e.clientY);
-  };
-
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!enabled || !isInteractingRef.current) return;
-    updateFromCoords(e.clientX, e.clientY);
-  };
-
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    isInteractingRef.current = false;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {}
+  const onPointerLeave = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return;
     targetRef.current = REST_STATE;
   };
 
-  const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+  const onPointerDown = () => {
     requestGyroPermission();
-    isInteractingRef.current = true;
-    if (e.touches[0]) {
-      updateFromCoords(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  };
-
-  const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!enabled || !isInteractingRef.current) return;
-    if (e.touches[0]) {
-      updateFromCoords(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  };
-
-  const onTouchEnd = () => {
-    isInteractingRef.current = false;
-    targetRef.current = REST_STATE;
   };
 
   const style: CSSProperties = {
@@ -232,7 +185,7 @@ export function useTiltReflection(enabled = true) {
     transform: `perspective(1000px) rotateX(${state.rotateX}deg) rotateY(${state.rotateY}deg)`,
     transformStyle: 'preserve-3d',
     willChange: 'transform',
-    touchAction: 'none',
+    // DO NOT set touchAction: 'none'! Normal scrolling must always work.
   };
 
   return {
@@ -241,11 +194,6 @@ export function useTiltReflection(enabled = true) {
     state,
     onPointerDown,
     onPointerMove,
-    onPointerUp,
-    onPointerCancel: onPointerUp,
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
-    onTouchCancel: onTouchEnd,
+    onPointerLeave,
   };
 }

@@ -8,7 +8,6 @@ import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { TextField } from '../ui/Field';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
-import { WalletCard } from '../ui/WalletCard';
 import { STORE_SUGGESTIONS, autoStoreGradient, storeGradient } from '../../lib/cardTheme';
 import { ColorPicker } from '../ui/ColorPicker';
 import { PeoplePicker, type PickPerson } from './PeoplePicker';
@@ -228,7 +227,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
               maxLength={40}
               onChange={(e) => setStore(e.target.value)}
             />
-            <div className="no-scrollbar -mx-4 mt-2 flex gap-2 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+            <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
               {STORE_SUGGESTIONS.map((name) => {
                 const on = store.trim().toLowerCase() === name.toLowerCase();
                 return (
@@ -236,8 +235,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     key={name}
                     type="button"
                     onClick={() => setStore(on ? '' : name)}
-                    className={`h-8 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition active:scale-95 ${
-                      on ? 'text-white' : 'bg-white text-ink shadow-sm ring-1 ring-hairline'
+                    className={`h-7 shrink-0 rounded-full px-3 text-[12px] font-medium transition active:scale-95 ${
+                      on ? 'text-white font-semibold' : 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-hairline'
                     }`}
                     style={on ? { backgroundImage: storeGradient(name, name) } : undefined}
                   >
@@ -253,7 +252,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             value={color}
             onChange={setColor}
             autoBackground={autoStoreGradient(store, 'split-cost')}
-            hint="Auto uses the color of the card or store above. You can see it on the card below."
+            hint="Auto uses the color of the card or store above."
           />
 
           <TextField
@@ -272,7 +271,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
           />
 
           {/* People / Borrowers Section: Works whether someone joined or not */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {hasOtherMembers ? (
               <PeoplePicker
                 people={people}
@@ -283,18 +282,18 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                 error={errors.people}
               />
             ) : (
-              <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3">
+              <div className="rounded-[18px] bg-white p-3.5 shadow-sm ring-1 ring-hairline space-y-2.5">
                 <div>
-                  <p className="font-semibold text-ink text-[15px]">Who owes this item?</p>
-                  <p className="mt-0.5 text-[13px] text-muted">
-                    Type their name below to list what they owe right now:
+                  <p className="font-semibold text-ink text-[14px]">Who owes this?</p>
+                  <p className="text-[12px] text-muted">
+                    Type a name below to add them to this item:
                   </p>
                 </div>
 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="e.g. Juan, Mark, Friend, or Me"
+                    placeholder="e.g. Juan, Mark, or Me"
                     value={customBorrowerName}
                     onChange={(e) => {
                       setCustomBorrowerName(e.target.value);
@@ -306,13 +305,13 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                         addCustomBorrower();
                       }
                     }}
-                    className="h-10 flex-1 min-w-0 rounded-xl bg-fill px-3 text-[14px] text-ink placeholder-muted outline-none ring-1 ring-hairline focus:ring-2 focus:ring-accent"
+                    className="h-9 flex-1 min-w-0 rounded-lg bg-fill px-3 text-[13px] text-ink placeholder-muted outline-none ring-1 ring-hairline focus:ring-2 focus:ring-accent"
                   />
                   <Button
                     size="sm"
                     onClick={addCustomBorrower}
                     disabled={!customBorrowerName.trim()}
-                    icon={<Plus className="size-4" />}
+                    icon={<Plus className="size-3.5" />}
                   >
                     Add
                   </Button>
@@ -321,8 +320,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                 {/* Show already added custom borrowers or Me */}
                 {people.length > 0 && (
                   <div className="pt-1">
-                    <p className="text-[12px] font-medium text-muted mb-1.5">Selected borrower:</p>
-                    <div className="flex flex-wrap gap-2">
+                    <p className="text-[11px] font-medium text-muted mb-1">Selected:</p>
+                    <div className="flex flex-wrap gap-1.5">
                       {people.map((p) => {
                         const on = selected.has(p.uid);
                         return (
@@ -330,7 +329,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                             key={p.uid}
                             type="button"
                             onClick={() => toggle(p.uid)}
-                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition active:scale-95 ${
                               on
                                 ? 'bg-ink text-white shadow-sm'
                                 : 'bg-fill text-muted hover:text-ink'
@@ -346,11 +345,11 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                 )}
 
                 {errors.people && (
-                  <p className="text-[13px] font-medium text-bad">{errors.people}</p>
+                  <p className="text-[12px] font-medium text-bad">{errors.people}</p>
                 )}
 
-                <div className="pt-2 border-t border-hairline flex items-center justify-between text-[13px]">
-                  <span className="text-muted">Want them to see this on their phone?</span>
+                <div className="pt-2 border-t border-hairline flex items-center justify-between text-[12px]">
+                  <span className="text-muted">Want them to see this?</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -359,23 +358,27 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     }}
                     className="font-semibold text-accent inline-flex items-center gap-1 hover:underline"
                   >
-                    <UserPlus className="size-3.5" />
-                    Invite link
+                    <UserPlus className="size-3" />
+                    Invite
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          <WalletCard seed="split-cost" background={storeGradient(store, 'split-cost', color)} className="p-5">
-            <p className="mb-3 truncate text-[13px] font-bold tracking-[0.12em] uppercase">
-              {store.trim() || 'Item'}
+          {/* Compact Split Summary Card */}
+          <div
+            className="rounded-[18px] p-4 text-white shadow-sm ring-1 ring-white/20 select-none"
+            style={{ backgroundImage: storeGradient(store, 'split-cost', color) }}
+          >
+            <p className="mb-2 truncate text-[11px] font-bold tracking-[0.14em] uppercase text-white/80">
+              {store.trim() || 'Item Split'}
             </p>
-            <div className="flex items-center gap-2">
-              <p className="flex-1 text-[13px] font-medium text-white/80">Split cost (each person)</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] font-medium text-white/85">Each person pays</p>
               <button
                 type="button"
-                className="h-7 rounded-full bg-white/20 px-3 text-[12px] font-semibold backdrop-blur"
+                className="h-6 rounded-full bg-white/20 px-2.5 text-[11px] font-semibold backdrop-blur transition active:scale-95 hover:bg-white/30"
                 onClick={() => {
                   if (!custom) setSplitInput(centsToInput(autoSplit));
                   setCustom(!custom);
@@ -386,8 +389,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
               </button>
             </div>
             {custom ? (
-              <div className="mt-2 flex items-center gap-1 rounded-2xl bg-white/15 px-4 backdrop-blur">
-                <span className="text-[20px] font-bold">₱</span>
+              <div className="mt-2 flex items-center gap-1 rounded-xl bg-white/15 px-3 backdrop-blur">
+                <span className="text-[18px] font-bold">₱</span>
                 <input
                   id="item-split"
                   aria-label="Amount each person pays"
@@ -399,23 +402,23 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     setSplitInput(cleanMoneyInput(e.target.value));
                     setErrors((x) => ({ ...x, split: undefined }));
                   }}
-                  className="h-12 w-full min-w-0 bg-transparent text-[22px] font-bold text-white outline-none placeholder:text-white/50"
+                  className="h-10 w-full min-w-0 bg-transparent text-[20px] font-bold text-white outline-none placeholder:text-white/50"
                 />
               </div>
             ) : (
-              <p className="mt-1 text-[32px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
+              <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
                 {formatMoney(autoSplit)}
               </p>
             )}
-            <p className="mt-1 text-[12px] text-white/80">
+            <p className="mt-1 text-[11px] text-white/80">
               {selected.size > 0
                 ? `${formatMoney(priceCents)} split by ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
                 : 'Add a person above to split the price.'}
             </p>
             {errors.split && (
-              <p className="mt-2 rounded-xl bg-white px-3 py-1.5 text-[13px] font-semibold text-bad">{errors.split}</p>
+              <p className="mt-1.5 rounded-lg bg-white px-2.5 py-1 text-[12px] font-semibold text-bad">{errors.split}</p>
             )}
-          </WalletCard>
+          </div>
 
           <div>
             <TextField
