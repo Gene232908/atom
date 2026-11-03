@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  CheckCircle2,
   ChevronRight,
   Clock,
+  LogOut,
   Plus,
   QrCode,
   ReceiptText,
@@ -10,15 +12,18 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useItems } from '../../hooks/useItems';
-import { useSafeWrite } from '../../hooks/useToast';
+import { useSafeWrite, useToast } from '../../hooks/useToast';
 import { useTotalsSync } from '../../hooks/useTotalsSync';
 import { navigate } from '../../hooks/useRoute';
+import { removeMember } from '../../services/groups';
 import { claimAll, setShareStatus } from '../../services/items';
+import { friendlyError } from '../../lib/errors';
 import { firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
 import type { Group, Item, ShareStatus } from '../../lib/types';
 import { NavBar, PageBody } from '../layout/AppHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBanner } from '../ui/ErrorBanner';
+import { ConfirmSheet } from '../ui/ConfirmSheet';
 import { Spinner } from '../ui/Spinner';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
@@ -52,9 +57,11 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const isOwner = group.ownerId === uid;
   const { items, loading, fromServer, error, retry } = useItems(group.id, isOwner);
   const write = useSafeWrite();
+  const toast = useToast();
   const [filter, setFilter] = useState<ItemFilter>('all');
   const [focusUid, setFocusUid] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const close = useCallback(() => setPanel(null), []);
 
   useTotalsSync(group, items, isOwner && fromServer && !error);
@@ -144,7 +151,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
         backLabel="Wallet"
         onBack={() => navigate('/')}
         right={
-          isOwner && (
+          isOwner ? (
             <>
               <IconButton label="Invite people" onClick={() => setPanel({ kind: 'invite' })}>
                 <UserPlus className="size-[18px]" />
@@ -153,6 +160,10 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                 <Settings className="size-[18px]" />
               </IconButton>
             </>
+          ) : (
+            <IconButton label="Remove from wallet" onClick={() => setConfirmLeave(true)}>
+              <LogOut className="size-[18px]" />
+            </IconButton>
           )
         }
       />
@@ -162,6 +173,26 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           {/* Left Column (Sticky card, quick actions, people) */}
           <div className="space-y-6 lg:sticky lg:top-20 lg:col-span-5">
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
+
+            {/* Celebratory badge for owner when all items are fully paid */}
+            {isOwner && items.length > 0 && waitingCount === 0 && Object.values(group.totals).every((v) => v === 0) && (
+              <div className="flex items-center justify-between gap-3 rounded-[20px] bg-ok/10 p-4 ring-1 ring-ok/20">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="size-5 shrink-0 text-ok" />
+                  <div>
+                    <p className="text-[14px] font-semibold text-ink">All debts settled!</p>
+                    <p className="text-[12px] text-muted">You can delete this card in Settings.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanel({ kind: 'settings' })}
+                  className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-ink shadow-sm ring-1 ring-hairline transition hover:bg-canvas"
+                >
+                  Settings
+                </button>
+              </div>
+            )}
 
             {isOwner && (
               <QuickActions
@@ -345,6 +376,27 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
         uid={uid}
         onClose={close}
         onShowItems={showPerson}
+      />
+      <ConfirmSheet
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title="Remove this list from your wallet?"
+        message={
+          <>
+            You will leave <span className="font-semibold text-ink">"{group.name}"</span> and it will be removed from your wallet. If you want to rejoin later, you will need the invite code again.
+          </>
+        }
+        confirmText="Remove card"
+        danger
+        onConfirm={async () => {
+          try {
+            await removeMember(group.id, uid);
+            toast('Removed list from your wallet');
+            navigate('/', true);
+          } catch (err) {
+            toast(friendlyError(err), 'error');
+          }
+        }}
       />
     </>
   );
