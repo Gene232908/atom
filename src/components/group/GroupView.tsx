@@ -68,6 +68,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   useTotalsSync(group, items, isOwner && fromServer && !error);
 
   const people = useMemo(() => peopleSummary(group, items), [group, items]);
+  const otherMembers = useMemo(() => people.filter((p) => !p.isOwner), [people]);
 
   const counts = useMemo(() => {
     const result: Record<ItemFilter, number> = { all: 0, unpaid: 0, waiting: 0, paid: 0 };
@@ -195,7 +196,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
 
             {/* When no other members have joined yet */}
-            {isOwner && people.length === 0 && (
+            {isOwner && otherMembers.length === 0 && (
               <div className="flex items-center justify-between gap-3 rounded-[20px] bg-accent/10 p-4 ring-1 ring-accent/20">
                 <div className="flex items-center gap-2.5">
                   <UserPlus className="size-5 shrink-0 text-accent" />
@@ -214,8 +215,13 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               </div>
             )}
 
-            {/* Celebratory badge for owner ONLY when there are actual members and all debts are settled */}
-            {isOwner && people.length > 0 && items.length > 0 && waitingCount === 0 && Object.values(group.totals).every((v) => v === 0) && (
+            {/* Celebratory badge for owner ONLY when there are actual members who owed and all debts are settled */}
+            {isOwner &&
+              otherMembers.length > 0 &&
+              items.length > 0 &&
+              waitingCount === 0 &&
+              otherMembers.every((p) => p.owes === 0) &&
+              otherMembers.some((p) => p.paid > 0) && (
               <div className="flex items-center justify-between gap-3 rounded-[20px] bg-ok/10 p-4 ring-1 ring-ok/20">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="size-5 shrink-0 text-ok" />
