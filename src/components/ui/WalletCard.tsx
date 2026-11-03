@@ -49,16 +49,10 @@ export function WalletCard({
           backgroundImage: background ?? cardGradient(seed),
         }}
       >
-        {/* Soft top-right ambient glow */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-16 -right-12 size-48 rounded-full bg-white/25 blur-2xl"
-        />
-
         {/* Diagonal metallic brushed shimmer */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,transparent_20%,rgba(255,255,255,0.14)_45%,transparent_65%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,transparent_20%,rgba(255,255,255,0.08)_45%,transparent_65%)]"
         />
 
         {/* DYNAMIC HOLOGRAPHIC FOIL LAYER (Reacts to tilting phone and touch drag) */}
@@ -85,10 +79,10 @@ export function WalletCard({
           }}
         />
 
-        {/* Inner rim lighting (crisp Apple card border) */}
+        {/* Subtle glassmorphism border without harsh white corner glare */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-white/20 ring-inset"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-white/10 ring-inset"
         />
 
         {/* Card content */}

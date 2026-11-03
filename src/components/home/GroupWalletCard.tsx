@@ -31,7 +31,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
         seed={group.id}
         background={listGradient(group.id, group.color)}
         interactive={true}
-        className="flex h-[196px] flex-col p-5 ring-1 ring-white/15"
+        className="flex h-[196px] flex-col p-5"
       >
         <div className="flex items-start justify-between gap-3">
           <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow-sm">
@@ -108,7 +108,7 @@ function DeckCardItem({
       seed={group.id}
       background={listGradient(group.id, group.color)}
       interactive={isFront}
-      className="flex h-[196px] flex-col p-5 ring-1 ring-white/15 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18)]"
+      className="flex h-[196px] flex-col p-5 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18)]"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow-sm">

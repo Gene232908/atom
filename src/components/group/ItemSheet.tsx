@@ -14,7 +14,7 @@ import { formatMoney, toCents, centsToInput } from '../../lib/money';
 import { dueInfo, isItemDone, itemProgress } from '../../lib/items';
 import { confirmPayment, recordPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
-import type { Group, Item, ShareStatus } from '../../lib/types';
+import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { WalletCard } from '../ui/WalletCard';
@@ -64,7 +64,30 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
       ? Math.round(item.splitCents / item.installmentsCount)
       : null;
 
-  const payments = item.payments ?? [];
+  // Auto-record borrower payments in Transaction History: includes recorded payments AND any borrower claimed payments
+  const payments = useMemo(() => {
+    const list: PaymentRecord[] = [...(item.payments ?? [])];
+    const existingUidsWithPending = new Set(list.filter((p) => p.status === 'pending').map((p) => p.uid));
+
+    for (const [pid, share] of Object.entries(item.shares)) {
+      if (pid === group.ownerId) continue;
+      if (share.status === 'claimed' && !existingUidsWithPending.has(pid)) {
+        const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
+        const amt = share.paidCents && share.paidCents > 0 ? share.paidCents : (item.monthlyCents || installmentMonthly || item.splitCents);
+        list.unshift({
+          id: `claim-${pid}`,
+          uid: pid,
+          payerName: borrowerName,
+          amountCents: amt,
+          refNumber: share.refNumber || 'Pending verification',
+          note: 'Submitted via Pay now',
+          status: 'pending',
+          paidAt: share.updatedAt,
+        });
+      }
+    }
+    return list;
+  }, [item.payments, item.shares, item.monthlyCents, item.splitCents, installmentMonthly, group.members, group.ownerId]);
 
   const handleRecordPaymentSubmit = () => {
     const targetUid = recUid || (people[0] ? people[0][0] : '');
@@ -241,7 +264,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
               className="inline-flex items-center gap-1 rounded-full bg-fill px-3 py-1 text-[12px] font-semibold text-accent transition hover:bg-black/5 active:scale-95"
             >
               <Plus className="size-3.5" />
-              <span>Record payment</span>
+              <span>Manual entry (optional)</span>
             </button>
           )}
         </div>
@@ -380,7 +403,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                         <button
                           type="button"
                           onClick={() => {
-                            write(confirmPayment(group.id, item, p.id), 'Payment confirmed!');
+                            write(confirmPayment(group.id, item, p.id, p.uid), 'Payment confirmed!');
                           }}
                           className="mt-1 inline-flex items-center gap-1 rounded-full bg-ok px-2.5 py-1 text-[11px] font-bold text-white shadow-sm transition active:scale-95"
                         >

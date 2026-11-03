@@ -143,24 +143,44 @@ export async function confirmPayment(
   groupId: string,
   item: Item,
   paymentId: string,
+  targetUid?: string,
 ): Promise<void> {
   const now = Date.now();
-  const payments = (item.payments ?? []).map((p) =>
-    p.id === paymentId ? { ...p, status: 'confirmed' as const } : p,
-  );
-  const targetPayment = payments.find((p) => p.id === paymentId);
+  let payments = item.payments ? [...item.payments] : [];
+  const found = payments.some((p) => p.id === paymentId);
 
+  if (found) {
+    payments = payments.map((p) =>
+      p.id === paymentId ? { ...p, status: 'confirmed' as const } : p,
+    );
+  } else if (targetUid) {
+    const share = item.shares[targetUid];
+    const borrowerName = item.shares[targetUid]?.name ?? 'Borrower';
+    const amt = share?.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
+    payments = [
+      {
+        id: paymentId,
+        uid: targetUid,
+        payerName: borrowerName,
+        amountCents: amt,
+        refNumber: share?.refNumber || 'Confirmed by lender',
+        note: 'Cut-off payment',
+        status: 'confirmed',
+        paidAt: now,
+      },
+      ...payments,
+    ];
+  }
+
+  const uid = targetUid || payments.find((p) => p.id === paymentId)?.uid;
   const updates: Record<string, unknown> = {
     payments,
     updatedAt: now,
   };
 
-  if (targetPayment) {
-    const share = item.shares[targetPayment.uid];
-    const totalPaid = share?.paidCents ?? 0;
-    if (totalPaid >= item.splitCents) {
-      updates[`shares.${targetPayment.uid}.status`] = 'paid';
-    }
+  if (uid) {
+    updates[`shares.${uid}.status`] = 'paid';
+    updates[`shares.${uid}.updatedAt`] = now;
   }
 
   await updateDoc(doc(db, 'groups', groupId, 'items', item.id), updates);
