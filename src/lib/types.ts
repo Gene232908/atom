@@ -29,6 +29,23 @@ export interface Share {
   name: string;
   status: ShareStatus;
   updatedAt: number;
+  /** Amount in centavos already paid towards this share (for installments / cut-offs) */
+  paidCents?: number;
+  /** Latest payment reference number (e.g. GCash / Maya reference string) */
+  refNumber?: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  uid: string;
+  payerName: string;
+  amountCents: number;
+  /** Alphanumeric payment reference number (e.g. GCash / Bank reference code) */
+  refNumber: string;
+  paidAt: number;
+  note?: string;
+  /** 'pending' = waiting for lender confirmation, 'confirmed' = lender verified */
+  status: 'pending' | 'confirmed';
 }
 
 export interface Item {
@@ -40,6 +57,12 @@ export interface Item {
   shares: Record<string, Share>;
   /** Format: YYYY-MM-DD */
   dueDate: string | null;
+  /** Billing cycle or cutoff info, e.g. "Monthly (Every 15th)", "Every cutoff" */
+  billingCycle?: string;
+  /** Number of months / terms if installment (e.g. 6, 12, 24) */
+  installmentsCount?: number;
+  /** Transaction / payment history log for this item */
+  payments?: PaymentRecord[];
   /** Where the debt came from, like Shopee or Lazada. Can be empty. */
   store: string;
   /** Card color picked by the lender. Empty means automatic. */

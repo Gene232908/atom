@@ -16,15 +16,16 @@ import { useSafeWrite, useToast } from '../../hooks/useToast';
 import { useTotalsSync } from '../../hooks/useTotalsSync';
 import { navigate } from '../../hooks/useRoute';
 import { removeMember } from '../../services/groups';
-import { claimAll, setShareStatus } from '../../services/items';
+import { claimAll, recordPayment, setShareStatus } from '../../services/items';
 import { friendlyError } from '../../lib/errors';
+import { formatMoney } from '../../lib/money';
 import { firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
 import type { Group, Item, ShareStatus } from '../../lib/types';
 import { NavBar, PageBody } from '../layout/AppHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBanner } from '../ui/ErrorBanner';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
-import { Spinner } from '../ui/Spinner';
+import { Skeleton } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { SectionLabel } from '../ui/Group';
@@ -108,9 +109,28 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
     [group.id, group.members, ownerName, write],
   );
 
-  const onPaid = (item: Item | null) => {
-    if (item) write(setShareStatus(group.id, item.id, uid, 'claimed'), `Sent! ${ownerName} will confirm it.`);
-    else write(claimAll(group.id, items, uid), `Sent! ${ownerName} will confirm your payments.`);
+  const onPaid = (item: Item | null, amountCents?: number, refNumber?: string, note?: string) => {
+    if (item) {
+      if (refNumber || (amountCents && amountCents !== item.splitCents)) {
+        const payAmount = amountCents ?? item.splitCents;
+        const payerName = group.members[uid]?.name ?? item.shares[uid]?.name ?? 'You';
+        write(
+          recordPayment(group.id, item, {
+            uid,
+            payerName,
+            amountCents: payAmount,
+            refNumber: refNumber || 'Manual',
+            note: note || 'Cut-off payment',
+            status: 'pending',
+          }),
+          `Payment of ${formatMoney(payAmount)} sent! ${ownerName} will confirm it.`,
+        );
+      } else {
+        write(setShareStatus(group.id, item.id, uid, 'claimed', refNumber), `Sent! ${ownerName} will confirm it.`);
+      }
+    } else {
+      write(claimAll(group.id, items, uid), `Sent! ${ownerName} will confirm your payments.`);
+    }
     close();
   };
 
@@ -169,9 +189,9 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
       />
 
       <PageBody>
-        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
+        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 xl:gap-12">
           {/* Left Column (Sticky card, quick actions, people) */}
-          <div className="space-y-6 lg:sticky lg:top-20 lg:col-span-5">
+          <div className="space-y-6 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
 
             {/* When no other members have joined yet */}
@@ -285,8 +305,17 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               </SectionLabel>
 
               {loading ? (
-                <div className="flex justify-center py-16 text-muted">
-                  <Spinner className="size-7" />
+                <div className="space-y-3">
+                  <div className="rounded-[20px] bg-white p-4 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-5 w-20" />
+                    </div>
+                  </div>
                 </div>
               ) : items.length === 0 ? (
                 <EmptyState
@@ -384,6 +413,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
         open={panel?.kind === 'pay'}
         onClose={close}
         group={group}
+        uid={uid}
         item={paying}
         totalCents={myUnpaidTotal}
         unpaidCount={myUnpaid.length}

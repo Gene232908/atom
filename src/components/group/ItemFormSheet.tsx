@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CircleAlert, Plus, Trash2, UserPlus } from 'lucide-react';
+import { CircleAlert, CreditCard, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useSafeWrite } from '../../hooks/useToast';
 import { addItem, deleteItem, updateItem } from '../../services/items';
 import { centsToInput, cleanMoneyInput, formatMoney, splitEvenly, toCents } from '../../lib/money';
@@ -76,6 +76,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
   );
   const [splitInput, setSplitInput] = useState(item ? centsToInput(item.splitCents) : '');
   const [dueDate, setDueDate] = useState(item?.dueDate ?? '');
+  const [billingCycle, setBillingCycle] = useState(item?.billingCycle ?? '');
+  const [installmentsCount, setInstallmentsCount] = useState<number>(item?.installmentsCount ?? 1);
   const [store, setStore] = useState(item?.store ?? '');
   const [color, setColor] = useState(item?.color ?? '');
   const [errors, setErrors] = useState<Errors>({});
@@ -152,6 +154,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
       splitCents,
       shares,
       dueDate: dueDate || null,
+      billingCycle: billingCycle.trim() || undefined,
+      installmentsCount: installmentsCount > 1 ? installmentsCount : undefined,
       store: store.trim().slice(0, 40),
       color,
     };
@@ -420,14 +424,58 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             )}
           </div>
 
+          {/* Credit Card Installments & Cutoff schedule */}
+          <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3">
+            <div className="flex items-center gap-2">
+              <CreditCard className="size-4 text-accent" />
+              <p className="text-[13px] font-bold text-ink">Credit Card / Payment Terms</p>
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-muted">Installment Terms</label>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {[1, 3, 6, 12, 24].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setInstallmentsCount(n)}
+                    className={`rounded-full px-3 py-1 text-[12px] font-semibold transition active:scale-95 ${
+                      installmentsCount === n
+                        ? 'bg-ink text-white shadow-sm'
+                        : 'bg-fill text-muted hover:text-ink'
+                    }`}
+                  >
+                    {n === 1 ? 'Straight' : `${n} months`}
+                  </button>
+                ))}
+              </div>
+              {installmentsCount > 1 && splitCents > 0 && (
+                <p className="mt-1.5 text-[12px] font-semibold text-accent">
+                  Estimated: {formatMoney(Math.round(splitCents / installmentsCount))} per month
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-medium text-muted">Cut-off / Billing Cycle (optional)</label>
+              <input
+                type="text"
+                value={billingCycle}
+                onChange={(e) => setBillingCycle(e.target.value)}
+                placeholder="e.g. Every 15th of the month, Every cut-off"
+                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2 text-[14px] text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+              />
+            </div>
+          </div>
+
           <div>
             <TextField
               id="item-due"
-              label="Due date (optional)"
+              label="First Due date (optional)"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              hint="When should they pay? Leave empty if there is no due date."
+              hint="When is the first or next payment due?"
               className="appearance-none text-left [&::-webkit-date-and-time-value]:text-left"
             />
             {dueDate && (

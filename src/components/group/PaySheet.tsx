@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy, Download, QrCode, ShoppingBag } from 'lucide-react';
+import { Check, Copy, Download, QrCode, ReceiptText, ShoppingBag } from 'lucide-react';
 import { loadQr } from '../../services/groups';
 import { copyText } from '../../lib/clipboard';
 import { listGradient, storeGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, toCents, centsToInput } from '../../lib/money';
 import { firstName } from '../../lib/items';
 import type { Group, Item } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
@@ -16,20 +16,49 @@ interface Props {
   open: boolean;
   onClose: () => void;
   group: Group;
+  uid: string;
   /** Paying for one item. When null, paying for everything. */
   item: Item | null;
   totalCents: number;
   unpaidCount: number;
-  onPaid: (item: Item | null) => void;
+  onPaid: (item: Item | null, amountCents?: number, refNumber?: string, note?: string) => void;
 }
 
-/** Where and how much to pay. The QR picture only downloads when this opens. */
-export function PaySheet({ open, onClose, group, item, totalCents, unpaidCount, onPaid }: Props) {
+/** Where and how much to pay. Supports partial/installment cutoffs and alphanumeric reference numbers. */
+export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCount, onPaid }: Props) {
   const [qr, setQr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [refNumber, setRefNumber] = useState('');
+  const [note, setNote] = useState('');
+  const [payMode, setPayMode] = useState<'full' | 'custom'>('full');
+  const [customAmountInput, setCustomAmountInput] = useState('');
+
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
+
+  // Calculate user's remaining balance for this item
+  const myShare = item?.shares[uid];
+  const paidSoFar = myShare?.paidCents ?? (myShare?.status === 'paid' ? item?.splitCents ?? 0 : 0);
+  const remainingCents = item ? Math.max(0, item.splitCents - paidSoFar) : totalCents;
+
+  const installmentMonthly =
+    item?.installmentsCount && item.installmentsCount > 1
+      ? Math.round(item.splitCents / item.installmentsCount)
+      : null;
+
+  useEffect(() => {
+    if (!open) {
+      setRefNumber('');
+      setNote('');
+      setPayMode('full');
+      setCustomAmountInput('');
+      return;
+    }
+    if (installmentMonthly && installmentMonthly < remainingCents) {
+      setCustomAmountInput(centsToInput(installmentMonthly));
+    }
+  }, [open, installmentMonthly, remainingCents]);
 
   useEffect(() => {
     if (!open || !group.hasQr) return;
@@ -52,20 +81,30 @@ export function PaySheet({ open, onClose, group, item, totalCents, unpaidCount, 
     }
   };
 
-  const amount = item ? item.splitCents : totalCents;
+  const customCents = toCents(customAmountInput) ?? 0;
+  const amountToPay = item && payMode === 'custom' && customCents > 0 ? customCents : remainingCents;
   const nothing = !group.hasQr && !group.paymentNote;
-  const canMark = item ? true : unpaidCount > 0;
+  const canMark = item ? remainingCents > 0 : unpaidCount > 0;
+
+  const handlePaidSubmit = () => {
+    onPaid(item, amountToPay, refNumber.trim(), note.trim());
+  };
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
       title="Pay now"
-      description={`Send your payment to ${ownerName}, then tap the button below.`}
+      description={`Send payment to ${ownerName}, then enter your reference number.`}
       footer={
-        canMark && amount > 0 ? (
-          <Button size="lg" full icon={<Check className="size-5" strokeWidth={2.5} />} onClick={() => onPaid(item)}>
-            I already paid {formatMoney(amount)}
+        canMark && amountToPay > 0 ? (
+          <Button
+            size="lg"
+            full
+            icon={<Check className="size-5" strokeWidth={2.5} />}
+            onClick={handlePaidSubmit}
+          >
+            I already paid {formatMoney(amountToPay)}
           </Button>
         ) : undefined
       }
@@ -84,12 +123,102 @@ export function PaySheet({ open, onClose, group, item, totalCents, unpaidCount, 
         <p className="mt-2 line-clamp-2 text-[14px] text-white/85">
           {item ? item.description : `All ${unpaidCount} unpaid ${unpaidCount === 1 ? 'item' : 'items'}`}
         </p>
+
+        {paidSoFar > 0 && item && (
+          <p className="mt-2 text-[12px] font-medium text-white/80">
+            Paid so far: {formatMoney(paidSoFar)} · Balance: {formatMoney(remainingCents)}
+          </p>
+        )}
+
         <p className="mt-4 text-[11px] font-medium text-white/70">Amount to pay</p>
         <p className="text-[34px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
-          {formatMoney(amount)}
+          {formatMoney(amountToPay)}
         </p>
         <p className="mt-1 text-[12px] text-white/75">Pay to {group.members[group.ownerId]?.name ?? ownerName}</p>
       </WalletCard>
+
+      {/* If this is an installment item, let the user choose cut-off payment */}
+      {item && remainingCents > 0 && (
+        <div className="mt-4 rounded-[20px] bg-white p-4">
+          <p className="text-[13px] font-semibold text-ink">Payment Type</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPayMode('full')}
+              className={`rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition active:scale-95 ${
+                payMode === 'full'
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'bg-fill text-muted hover:text-ink'
+              }`}
+            >
+              Full Balance
+              <span className="block text-[11px] font-normal opacity-80">{formatMoney(remainingCents)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPayMode('custom');
+                if (!customAmountInput && installmentMonthly) {
+                  setCustomAmountInput(centsToInput(installmentMonthly));
+                }
+              }}
+              className={`rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition active:scale-95 ${
+                payMode === 'custom'
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'bg-fill text-muted hover:text-ink'
+              }`}
+            >
+              Cut-off / Installment
+              <span className="block text-[11px] font-normal opacity-80">
+                {installmentMonthly ? `${formatMoney(installmentMonthly)}/mo` : 'Partial'}
+              </span>
+            </button>
+          </div>
+
+          {payMode === 'custom' && (
+            <div className="mt-3">
+              <label className="block text-[12px] font-medium text-muted">Amount you are paying now (₱)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={customAmountInput}
+                onChange={(e) => setCustomAmountInput(e.target.value)}
+                placeholder={centsToInput(remainingCents)}
+                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[15px] font-semibold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reference Number Input */}
+      <div className="mt-4 rounded-[20px] bg-white p-4">
+        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+          <ReceiptText className="size-4 text-accent" />
+          <span>Payment Reference Number</span>
+        </div>
+        <p className="mt-0.5 text-[12px] text-muted">
+          Type the reference number from your GCash, Maya, or bank receipt (e.g. 1002938491, MP24-A821).
+        </p>
+        <input
+          type="text"
+          value={refNumber}
+          onChange={(e) => setRefNumber(e.target.value)}
+          placeholder="e.g. GCash Ref # 100492817291"
+          className="mt-2.5 w-full rounded-xl bg-fill px-3.5 py-2.5 font-mono text-[14px] font-medium text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+        />
+
+        <div className="mt-3">
+          <label className="block text-[12px] font-medium text-muted">Note or Cut-off (optional)</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Cut-off payment (15th), Installment 1 of 6"
+            className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2 text-[13px] text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+          />
+        </div>
+      </div>
 
       {nothing && (
         <div className="mt-4 rounded-[20px] bg-white p-5 text-center">

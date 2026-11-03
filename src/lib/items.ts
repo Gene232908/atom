@@ -50,7 +50,11 @@ export function computeTotals(items: Item[], ownerId: string): Record<string, nu
   const totals: Record<string, number> = {};
   for (const item of items) {
     for (const [uid, share] of otherShares(item, ownerId)) {
-      if (share.status !== 'paid') totals[uid] = (totals[uid] ?? 0) + item.splitCents;
+      if (share.status !== 'paid') {
+        const paid = share.paidCents ?? 0;
+        const remaining = Math.max(0, item.splitCents - paid);
+        totals[uid] = (totals[uid] ?? 0) + remaining;
+      }
     }
   }
   return totals;
@@ -93,9 +97,15 @@ export function peopleSummary(group: Group, items: Item[]): PersonSummary[] {
   for (const item of items) {
     for (const [uid, share] of otherShares(item, group.ownerId)) {
       const p = ensure(uid, share.name);
-      if (share.status === 'paid') p.paid += item.splitCents;
-      else p.owes += item.splitCents;
-      if (share.status === 'claimed') p.waiting += item.splitCents;
+      if (share.status === 'paid') {
+        p.paid += item.splitCents;
+      } else {
+        const paid = share.paidCents ?? 0;
+        const remaining = Math.max(0, item.splitCents - paid);
+        p.paid += paid;
+        p.owes += remaining;
+        if (share.status === 'claimed') p.waiting += remaining;
+      }
     }
   }
 

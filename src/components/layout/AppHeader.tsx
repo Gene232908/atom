@@ -23,8 +23,8 @@ export function NavBar({ title, onBack, backLabel = 'Wallet', right, closeButton
           : 'border-b border-transparent bg-canvas'
       }`}
     >
-      <div className="mx-auto grid h-13 w-full max-w-5xl grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-center gap-2 px-2 sm:px-5">
-        <div className="flex min-w-0 justify-start">
+      <div className="relative mx-auto flex h-13 w-full max-w-7xl xl:max-w-[1600px] items-center justify-between gap-2 px-3 sm:px-6 lg:px-10 xl:px-12">
+        <div className="flex min-w-0 shrink-0 items-center justify-start">
           {onBack &&
             (closeButton ? (
               <button
@@ -47,13 +47,13 @@ export function NavBar({ title, onBack, backLabel = 'Wallet', right, closeButton
             ))}
         </div>
         <p
-          className={`truncate text-center text-[16px] font-semibold text-ink transition-opacity duration-200 ${
+          className={`pointer-events-none absolute inset-x-0 mx-auto max-w-xs truncate text-center text-[16px] font-semibold text-ink transition-opacity duration-200 ${
             scrolled ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {title}
         </p>
-        <div className="flex min-w-0 items-center justify-end gap-2">{right}</div>
+        <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">{right}</div>
       </div>
     </header>
   );
@@ -82,7 +82,7 @@ export function LargeTitle({ title, eyebrow, right }: TitleProps) {
 
 export function PageBody({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <main className={`mx-auto w-full max-w-5xl px-4 pt-1 pb-10 sm:px-5 sm:pb-12 lg:pb-16 select-none ${className}`}>
+    <main className={`mx-auto w-full max-w-7xl xl:max-w-[1600px] px-3 sm:px-6 lg:px-10 xl:px-12 pt-1 pb-10 sm:pb-12 lg:pb-16 select-none ${className}`}>
       {children}
     </main>
   );

@@ -9,16 +9,16 @@ import { NavBar, PageBody } from '../components/layout/AppHeader';
 import { WalletCardsView } from '../components/home/GroupWalletCard';
 import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
-import { AccountSheet } from '../components/home/AccountSheet';
+import { ProfileMenu } from '../components/home/ProfileMenu';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
-import { Spinner } from '../components/ui/Spinner';
+import { HomeSkeleton } from '../components/ui/Skeleton';
 
-type Panel = 'create' | 'join' | 'account' | null;
+type Panel = 'create' | 'join' | null;
 
 const PREF_KEY = 'atom_default_home_tab';
 const LAYOUT_KEY = 'atom_card_layout_mode';
@@ -48,6 +48,7 @@ export function HomePage() {
   const toast = useToast();
   const { groups, loading, error, retry } = useGroups();
   const [panel, setPanel] = useState<Panel>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
@@ -148,9 +149,9 @@ export function HomePage() {
             </IconButton>
             <button
               type="button"
-              onClick={() => setPanel('account')}
+              onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="Your account"
-              className="rounded-full transition active:scale-90 ml-0.5"
+              className="size-9 shrink-0 rounded-full ring-2 ring-hairline shadow-sm overflow-hidden transition active:scale-90 ml-0.5"
             >
               <Avatar name={name} photo={user.photoURL ?? ''} size="sm" />
             </button>
@@ -158,117 +159,118 @@ export function HomePage() {
         }
       />
 
+      <ProfileMenu open={profileOpen} onClose={() => setProfileOpen(false)} />
+
       <PageBody>
-        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 pt-1 sm:pt-2">
-          {/* Left Column on Desktop / Top Section on Mobile */}
-          <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-3.5">
-              <SummaryTile label="You owe" amount={youOwe} tone="bad" />
-              <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
+        {loading ? (
+          <HomeSkeleton />
+        ) : (
+          <div className="animate-fade-in lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 pt-1 sm:pt-2">
+            {/* Left Column on Desktop / Top Section on Mobile */}
+            <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-3.5">
+                <SummaryTile label="You owe" amount={youOwe} tone="bad" />
+                <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
+              </div>
             </div>
-          </div>
 
-          {/* Right Column: Cards & Toggle Switch */}
-          <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
-            {/* Compact Segmented Control between You lend & You owe + Settings icon */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
+            {/* Right Column: Cards & Toggle Switch */}
+            <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
+              {/* Compact Segmented Control between You lend & You owe + Settings icon */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
+                  <button
+                    type="button"
+                    onClick={() => setTab('lend')}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                      tab === 'lend'
+                        ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    <span>You lend</span>
+                    {lending.length > 0 && (
+                      <span
+                        className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
+                          tab === 'lend' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
+                        }`}
+                      >
+                        {lending.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTab('owe')}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                      tab === 'owe'
+                        ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    <span>You owe</span>
+                    {owing.length > 0 && (
+                      <span
+                        className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
+                          tab === 'owe' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
+                        }`}
+                      >
+                        {owing.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setTab('lend')}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
-                    tab === 'lend'
-                      ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
-                      : 'text-muted hover:text-ink'
-                  }`}
+                  onClick={() => setDefaultViewOpen(true)}
+                  title="Display & default view settings"
+                  aria-label="Default view settings"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-muted shadow-sm ring-1 ring-hairline transition hover:text-ink active:scale-90"
                 >
-                  <span>You lend</span>
-                  {lending.length > 0 && (
-                    <span
-                      className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
-                        tab === 'lend' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
-                      }`}
-                    >
-                      {lending.length}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTab('owe')}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
-                    tab === 'owe'
-                      ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
-                      : 'text-muted hover:text-ink'
-                  }`}
-                >
-                  <span>You owe</span>
-                  {owing.length > 0 && (
-                    <span
-                      className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
-                        tab === 'owe' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
-                      }`}
-                    >
-                      {owing.length}
-                    </span>
-                  )}
+                  <SlidersHorizontal className="size-4" strokeWidth={2.2} />
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setDefaultViewOpen(true)}
-                title="Display & default view settings"
-                aria-label="Default view settings"
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-muted shadow-sm ring-1 ring-hairline transition hover:text-ink active:scale-90"
-              >
-                <SlidersHorizontal className="size-4" strokeWidth={2.2} />
-              </button>
-            </div>
+              {error && <ErrorBanner message={error} onRetry={retry} />}
 
-            {error && <ErrorBanner message={error} onRetry={retry} />}
-
-            {loading ? (
-              <div className="flex justify-center py-16 text-muted">
-                <Spinner className="size-7" />
-              </div>
-            ) : tab === 'lend' ? (
-              lending.length > 0 ? (
-                <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
+              {tab === 'lend' ? (
+                lending.length > 0 ? (
+                  <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
+                ) : (
+                  <EmptyState
+                    icon={<WalletCards className="size-7" />}
+                    title="No lending lists yet"
+                    text="Create a list if people owe you money, or if you paid for shared orders."
+                    action={
+                      <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
+                        New list
+                      </Button>
+                    }
+                  />
+                )
+              ) : owing.length > 0 ? (
+                <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
               ) : (
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
-                  title="No lending lists yet"
-                  text="Create a list if people owe you money, or if you paid for shared orders."
+                  title="You don't owe anyone right now"
+                  text="When someone lends you money or splits a bill with you, tap Join to enter their code."
                   action={
-                    <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
-                      New list
+                    <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('join')}>
+                      Join a list
                     </Button>
                   }
                 />
-              )
-            ) : owing.length > 0 ? (
-              <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
-            ) : (
-              <EmptyState
-                icon={<WalletCards className="size-7" />}
-                title="You don't owe anyone right now"
-                text="When someone lends you money or splits a bill with you, tap Join to enter their code."
-                action={
-                  <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('join')}>
-                    Join a list
-                  </Button>
-                }
-              />
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </PageBody>
 
       <CreateGroupSheet open={panel === 'create'} onClose={close} />
       <JoinCodeSheet open={panel === 'join'} onClose={close} />
-      <AccountSheet open={panel === 'account'} onClose={close} />
       <DefaultViewSheet
         open={defaultViewOpen}
         onClose={() => setDefaultViewOpen(false)}

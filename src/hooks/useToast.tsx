@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { CircleAlert, CircleCheck, Info } from 'lucide-react';
 import { friendlyError } from '../lib/errors';
 
@@ -22,12 +22,19 @@ const toneStyle: Record<Tone, string> = {
 let nextId = 1;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   const show = useCallback<ShowToast>((message, tone = 'success') => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+    }
     const id = nextId++;
-    setToasts((list) => [...list.slice(-2), { id, message, tone }]);
-    window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3500);
+    setToast({ id, message, tone });
+    timerRef.current = window.setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+      timerRef.current = null;
+    }, 3000);
   }, []);
 
   return (
@@ -35,23 +42,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[70] flex flex-col items-center gap-2 px-4"
+        className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[70] flex flex-col items-center px-4"
       >
-        {toasts.map((t) => (
+        {toast && (
           <div
-            key={t.id}
-            className={`flex w-fit max-w-sm animate-pop items-start gap-2.5 rounded-[22px] bg-black/90 px-4 py-3 text-[14px] font-medium shadow-[0_10px_30px_-8px_rgba(0,0,0,0.5)] backdrop-blur-xl ${toneStyle[t.tone]}`}
+            key={toast.id}
+            className={`flex w-fit max-w-sm animate-pop items-start gap-2.5 rounded-[22px] bg-black/90 px-4 py-3 text-[14px] font-medium shadow-[0_10px_30px_-8px_rgba(0,0,0,0.5)] backdrop-blur-xl ${toneStyle[toast.tone]}`}
           >
-            {t.tone === 'error' ? (
+            {toast.tone === 'error' ? (
               <CircleAlert className="mt-0.5 size-4 shrink-0 text-bad" />
-            ) : t.tone === 'info' ? (
+            ) : toast.tone === 'info' ? (
               <Info className="mt-0.5 size-4 shrink-0 text-accent" />
             ) : (
               <CircleCheck className="mt-0.5 size-4 shrink-0 text-ok" />
             )}
-            <span className="min-w-0 wrap-break-word">{t.message}</span>
+            <span className="min-w-0 wrap-break-word">{toast.message}</span>
           </div>
-        ))}
+        )}
       </div>
     </ToastContext.Provider>
   );

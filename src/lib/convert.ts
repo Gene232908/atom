@@ -1,6 +1,6 @@
 import type { DocumentData } from 'firebase/firestore';
 import { isCardColor } from './cardTheme';
-import type { Group, Invite, Item, Member, Share, ShareStatus } from './types';
+import type { Group, Invite, Item, Member, PaymentRecord, Share, ShareStatus } from './types';
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown, fallback = 0): number =>
@@ -20,10 +20,31 @@ function toMember(raw: unknown): Member {
   };
 }
 
+function toPaymentRecord(raw: unknown): PaymentRecord {
+  const p = obj(raw);
+  const status = p.status === 'confirmed' ? 'confirmed' : 'pending';
+  return {
+    id: str(p.id, Math.random().toString(36).slice(2)),
+    uid: str(p.uid),
+    payerName: str(p.payerName, 'Borrower'),
+    amountCents: Math.round(num(p.amountCents)),
+    refNumber: str(p.refNumber),
+    paidAt: num(p.paidAt, Date.now()),
+    note: typeof p.note === 'string' ? p.note : undefined,
+    status,
+  };
+}
+
 function toShare(raw: unknown): Share {
   const s = obj(raw);
   const status = STATUSES.includes(s.status as ShareStatus) ? (s.status as ShareStatus) : 'unpaid';
-  return { name: str(s.name, 'Someone'), status, updatedAt: num(s.updatedAt) };
+  return {
+    name: str(s.name, 'Someone'),
+    status,
+    updatedAt: num(s.updatedAt),
+    paidCents: typeof s.paidCents === 'number' ? Math.round(s.paidCents) : undefined,
+    refNumber: typeof s.refNumber === 'string' ? s.refNumber : undefined,
+  };
 }
 
 /** Reads a list safely, even if some fields are missing. */
@@ -58,6 +79,10 @@ export function toItem(id: string, d: DocumentData): Item {
   const shares: Record<string, Share> = {};
   for (const [uid, raw] of Object.entries(obj(d.shares))) shares[uid] = toShare(raw);
 
+  const payments: PaymentRecord[] = Array.isArray(d.payments)
+    ? d.payments.map((p: unknown) => toPaymentRecord(p))
+    : [];
+
   return {
     id,
     description: str(d.description, 'No description'),
@@ -65,6 +90,9 @@ export function toItem(id: string, d: DocumentData): Item {
     splitCents: Math.round(num(d.splitCents)),
     shares,
     dueDate: typeof d.dueDate === 'string' && d.dueDate ? d.dueDate : null,
+    billingCycle: typeof d.billingCycle === 'string' && d.billingCycle ? d.billingCycle : undefined,
+    installmentsCount: typeof d.installmentsCount === 'number' ? Math.round(d.installmentsCount) : undefined,
+    payments,
     store: str(d.store).slice(0, 40),
     color: isCardColor(str(d.color)) ? str(d.color) : '',
     createdAt: num(d.createdAt),

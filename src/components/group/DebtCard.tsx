@@ -17,10 +17,14 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
   const share = item.shares[personUid];
   if (!share) return null;
   const status = share.status;
+  const paidCents = share.paidCents ?? (status === 'paid' ? item.splitCents : 0);
+  const remainingCents = Math.max(0, item.splitCents - paidCents);
   const due = dueInfo(item.dueDate, status === 'paid');
   const count = Object.keys(item.shares).length;
   const store = item.store.trim();
   const last4 = item.id.slice(-4).toUpperCase();
+
+  const isPartial = paidCents > 0 && status !== 'paid';
 
   return (
     <div
@@ -53,10 +57,18 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
               <Check className="size-3 text-ok" strokeWidth={3} />
             ) : status === 'claimed' ? (
               <Clock className="size-3 text-warn" strokeWidth={3} />
+            ) : isPartial ? (
+              <span className="size-1.5 rounded-full bg-accent" />
             ) : (
               <span className="size-1.5 rounded-full bg-bad" />
             )}
-            {status === 'paid' ? 'Paid' : status === 'claimed' ? 'Waiting' : 'Unpaid'}
+            {status === 'paid'
+              ? 'Paid'
+              : status === 'claimed'
+                ? 'Waiting'
+                : isPartial
+                  ? 'Partial'
+                  : 'Unpaid'}
           </span>
         </div>
 
@@ -64,23 +76,32 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
           {item.description}
         </p>
 
-        {due && (
-          <span
-            className={`mt-1.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-              due.tone === 'slate' ? 'bg-white/15 text-white' : 'bg-white text-bad-ink'
-            }`}
-          >
-            <CalendarClock className="size-3" />
-            {due.text}
-          </span>
-        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {due && (
+            <span
+              className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                due.tone === 'slate' ? 'bg-white/15 text-white' : 'bg-white text-bad-ink'
+              }`}
+            >
+              <CalendarClock className="size-3" />
+              {due.text}
+            </span>
+          )}
+          {item.billingCycle && (
+            <span className="inline-flex w-fit items-center rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur">
+              {item.billingCycle}
+            </span>
+          )}
+        </div>
 
         <div className="mt-auto min-w-0 pt-2">
           <div className="flex items-baseline justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-white/70 uppercase tracking-wider">Your share</p>
+              <p className="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
+                {isPartial ? 'Remaining Balance' : 'Your share'}
+              </p>
               <p className="truncate text-[28px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[32px]">
-                {formatMoney(item.splitCents)}
+                {formatMoney(remainingCents > 0 ? remainingCents : item.splitCents)}
               </p>
             </div>
             <p className="font-mono text-[13px] tracking-[0.2em] text-white/80">
@@ -90,10 +111,11 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
 
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-[11px] text-white/75">
-              of {formatMoney(item.priceCents)}
-              {count > 1 ? ` · split by ${count}` : ''}
+              {isPartial
+                ? `Paid ${formatMoney(paidCents)} of ${formatMoney(item.splitCents)}`
+                : `of ${formatMoney(item.priceCents)}${count > 1 ? ` · split by ${count}` : ''}`}
             </p>
-            {status === 'unpaid' ? (
+            {status === 'unpaid' && remainingCents > 0 ? (
               <button
                 type="button"
                 onClick={(e) => {

@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toItem } from '../lib/convert';
-import type { Item, Share, ShareStatus } from '../lib/types';
+import type { Item, PaymentRecord, Share, ShareStatus } from '../lib/types';
 
 /** Safety cap so a single list can never use up the daily free reads. */
 const MAX_ITEMS = 300;
@@ -23,6 +23,8 @@ export interface ItemInput {
   splitCents: number;
   shares: Record<string, Share>;
   dueDate: string | null;
+  billingCycle?: string;
+  installmentsCount?: number;
   store: string;
   color: string;
 }
@@ -50,7 +52,7 @@ export function subscribeItems(
 
 export async function addItem(groupId: string, input: ItemInput): Promise<void> {
   const now = Date.now();
-  await addDoc(itemsRef(groupId), { ...input, createdAt: now, updatedAt: now });
+  await addDoc(itemsRef(groupId), { ...input, payments: [], createdAt: now, updatedAt: now });
 }
 
 export function updateItem(groupId: string, itemId: string, input: ItemInput): Promise<void> {
@@ -69,13 +71,82 @@ export function setShareStatus(
   itemId: string,
   uid: string,
   status: ShareStatus,
+  refNumber?: string,
 ): Promise<void> {
   const now = Date.now();
-  return updateDoc(doc(db, 'groups', groupId, 'items', itemId), {
+  const updates: Record<string, unknown> = {
     [`shares.${uid}.status`]: status,
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
+  };
+  if (refNumber !== undefined) {
+    updates[`shares.${uid}.refNumber`] = refNumber;
+  }
+  return updateDoc(doc(db, 'groups', groupId, 'items', itemId), updates);
+}
+
+/** Record a partial or installment payment with a reference number and note. */
+export async function recordPayment(
+  groupId: string,
+  item: Item,
+  payment: Omit<PaymentRecord, 'id' | 'paidAt'>,
+): Promise<void> {
+  const now = Date.now();
+  const id = Math.random().toString(36).slice(2, 10);
+  const newRecord: PaymentRecord = {
+    ...payment,
+    id,
+    paidAt: now,
+  };
+
+  const existingPayments = item.payments ?? [];
+  const updatedPayments = [newRecord, ...existingPayments];
+
+  const share = item.shares[payment.uid];
+  const prevPaid = share?.paidCents ?? (share?.status === 'paid' ? item.splitCents : 0);
+  const newPaid = prevPaid + payment.amountCents;
+  const isFullyPaid = newPaid >= item.splitCents;
+
+  const nextStatus: ShareStatus = isFullyPaid
+    ? (payment.status === 'confirmed' ? 'paid' : 'claimed')
+    : (payment.status === 'confirmed' ? 'unpaid' : 'claimed');
+
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
+    payments: updatedPayments,
+    [`shares.${payment.uid}.paidCents`]: newPaid,
+    [`shares.${payment.uid}.refNumber`]: payment.refNumber,
+    [`shares.${payment.uid}.status`]: nextStatus,
+    [`shares.${payment.uid}.updatedAt`]: now,
+    updatedAt: now,
   });
+}
+
+/** Lender confirms a pending payment record. */
+export async function confirmPayment(
+  groupId: string,
+  item: Item,
+  paymentId: string,
+): Promise<void> {
+  const now = Date.now();
+  const payments = (item.payments ?? []).map((p) =>
+    p.id === paymentId ? { ...p, status: 'confirmed' as const } : p,
+  );
+  const targetPayment = payments.find((p) => p.id === paymentId);
+
+  const updates: Record<string, unknown> = {
+    payments,
+    updatedAt: now,
+  };
+
+  if (targetPayment) {
+    const share = item.shares[targetPayment.uid];
+    const totalPaid = share?.paidCents ?? 0;
+    if (totalPaid >= item.splitCents) {
+      updates[`shares.${targetPayment.uid}.status`] = 'paid';
+    }
+  }
+
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), updates);
 }
 
 /** Lender only: marks every unpaid share of one person as paid. */

@@ -8,7 +8,7 @@ import { GroupView } from '../components/group/GroupView';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
-import { Spinner } from '../components/ui/Spinner';
+import { GroupSkeleton } from '../components/ui/Skeleton';
 
 export function GroupPage({ id }: { id: string }) {
   const user = useUser();
@@ -31,9 +31,7 @@ export function GroupPage({ id }: { id: string }) {
         {error ? (
           <ErrorBanner message={error} onRetry={retry} />
         ) : loading || waiting ? (
-          <div className="flex justify-center py-20 text-muted">
-            <Spinner className="size-8" />
-          </div>
+          <GroupSkeleton />
         ) : (
           <EmptyState
             icon={<SearchX className="size-7" />}

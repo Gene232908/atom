@@ -3,7 +3,6 @@ import { formatMoney } from '../../lib/money';
 import { firstName } from '../../lib/items';
 import type { PersonSummary } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
-import { Carousel } from './Carousel';
 
 interface Props {
   people: PersonSummary[];
@@ -13,62 +12,60 @@ interface Props {
   onInvite: () => void;
 }
 
-/** Swipeable people cards with how much each one still owes */
+/**
+ * Minimalist horizontal member chips instead of bulky oversized cards.
+ * Easy to scan, clean, and avoids card fatigue.
+ */
 export function PeopleCarousel({ people, uid, isOwner, onOpen, onInvite }: Props) {
-  const cards = people.map((p) => {
-    const total = p.owes + p.paid;
-    const pct = total > 0 ? Math.round((p.paid / total) * 100) : 100;
-    return (
-      <button
-        key={p.uid}
-        type="button"
-        onClick={() => onOpen(p.uid)}
-        className="flex h-full w-full flex-col rounded-[20px] bg-white p-3.5 text-left shadow-sm ring-1 ring-hairline transition select-none active:scale-[0.97]"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <Avatar name={p.name} photo={p.photo} />
-          {p.isOwner && <Crown className="size-4 text-warn" aria-label="Lender" />}
-        </div>
-        <p className="mt-2.5 truncate text-[14px] font-semibold text-ink">
-          {p.uid === uid ? 'You' : firstName(p.name)}
-        </p>
-        {p.isOwner ? (
-          <p className="truncate text-[12px] font-medium text-muted">Lender</p>
-        ) : p.owes > 0 ? (
-          <p className="truncate text-[13px] font-semibold text-bad-ink tabular-nums">{formatMoney(p.owes)}</p>
-        ) : (
-          <p className="truncate text-[12px] font-semibold text-ok-ink">All paid</p>
-        )}
-        {!p.isOwner && (
-          <div className="mt-auto pt-2.5">
-            <div className="h-1 overflow-hidden rounded-full bg-fill">
-              <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        )}
-      </button>
-    );
-  });
-
-  if (isOwner) {
-    cards.push(
-      <button
-        key="invite"
-        type="button"
-        onClick={onInvite}
-        className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-fill-strong p-3.5 text-muted transition select-none active:scale-[0.97]"
-      >
-        <span className="grid size-10 place-items-center rounded-full bg-white text-ink shadow-sm">
-          <Plus className="size-5" />
-        </span>
-        <span className="text-[13px] font-semibold">Invite</span>
-      </button>,
-    );
-  }
-
   return (
-    <Carousel slideClass="w-[136px] lg:w-auto" wideClass="lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
-      {cards}
-    </Carousel>
+    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+      {people.map((p) => {
+        const isSelf = p.uid === uid;
+        const name = isSelf ? 'You' : firstName(p.name);
+
+        return (
+          <button
+            key={p.uid}
+            type="button"
+            onClick={() => onOpen(p.uid)}
+            className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-2.5 py-1.5 text-left shadow-sm ring-1 ring-hairline transition hover:ring-black/15 active:scale-95 select-none"
+          >
+            <div className="size-6 shrink-0 rounded-full overflow-hidden">
+              <Avatar name={p.name} photo={p.photo} size="sm" />
+            </div>
+
+            <span className="truncate max-w-[80px] sm:max-w-[100px] text-[13px] font-semibold text-ink">
+              {name}
+            </span>
+
+            {p.isOwner ? (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-warn-ink">
+                <Crown className="size-3 text-warn" />
+                Lender
+              </span>
+            ) : p.owes > 0 ? (
+              <span className="shrink-0 rounded-full bg-bad/10 px-2 py-0.5 text-[11px] font-bold text-bad-ink tabular-nums">
+                {formatMoney(p.owes)}
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-bold text-ok-ink">
+                Paid
+              </span>
+            )}
+          </button>
+        );
+      })}
+
+      {isOwner && (
+        <button
+          type="button"
+          onClick={onInvite}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-muted/50 bg-white/60 px-3 py-1.5 text-[12px] font-semibold text-muted transition hover:border-accent hover:text-accent hover:bg-white active:scale-95 select-none"
+        >
+          <Plus className="size-3.5" strokeWidth={2.5} />
+          <span>Invite</span>
+        </button>
+      )}
+    </div>
   );
 }

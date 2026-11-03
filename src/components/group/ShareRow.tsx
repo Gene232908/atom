@@ -1,3 +1,4 @@
+import { formatMoney } from '../../lib/money';
 import type { Group, Share, ShareStatus } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -40,6 +41,14 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
   if (isLender) note = 'Lender’s own share';
   else if (share.status === 'claimed' && ownerViewing) note = 'Says they paid';
   else if (!member) note = 'Removed';
+
+  if (share.paidCents && share.paidCents > 0 && share.status !== 'paid') {
+    const paidText = `Paid ${formatMoney(share.paidCents)}`;
+    note = note ? `${note} · ${paidText}` : paidText;
+  }
+  if (share.refNumber) {
+    note = note ? `${note} · Ref: ${share.refNumber}` : `Ref: ${share.refNumber}`;
+  }
 
   return (
     <div className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
