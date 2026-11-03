@@ -5,7 +5,7 @@ import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
 import { useSafeWrite, useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
-import { firstName } from '../lib/items';
+import { firstName, sumOwed } from '../lib/items';
 import type { Group, Item, ShareStatus } from '../lib/types';
 import { createGroup } from '../services/groups';
 import { confirmPayment, recordPayment, setShareStatus, undoPayment } from '../services/items';
@@ -102,31 +102,56 @@ export function HomePage() {
     [items, user.uid],
   );
 
-  // Compute live accurate totals from all items
+  // Compute live accurate remaining balances from items and confirmed payments
   const { youOwe, owedToYou } = useMemo(() => {
+    if (items.length === 0 && groups.length > 0) {
+      let owe = 0;
+      let owed = 0;
+      for (const g of groups) {
+        if (g.ownerId === user.uid) owed += sumOwed(g.totals);
+        else owe += g.totals[user.uid] ?? 0;
+      }
+      return { youOwe: owe, owedToYou: owed };
+    }
+
     let owe = 0;
     let owed = 0;
 
     for (const item of items) {
       const isOwner = item.group.ownerId === user.uid;
+      const payments = Array.isArray(item.payments) ? item.payments : [];
+
       if (isOwner) {
+        // As a lender: calculate remaining balance that other members still owe
         for (const [pid, share] of Object.entries(item.shares || {})) {
-          if (pid === user.uid) continue;
-          if (share?.status === 'paid') continue;
-          const paidCents = share?.paidCents || 0;
-          owed += Math.max(0, item.splitCents - paidCents);
+          if (pid === user.uid || !share) continue;
+          if (share.status === 'paid') continue;
+
+          const confirmedFromPayments = payments
+            .filter((p) => p && p.uid === pid && p.status === 'confirmed')
+            .reduce((sum, p) => sum + (p.amountCents || 0), 0);
+          const totalPaid = Math.max(share.paidCents || 0, confirmedFromPayments);
+          const remaining = Math.max(0, item.splitCents - totalPaid);
+
+          owed += remaining;
         }
       } else {
+        // As a borrower: calculate remaining balance you personally still owe
         const myShare = item.shares ? item.shares[user.uid] : undefined;
         if (myShare && myShare.status !== 'paid') {
-          const paidCents = myShare.paidCents || 0;
-          owe += Math.max(0, item.splitCents - paidCents);
+          const confirmedFromPayments = payments
+            .filter((p) => p && p.uid === user.uid && p.status === 'confirmed')
+            .reduce((sum, p) => sum + (p.amountCents || 0), 0);
+          const totalPaid = Math.max(myShare.paidCents || 0, confirmedFromPayments);
+          const remaining = Math.max(0, item.splitCents - totalPaid);
+
+          owe += remaining;
         }
       }
     }
 
     return { youOwe: owe, owedToYou: owed };
-  }, [items, user.uid]);
+  }, [items, groups, user.uid]);
 
   // Automatically determine the initial tab on open/login
   useEffect(() => {
@@ -331,9 +356,9 @@ export function HomePage() {
           <div className="animate-fade-in lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 pt-1 sm:pt-2">
             {/* Left Column on Desktop / Top Section on Mobile */}
             <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
-              <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-3.5">
-                <SummaryTile label="You owe" amount={youOwe} tone="bad" />
-                <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 sm:gap-3.5">
+                <SummaryTile label="You owe" amount={youOwe} tone="bad" sublabel="remaining" />
+                <SummaryTile label="To collect" amount={owedToYou} tone="ok" sublabel="remaining" />
               </div>
             </div>
 
@@ -534,19 +559,36 @@ export function HomePage() {
   );
 }
 
-function SummaryTile({ label, amount, tone }: { label: string; amount: number; tone: 'ok' | 'bad' }) {
+function SummaryTile({
+  label,
+  amount,
+  tone,
+  sublabel,
+}: {
+  label: string;
+  amount: number;
+  tone: 'ok' | 'bad';
+  sublabel?: string;
+}) {
   const Icon = tone === 'ok' ? ArrowDownLeft : ArrowUpRight;
   return (
-    <div className="min-w-0 rounded-[18px] sm:rounded-[20px] bg-white p-3.5 sm:p-4 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span
-          className={`grid size-6 sm:size-7 place-items-center rounded-full ${
-            tone === 'ok' ? 'bg-ok/12 text-ok-ink' : 'bg-bad/10 text-bad-ink'
-          }`}
-        >
-          <Icon className="size-3.5 sm:size-4" strokeWidth={2.5} />
-        </span>
-        <p className="truncate text-[12px] sm:text-[13px] font-medium text-muted">{label}</p>
+    <div className="min-w-0 rounded-[18px] sm:rounded-[20px] bg-white p-3 sm:p-4 shadow-sm ring-1 ring-hairline/80">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <span
+            className={`grid size-6 sm:size-7 shrink-0 place-items-center rounded-full ${
+              tone === 'ok' ? 'bg-ok/12 text-ok-ink' : 'bg-bad/10 text-bad-ink'
+            }`}
+          >
+            <Icon className="size-3.5 sm:size-4" strokeWidth={2.5} />
+          </span>
+          <p className="truncate text-[12px] sm:text-[13px] font-semibold text-muted">{label}</p>
+        </div>
+        {sublabel && (
+          <span className="shrink-0 text-[9.5px] sm:text-[10px] font-medium text-muted/70 lowercase">
+            {sublabel}
+          </span>
+        )}
       </div>
       <p className="mt-1.5 sm:mt-2 truncate text-[18px] sm:text-[22px] font-bold tracking-tight text-ink tabular-nums">
         {formatMoney(amount)}

@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   limit,
   onSnapshot,
@@ -53,14 +54,63 @@ export function subscribeItems(
 
 export async function addItem(groupId: string, input: ItemInput): Promise<void> {
   const now = Date.now();
-  await addDoc(itemsRef(groupId), { ...input, payments: [], createdAt: now, updatedAt: now });
+  const data: Record<string, unknown> = {
+    description: input.description.trim().slice(0, 200),
+    priceCents: Math.round(input.priceCents),
+    splitCents: Math.round(input.splitCents),
+    shares: input.shares,
+    dueDate: input.dueDate ?? null,
+    store: (input.store || '').trim().slice(0, 40),
+    color: input.color || '',
+    payments: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (input.billingCycle && input.billingCycle.trim()) {
+    data.billingCycle = input.billingCycle.trim();
+  }
+  if (input.installmentsCount && input.installmentsCount > 1) {
+    data.installmentsCount = Math.round(input.installmentsCount);
+  }
+  if (input.monthlyCents && input.monthlyCents > 0) {
+    data.monthlyCents = Math.round(input.monthlyCents);
+  }
+
+  await addDoc(itemsRef(groupId), data);
 }
 
 export function updateItem(groupId: string, itemId: string, input: ItemInput): Promise<void> {
-  return updateDoc(doc(db, 'groups', groupId, 'items', itemId), {
-    ...input,
+  const data: Record<string, unknown> = {
+    description: input.description.trim().slice(0, 200),
+    priceCents: Math.round(input.priceCents),
+    splitCents: Math.round(input.splitCents),
+    shares: input.shares,
+    dueDate: input.dueDate ?? null,
+    store: (input.store || '').trim().slice(0, 40),
+    color: input.color || '',
     updatedAt: Date.now(),
-  });
+  };
+
+  if (input.billingCycle && input.billingCycle.trim()) {
+    data.billingCycle = input.billingCycle.trim();
+  } else {
+    data.billingCycle = deleteField();
+  }
+
+  if (input.installmentsCount && input.installmentsCount > 1) {
+    data.installmentsCount = Math.round(input.installmentsCount);
+  } else {
+    data.installmentsCount = deleteField();
+  }
+
+  if (input.monthlyCents && input.monthlyCents > 0) {
+    data.monthlyCents = Math.round(input.monthlyCents);
+  } else {
+    data.monthlyCents = deleteField();
+  }
+
+  return updateDoc(doc(db, 'groups', groupId, 'items', itemId), data);
 }
 
 export function deleteItem(groupId: string, itemId: string): Promise<void> {

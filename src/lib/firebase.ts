@@ -36,6 +36,7 @@ function createDb(): Firestore {
   try {
     return initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      ignoreUndefinedProperties: true,
     });
   } catch {
     // Already set up (for example after a hot reload in development).
