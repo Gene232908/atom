@@ -42,17 +42,17 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
           </p>
         </div>
 
-        <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
-          {isOwner
-            ? !hasOtherMembers
-              ? 'Waiting for members to join'
-              : amount > 0
-                ? 'Left to collect'
-                : 'All debts settled'
-            : amount > 0
-              ? `You owe ${ownerName}`
-              : `All paid to ${ownerName}`}
-        </p>
+        {isOwner ? (
+          hasOtherMembers ? (
+            <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
+              {amount > 0 ? 'Left to collect' : 'All debts settled'}
+            </p>
+          ) : null
+        ) : (
+          <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
+            {amount > 0 ? `You owe ${ownerName}` : `All paid to ${ownerName}`}
+          </p>
+        )}
 
         <div className="mt-auto flex items-end justify-between gap-3">
           <div className="min-w-0">
@@ -63,13 +63,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
               •••• {last4}
             </p>
           </div>
-          {people.length > 0 ? (
-            <AvatarStack people={people} />
-          ) : isOwner ? (
-            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
-              Waiting to join
-            </span>
-          ) : null}
+          {people.length > 0 && <AvatarStack people={people} />}
         </div>
       </WalletCard>
     </button>
@@ -81,7 +75,7 @@ export function WalletStack({ groups, uid }: { groups: Group[]; uid: string }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {groups.map((g, i) => (
-        <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[124px]' : ''}`} style={{ zIndex: i }}>
+        <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[138px]' : ''}`} style={{ zIndex: i }}>
           <GroupWalletCard group={g} uid={uid} index={i} />
         </div>
       ))}
@@ -125,36 +119,30 @@ function DeckCardItem({
         </p>
       </div>
 
-      <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
-        {isOwner
-          ? !hasOtherMembers
-            ? 'Waiting for members to join'
-            : amount > 0
-              ? 'Left to collect'
-              : 'All debts settled'
-          : amount > 0
-            ? `You owe ${ownerName}`
-            : `All paid to ${ownerName}`}
-      </p>
+        {isOwner ? (
+          hasOtherMembers ? (
+            <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
+              {amount > 0 ? 'Left to collect' : 'All debts settled'}
+            </p>
+          ) : null
+        ) : (
+          <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
+            {amount > 0 ? `You owe ${ownerName}` : `All paid to ${ownerName}`}
+          </p>
+        )}
 
-      <div className="mt-auto flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
-            {isOwner ? 'You lend' : 'You borrow'}
-          </p>
-          <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">
-            •••• {last4}
-          </p>
+        <div className="mt-auto flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+              {isOwner ? 'You lend' : 'You borrow'}
+            </p>
+            <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">
+              •••• {last4}
+            </p>
+          </div>
+          {people.length > 0 && <AvatarStack people={people} />}
         </div>
-        {people.length > 0 ? (
-          <AvatarStack people={people} />
-        ) : isOwner ? (
-          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
-            Waiting to join
-          </span>
-        ) : null}
-      </div>
-    </WalletCard>
+      </WalletCard>
   );
 }
 

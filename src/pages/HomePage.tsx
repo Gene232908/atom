@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, KeyRound, Plus, SlidersHorizontal, WalletCards } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
-import { firstName, sumOwed } from '../lib/items';
-import { LargeTitle, NavBar, PageBody } from '../components/layout/AppHeader';
+import { sumOwed } from '../lib/items';
+import { NavBar, PageBody } from '../components/layout/AppHeader';
 import { WalletCardsView } from '../components/home/GroupWalletCard';
 import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
@@ -41,13 +41,6 @@ function getStoredLayout(): CardLayoutMode {
     // ignore
   }
   return 'stack';
-}
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
 }
 
 export function HomePage() {
@@ -146,7 +139,10 @@ export function HomePage() {
       <NavBar
         title="Wallet"
         right={
-          <>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <IconButton label="Join a list" onClick={() => setPanel('join')}>
+              <UserPlus className="size-[18px]" strokeWidth={2.2} />
+            </IconButton>
             <IconButton label="New list" dark onClick={() => setPanel('create')}>
               <Plus className="size-5" strokeWidth={2.5} />
             </IconButton>
@@ -154,47 +150,26 @@ export function HomePage() {
               type="button"
               onClick={() => setPanel('account')}
               aria-label="Your account"
-              className="rounded-full transition active:scale-90"
+              className="rounded-full transition active:scale-90 ml-0.5"
             >
               <Avatar name={name} photo={user.photoURL ?? ''} size="sm" />
             </button>
-          </>
+          </div>
         }
       />
 
       <PageBody>
-        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
-          {/* Left Column: Sticky overview on iPad / Laptop / Desktop */}
-          <div className="space-y-4 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
-            <LargeTitle eyebrow={`${greeting()}, ${firstName(name)}`} title="Wallet" />
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 pt-1 sm:pt-2">
+          {/* Left Column on Desktop / Top Section on Mobile */}
+          <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-3.5">
               <SummaryTile label="You owe" amount={youOwe} tone="bad" />
               <SummaryTile label="To collect" amount={owedToYou} tone="ok" />
-            </div>
-
-            {/* Compact action buttons: sized naturally, not stretched */}
-            <div className="flex items-center gap-2 pt-0.5">
-              <Button
-                size="sm"
-                icon={<Plus className="size-4" strokeWidth={2.5} />}
-                onClick={() => setPanel('create')}
-              >
-                New list
-              </Button>
-              <Button
-                size="sm"
-                variant="white"
-                icon={<KeyRound className="size-3.5" />}
-                onClick={() => setPanel('join')}
-              >
-                Join
-              </Button>
             </div>
           </div>
 
           {/* Right Column: Cards & Toggle Switch */}
-          <div className="mt-7 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
+          <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
             {/* Compact Segmented Control between You lend & You owe + Settings icon */}
             <div className="flex items-center justify-between gap-3">
               <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
@@ -281,7 +256,7 @@ export function HomePage() {
                 title="You don't owe anyone right now"
                 text="When someone lends you money or splits a bill with you, tap Join to enter their code."
                 action={
-                  <Button size="sm" variant="white" icon={<KeyRound className="size-4" />} onClick={() => setPanel('join')}>
+                  <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('join')}>
                     Join a list
                   </Button>
                 }
