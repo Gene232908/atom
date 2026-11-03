@@ -80,9 +80,21 @@ export function LargeTitle({ title, eyebrow, right }: TitleProps) {
   );
 }
 
-export function PageBody({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function PageBody({
+  children,
+  className = '',
+  compactBottom = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  compactBottom?: boolean;
+}) {
   return (
-    <main className={`mx-auto w-full max-w-7xl xl:max-w-[1600px] px-3 sm:px-6 lg:px-10 xl:px-12 pt-1 pb-10 sm:pb-12 lg:pb-16 select-none ${className}`}>
+    <main
+      className={`mx-auto w-full max-w-7xl xl:max-w-[1600px] px-3 sm:px-6 lg:px-10 xl:px-12 pt-1 ${
+        compactBottom ? 'pb-3 sm:pb-12 lg:pb-16' : 'pb-10 sm:pb-12 lg:pb-16'
+      } select-none ${className}`}
+    >
       {children}
     </main>
   );

@@ -360,7 +360,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                         : 'bg-fill text-muted hover:text-ink'
                     }`}
                   >
-                    {n === 1 ? 'Straight' : `${n} months`}
+                    {n === 1 ? '1x (Full)' : `${n} months`}
                   </button>
                 ))}
               </div>

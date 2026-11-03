@@ -12,6 +12,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useItems } from '../../hooks/useItems';
+import { useUser } from '../../hooks/useAuth';
 import { useSafeWrite, useToast } from '../../hooks/useToast';
 import { useTotalsSync } from '../../hooks/useTotalsSync';
 import { navigate } from '../../hooks/useRoute';
@@ -26,9 +27,10 @@ import { EmptyState } from '../ui/EmptyState';
 import { ErrorBanner } from '../ui/ErrorBanner';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
 import { Skeleton } from '../ui/Skeleton';
-import { Button } from '../ui/Button';
+import { Avatar } from '../ui/Avatar';
 import { IconButton } from '../ui/IconButton';
 import { SectionLabel } from '../ui/Group';
+import { ProfileMenu } from '../home/ProfileMenu';
 import { HeroCard } from './HeroCard';
 import { QuickActions } from './QuickActions';
 import { PeopleCarousel } from './PeopleCarousel';
@@ -55,6 +57,7 @@ type Panel =
 const FILTERS: ItemFilter[] = ['all', 'unpaid', 'waiting', 'paid'];
 
 export function GroupView({ group, uid }: { group: Group; uid: string }) {
+  const user = useUser();
   const isOwner = group.ownerId === uid;
   const { items, loading, fromServer, error, retry } = useItems(group.id, isOwner);
   const write = useSafeWrite();
@@ -62,6 +65,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const [filter, setFilter] = useState<ItemFilter>('all');
   const [focusUid, setFocusUid] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const close = useCallback(() => setPanel(null), []);
 
@@ -172,27 +176,34 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
         backLabel="Wallet"
         onBack={() => navigate('/')}
         right={
-          isOwner ? (
-            <>
-              <IconButton label="Invite people" onClick={() => setPanel({ kind: 'invite' })}>
-                <UserPlus className="size-[18px]" />
-              </IconButton>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {isOwner ? (
               <IconButton label="List settings" onClick={() => setPanel({ kind: 'settings' })}>
                 <Settings className="size-[18px]" />
               </IconButton>
-            </>
-          ) : (
-            <IconButton label="Remove from wallet" onClick={() => setConfirmLeave(true)}>
-              <LogOut className="size-[18px]" />
-            </IconButton>
-          )
+            ) : (
+              <IconButton label="Remove from wallet" onClick={() => setConfirmLeave(true)}>
+                <LogOut className="size-[18px]" />
+              </IconButton>
+            )}
+            <button
+              type="button"
+              onClick={() => setProfileOpen((prev) => !prev)}
+              aria-label="Your account"
+              className="size-9 shrink-0 rounded-full ring-2 ring-hairline shadow-sm overflow-hidden transition active:scale-90 ml-0.5"
+            >
+              <Avatar name={user.displayName || user.email || 'You'} photo={user.photoURL ?? ''} size="sm" />
+            </button>
+          </div>
         }
       />
 
-      <PageBody>
+      <ProfileMenu open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      <PageBody compactBottom={items.length === 0}>
         <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 xl:gap-12">
           {/* Left Column (Sticky card, quick actions, people) */}
-          <div className="space-y-6 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
+          <div className="space-y-4 sm:space-y-6 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
 
             {/* When no other members have joined yet */}
@@ -291,7 +302,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           </div>
 
           {/* Right Column (Items list / Add transaction) */}
-          <div className="mt-6 space-y-6 lg:col-span-7 lg:mt-0">
+          <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-6 lg:col-span-7 lg:mt-0">
             {/* Suppress transient error banner if the list was just created in the last 15 seconds */}
             {error && !(isOwner && Date.now() - group.createdAt < 15000) && (
               <ErrorBanner message={error} onRetry={retry} />
@@ -324,22 +335,23 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                   </div>
                 </div>
               ) : items.length === 0 ? (
-                <EmptyState
-                  icon={<ReceiptText className="size-7" />}
-                  title="No items yet"
-                  text={
-                    isOwner
-                      ? 'Tap Add item to list what people owe you. Everyone in the list will see it.'
-                      : `${ownerName} has not added any items yet. They will show here right away.`
-                  }
-                  action={
-                    isOwner && (
-                      <Button icon={<Plus className="size-4" />} onClick={() => setPanel({ kind: 'add' })}>
-                        Add item
-                      </Button>
-                    )
-                  }
-                />
+                <>
+                  <div className="flex items-center justify-center gap-2 rounded-[18px] bg-white/80 py-3.5 px-4 text-center text-[13px] text-muted ring-1 ring-hairline sm:hidden">
+                    <ReceiptText className="size-4 shrink-0 text-muted/70" />
+                    <span>No items yet. Tap <strong>Add item</strong> above.</span>
+                  </div>
+                  <div className="hidden sm:block">
+                    <EmptyState
+                      icon={<ReceiptText className="size-7" />}
+                      title="No items yet"
+                      text={
+                        isOwner
+                          ? 'Tap Add item to list what people owe you. Everyone in the list will see it.'
+                          : `${ownerName} has not added any items yet. They will show here right away.`
+                      }
+                    />
+                  </div>
+                </>
               ) : (
                 <div className="space-y-3">
                   <FilterBar
@@ -379,18 +391,6 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           </div>
         </div>
       </PageBody>
-
-      {/* Floating Action Button for Owner on Mobile */}
-      {isOwner && (
-        <button
-          type="button"
-          aria-label="Add item"
-          onClick={() => setPanel({ kind: 'add' })}
-          className="fixed right-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30 grid size-14 place-items-center rounded-full bg-ink text-white shadow-[0_10px_30px_-6px_rgba(0,0,0,0.45)] transition active:scale-90 sm:right-6 lg:hidden"
-        >
-          <Plus className="size-6" strokeWidth={2.5} />
-        </button>
-      )}
 
       {/* Sheets & Dialogs */}
       {isOwner && (
