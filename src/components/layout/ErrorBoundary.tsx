@@ -2,13 +2,14 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface State {
   failed: boolean;
+  error?: Error;
 }
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { failed: false };
 
-  static getDerivedStateFromError(): State {
-    return { failed: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { failed: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -23,6 +24,13 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <p className="text-4xl">😕</p>
           <h1 className="mt-3 text-lg font-semibold text-ink">Something went wrong</h1>
           <p className="mt-1 text-sm text-muted">Please reload the page. Your data is safe.</p>
+          {this.state.error && (
+            <pre className="mt-3 max-h-36 overflow-auto rounded-lg bg-bad/10 p-2.5 text-left font-mono text-[11px] text-bad whitespace-pre-wrap">
+              {this.state.error.message}
+              {'\n'}
+              {this.state.error.stack}
+            </pre>
+          )}
           <button
             type="button"
             onClick={() => {

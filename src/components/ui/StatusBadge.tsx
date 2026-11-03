@@ -6,8 +6,8 @@ const STYLES: Record<ShareStatus, { dot: string; text: string; label: string }> 
   paid: { dot: 'bg-ok', text: 'text-ok-ink', label: 'Paid' },
 };
 
-export function StatusBadge({ status }: { status: ShareStatus }) {
-  const s = STYLES[status];
+export function StatusBadge({ status }: { status?: ShareStatus }) {
+  const s = (status && STYLES[status]) || STYLES.unpaid;
   return (
     <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${s.text}`}>
       <span className={`size-1.5 shrink-0 rounded-full ${s.dot}`} />

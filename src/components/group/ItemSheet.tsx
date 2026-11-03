@@ -39,6 +39,11 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   const [recRef, setRecRef] = useState('');
   const [recNote, setRecNote] = useState('');
 
+  const installmentMonthly =
+    item?.installmentsCount && item.installmentsCount > 1 && item.splitCents > 0
+      ? Math.round(item.splitCents / item.installmentsCount)
+      : null;
+
   const people = useMemo(() => {
     if (!item?.shares) return [];
     const rank = (pid: string, status?: ShareStatus) =>
@@ -50,27 +55,11 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
     );
   }, [item, uid, group.ownerId]);
 
-  if (!item) return null;
-  const isOwner = group.ownerId === uid;
-  const done = isItemDone(item, group.ownerId);
-  const due = dueInfo(item.dueDate, done);
-  const { paid, total } = itemProgress(item, group.ownerId);
-  const mine = item.shares ? item.shares[uid] : undefined;
-
-  const myPaid = mine?.paidCents ?? (mine?.status === 'paid' ? item.splitCents : 0);
-  const myRemaining = Math.max(0, item.splitCents - myPaid);
-  const canPay = !isOwner && myRemaining > 0;
-
-  const installmentMonthly =
-    item.installmentsCount && item.installmentsCount > 1 && item.splitCents > 0
-      ? Math.round(item.splitCents / item.installmentsCount)
-      : null;
-
   // Auto-record borrower payments in Transaction History: includes recorded payments AND any borrower claimed payments
   const payments = useMemo(() => {
     if (!item) return [];
     const list: PaymentRecord[] = Array.isArray(item.payments) ? [...item.payments] : [];
-    const existingUidsWithPending = new Set(list.filter((p) => p.status === 'pending').map((p) => p.uid));
+    const existingUidsWithPending = new Set(list.filter((p) => p && p.status === 'pending').map((p) => p.uid));
 
     const shares = item.shares ?? {};
     for (const [pid, share] of Object.entries(shares)) {
@@ -95,6 +84,17 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
     }
     return list;
   }, [item, installmentMonthly, group.members, group.ownerId]);
+
+  if (!item) return null;
+  const isOwner = group.ownerId === uid;
+  const done = isItemDone(item, group.ownerId);
+  const due = dueInfo(item.dueDate, done);
+  const { paid, total } = itemProgress(item, group.ownerId);
+  const mine = item.shares ? item.shares[uid] : undefined;
+
+  const myPaid = mine?.paidCents ?? (mine?.status === 'paid' ? item.splitCents : 0);
+  const myRemaining = Math.max(0, item.splitCents - myPaid);
+  const canPay = !isOwner && myRemaining > 0;
 
   const handleRecordPaymentSubmit = () => {
     const targetUid = recUid || (people[0] ? people[0][0] : '');
@@ -137,7 +137,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
         ) : undefined
       }
     >
-      <WalletCard seed={item.id} background={storeGradient(item.store, item.id, item.color)} className="p-5">
+      <WalletCard seed={item.id} background={storeGradient(item.store || '', item.id, item.color)} className="p-5">
         {/* Top Header: Store on left, Cycle on top right, Due Date directly below it */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -146,7 +146,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
             </span>
             <div className="min-w-0">
               <p className="truncate text-[14px] font-bold tracking-[0.08em] text-white uppercase drop-shadow-sm">
-                {item.store.trim() || 'Credit Card'}
+                {(item.store || '').trim() || 'Credit Card'}
               </p>
               {item.installmentsCount && item.installmentsCount > 1 && (
                 <p className="text-[11px] text-white/80 font-medium">

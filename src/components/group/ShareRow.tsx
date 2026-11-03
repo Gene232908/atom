@@ -5,7 +5,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 
 interface Props {
   personUid: string;
-  share: Share;
+  share?: Share;
   group: Group;
   viewerUid: string;
   onSetStatus: (personUid: string, status: ShareStatus) => void;
@@ -31,20 +31,21 @@ function actionFor(ownerViewing: boolean, personUid: string, ownerId: string, st
 export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Props) {
   const ownerViewing = group.ownerId === viewerUid;
   const member = group.members[personUid];
-  const name = member?.name ?? share.name;
+  const name = member?.name ?? share?.name ?? 'Member';
   const isLender = personUid === group.ownerId;
-  const action = actionFor(ownerViewing, personUid, group.ownerId, share.status);
+  const status: ShareStatus = share?.status ?? 'unpaid';
+  const action = actionFor(ownerViewing, personUid, group.ownerId, status);
 
   let note = '';
   if (isLender) note = 'Lender’s own share';
-  else if (share.status === 'claimed' && ownerViewing) note = 'Says they paid';
+  else if (status === 'claimed' && ownerViewing) note = 'Says they paid';
   else if (!member) note = 'Removed';
 
-  if (share.paidCents && share.paidCents > 0 && share.status !== 'paid') {
+  if (share?.paidCents && share.paidCents > 0 && status !== 'paid') {
     const paidText = `Paid ${formatMoney(share.paidCents)}`;
     note = note ? `${note} · ${paidText}` : paidText;
   }
-  if (share.refNumber) {
+  if (share?.refNumber) {
     note = note ? `${note} · Ref: ${share.refNumber}` : `Ref: ${share.refNumber}`;
   }
 
@@ -54,7 +55,7 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-medium">{personUid === viewerUid ? 'You' : name}</p>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2">
-          <StatusBadge status={share.status} />
+          <StatusBadge status={status} />
           {note && <span className="truncate text-[12px] text-muted">{note}</span>}
         </div>
       </div>

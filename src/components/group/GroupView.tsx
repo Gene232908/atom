@@ -406,15 +406,17 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           <SettingsSheet open={panel?.kind === 'settings'} onClose={close} group={group} />
         </>
       )}
-      <ItemSheet
-        item={viewing}
-        group={group}
-        uid={uid}
-        onClose={close}
-        onEdit={(item) => setPanel({ kind: 'edit', id: item.id })}
-        onPay={payItem}
-        onSetStatus={onSetStatus}
-      />
+      {viewing && (
+        <ItemSheet
+          item={viewing}
+          group={group}
+          uid={uid}
+          onClose={close}
+          onEdit={(item) => setPanel({ kind: 'edit', id: item.id })}
+          onPay={payItem}
+          onSetStatus={onSetStatus}
+        />
+      )}
       <PaySheet
         open={panel?.kind === 'pay'}
         onClose={close}
