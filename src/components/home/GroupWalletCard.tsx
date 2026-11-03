@@ -6,7 +6,7 @@ import type { Group } from '../../lib/types';
 import { WalletCard } from '../ui/WalletCard';
 import { AvatarStack } from '../ui/AvatarStack';
 
-/** One list shown as a wallet card. Only the top strip shows when stacked on phones. */
+/** One list shown as a loan card (exactly matching the user's approved layout) */
 export function GroupWalletCard({ group, uid, index }: { group: Group; uid: string; index: number }) {
   const isOwner = group.ownerId === uid;
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
@@ -15,21 +15,30 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
     .filter((id) => id !== group.ownerId)
     .map((id) => group.members[id])
     .filter(Boolean);
+  const last4 = group.inviteCode.slice(-4) || '0000';
 
   return (
     <button
       type="button"
       onClick={() => navigate(`/g/${group.id}`)}
-      className="block w-full animate-rise text-left transition-transform duration-300 hover:-translate-y-1.5 active:scale-[0.98]"
+      className="block w-full animate-rise text-left transition-transform duration-300 select-none hover:-translate-y-1.5 active:scale-[0.98] focus:outline-none"
       style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
     >
-      <WalletCard seed={group.id} background={listGradient(group.id, group.color)} className="flex h-[196px] flex-col p-5">
-        <div className="flex items-start gap-3">
-          <p className="min-w-0 flex-1 truncate text-[17px] font-semibold">{group.name}</p>
-          <p className="shrink-0 text-[17px] font-semibold tabular-nums">
+      <WalletCard
+        seed={group.id}
+        background={listGradient(group.id, group.color)}
+        interactive={true}
+        className="flex h-[196px] flex-col p-5"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow-sm">
+            {group.name}
+          </p>
+          <p className="shrink-0 text-[17px] font-semibold text-white tabular-nums">
             {amount > 0 ? formatMoney(amount) : 'Paid ✓'}
           </p>
         </div>
+
         <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
           {isOwner
             ? amount > 0
@@ -46,7 +55,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
               {isOwner ? 'You lend' : 'You borrow'}
             </p>
             <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">
-              •••• {group.inviteCode.slice(-4) || '0000'}
+              •••• {last4}
             </p>
           </div>
           {people.length > 0 && <AvatarStack people={people} />}
@@ -56,7 +65,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
   );
 }
 
-/** Stacked like Apple Wallet on phones, a neat grid on tablets and laptops. */
+/** Stacked like Apple Wallet on phones, a neat grid on tablets and laptops */
 export function WalletStack({ groups, uid }: { groups: Group[]; uid: string }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">

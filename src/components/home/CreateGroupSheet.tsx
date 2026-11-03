@@ -13,27 +13,35 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
   const toast = useToast();
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     const clean = name.trim();
     if (!clean) {
       setError('Please give your list a name.');
       return;
     }
-    const { id, saved } = createGroup(user, clean.slice(0, 80));
-    saved.catch((err) => toast(friendlyError(err), 'error'));
-    toast('List created! Now invite the people who owe you.');
-    setName('');
-    setError('');
-    onClose();
-    navigate(`/g/${id}`);
+    setSubmitting(true);
+    try {
+      const { id, saved } = createGroup(user, clean.slice(0, 80));
+      await saved;
+      toast('List created! Now invite the people who owe you.');
+      setName('');
+      setError('');
+      onClose();
+      navigate(`/g/${id}`);
+    } catch (err) {
+      toast(friendlyError(err), 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={submitting ? () => undefined : onClose}
       title="Make a new list"
       description="Make a list if people owe you money. You will be the lender."
     >
@@ -52,7 +60,7 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
             setError('');
           }}
         />
-        <Button type="submit" size="lg" full>
+        <Button type="submit" size="lg" full loading={submitting}>
           Create list
         </Button>
       </form>

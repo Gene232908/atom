@@ -18,12 +18,12 @@ const LABELS: Record<ItemFilter, string> = {
   paid: 'Paid',
 };
 
-/** iOS segmented control. */
+/** iOS segmented control */
 export function FilterBar({ filter, counts, showWaiting, onChange, personName, onClearPerson }: Props) {
   const options: ItemFilter[] = showWaiting ? ['all', 'unpaid', 'waiting', 'paid'] : ['all', 'unpaid', 'paid'];
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5 select-none">
       {personName !== null && (
         <div className="flex min-w-0 items-center gap-2 rounded-full bg-ink py-1 pr-1 pl-4 text-[13px] text-white">
           <span className="min-w-0 flex-1 truncate">
@@ -50,7 +50,7 @@ export function FilterBar({ filter, counts, showWaiting, onChange, personName, o
               aria-selected={active}
               onClick={() => onChange(key)}
               className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-[9px] px-1 text-[13px] font-semibold transition ${
-                active ? 'bg-white shadow-[0_2px_6px_rgba(0,0,0,0.1)]' : 'text-ink/70'
+                active ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.1)]' : 'text-ink/70 hover:text-ink'
               }`}
             >
               <span className="truncate">{LABELS[key]}</span>

@@ -13,7 +13,7 @@ interface Props {
   onInvite: () => void;
 }
 
-/** Swipeable people cards with how much each one still owes. */
+/** Swipeable people cards with how much each one still owes */
 export function PeopleCarousel({ people, uid, isOwner, onOpen, onInvite }: Props) {
   const cards = people.map((p) => {
     const total = p.owes + p.paid;
@@ -23,13 +23,13 @@ export function PeopleCarousel({ people, uid, isOwner, onOpen, onInvite }: Props
         key={p.uid}
         type="button"
         onClick={() => onOpen(p.uid)}
-        className="flex h-full w-full flex-col rounded-[20px] bg-white p-3.5 text-left transition active:scale-[0.97]"
+        className="flex h-full w-full flex-col rounded-[20px] bg-white p-3.5 text-left shadow-sm ring-1 ring-hairline transition select-none active:scale-[0.97]"
       >
         <div className="flex items-start justify-between gap-2">
           <Avatar name={p.name} photo={p.photo} />
           {p.isOwner && <Crown className="size-4 text-warn" aria-label="Lender" />}
         </div>
-        <p className="mt-2.5 truncate text-[14px] font-semibold">
+        <p className="mt-2.5 truncate text-[14px] font-semibold text-ink">
           {p.uid === uid ? 'You' : firstName(p.name)}
         </p>
         {p.isOwner ? (
@@ -56,9 +56,9 @@ export function PeopleCarousel({ people, uid, isOwner, onOpen, onInvite }: Props
         key="invite"
         type="button"
         onClick={onInvite}
-        className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-fill-strong p-3.5 text-muted transition active:scale-[0.97]"
+        className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-fill-strong p-3.5 text-muted transition select-none active:scale-[0.97]"
       >
-        <span className="grid size-10 place-items-center rounded-full bg-white text-ink">
+        <span className="grid size-10 place-items-center rounded-full bg-white text-ink shadow-sm">
           <Plus className="size-5" />
         </span>
         <span className="text-[13px] font-semibold">Invite</span>

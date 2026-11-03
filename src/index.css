@@ -1,10 +1,12 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
 
-  /* iOS-like palette */
+  /* Clean iOS System Palette */
   --color-canvas: #f2f2f7;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
   --color-ink: #1c1c1e;
   --color-muted: #8e8e93;
   --color-hairline: rgb(60 60 67 / 0.12);
@@ -69,10 +71,17 @@
 }
 
 @layer base {
+  *,
+  *::before,
+  *::after {
+    -webkit-touch-callout: none;
+  }
+
   html,
   body {
     overflow-x: hidden;
     max-width: 100%;
+    background-color: #f2f2f7;
   }
 
   body {
@@ -81,10 +90,14 @@
     -webkit-text-size-adjust: 100%;
     overscroll-behavior-y: none;
     font-feature-settings: 'tnum' 0;
+    /* Prevent accidental text selection on iPhone */
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   #root {
     min-height: 100dvh;
+    background-color: #f2f2f7;
   }
 
   /* 16px stops iPhones from zooming in when you tap a box */
@@ -92,17 +105,37 @@
   select,
   textarea {
     font-size: 16px;
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
   }
 
-  button {
+  button,
+  [role="button"] {
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
+    touch-action: manipulation;
   }
 
   button:disabled {
     cursor: not-allowed;
   }
+}
+
+/* Realistic multi-layer Apple Wallet card shadow */
+.apple-card-shadow {
+  box-shadow:
+    0 20px 40px -12px rgba(0, 0, 0, 0.45),
+    0 8px 16px -6px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.16) inset;
+}
+
+.apple-card-shadow-sm {
+  box-shadow:
+    0 12px 24px -8px rgba(0, 0, 0, 0.35),
+    0 4px 10px -3px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset;
 }
 
 @media (prefers-reduced-motion: reduce) {

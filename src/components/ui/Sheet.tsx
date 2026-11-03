@@ -9,6 +9,7 @@ interface Props {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  zIndex?: string;
 }
 
 let openSheets = 0;
@@ -18,7 +19,7 @@ const CLOSE_DISTANCE = 110;
  * iOS style sheet. Slides up from the bottom on phones (drag it down to close)
  * and shows as a centered card on tablets and laptops.
  */
-export function Sheet({ open, onClose, title, description, children, footer }: Props) {
+export function Sheet({ open, onClose, title, description, children, footer, zIndex = 'z-50' }: Props) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const [drag, setDrag] = useState(0);
@@ -69,7 +70,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: P
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6"
+      className={`fixed inset-0 ${zIndex} flex items-end justify-center md:items-center md:p-6 select-none`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -80,7 +81,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: P
         onClick={() => closeRef.current()}
       />
       <div
-        className="relative flex max-h-[94dvh] w-full animate-sheet-up flex-col rounded-t-[28px] bg-canvas shadow-2xl md:max-w-lg md:animate-pop md:rounded-[28px]"
+        className="relative flex max-h-[94dvh] w-full animate-sheet-up flex-col rounded-t-[28px] bg-canvas text-ink shadow-2xl md:max-w-lg md:animate-pop md:rounded-[28px]"
         style={{
           transform: drag ? `translateY(${drag}px)` : undefined,
           transition: dragging ? 'none' : 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
@@ -98,14 +99,14 @@ export function Sheet({ open, onClose, title, description, children, footer }: P
           </div>
           <div className="flex items-start gap-3 px-5 pt-3 pb-3 md:pt-5">
             <div className="min-w-0 flex-1">
-              <h2 className="text-[22px] leading-tight font-bold tracking-tight wrap-break-word">{title}</h2>
+              <h2 className="text-[22px] leading-tight font-bold tracking-tight text-ink wrap-break-word">{title}</h2>
               {description && <p className="mt-1 text-[14px] leading-snug text-muted">{description}</p>}
             </div>
             <button
               type="button"
               onClick={() => closeRef.current()}
               aria-label="Close"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-fill text-muted transition active:scale-90"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-fill text-muted transition active:scale-90 hover:text-ink"
             >
               <X className="size-4" strokeWidth={2.5} />
             </button>

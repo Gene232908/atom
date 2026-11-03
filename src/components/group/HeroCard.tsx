@@ -1,5 +1,5 @@
-import { listGradient } from '../../lib/cardTheme';
 import { useMemo } from 'react';
+import { listGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
 import { firstName, otherShares } from '../../lib/items';
 import type { Group, Item, Share } from '../../lib/types';
@@ -13,7 +13,7 @@ interface Props {
   onPay: () => void;
 }
 
-/** The big card at the top of a list: how much is still owed. */
+/** The clean loan card at the top of a list */
 export function HeroCard({ group, items, uid, onPay }: Props) {
   const isOwner = group.ownerId === uid;
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
@@ -44,41 +44,57 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
     .map((id) => group.members[id])
     .filter(Boolean);
 
+  const last4 = group.inviteCode.slice(-4) || '0000';
+
   return (
-    <WalletCard seed={group.id} background={listGradient(group.id, group.color)} className="flex min-h-[208px] animate-rise flex-col p-5 sm:min-h-[224px] sm:p-6">
-      <div className="flex items-start gap-3">
-        <p className="min-w-0 flex-1 truncate text-[17px] font-semibold">{group.name}</p>
-        <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
+    <WalletCard
+      seed={group.id}
+      background={listGradient(group.id, group.color)}
+      interactive={true}
+      className="flex min-h-[208px] animate-rise flex-col p-5 sm:min-h-[224px] sm:p-6"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 truncate text-[18px] font-bold text-white drop-shadow-sm">
+          {group.name}
+        </p>
+        <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
           {isOwner ? 'You lend' : `${ownerName} lends`}
         </span>
       </div>
 
-      <p className="mt-5 text-[13px] font-medium text-white/75">
+      <p className="mt-4 text-[13px] font-medium text-white/75">
         {isOwner ? 'Still owed to you' : `You still owe ${ownerName}`}
       </p>
-      <p className="text-[38px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word sm:text-[44px]">
+      <p className="text-[36px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[42px]">
         {formatMoney(stats.owed)}
       </p>
 
       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-        <p className="min-w-0 text-[12px] font-medium text-white/80">
-          {stats.unpaid === 0
-            ? isOwner
-              ? 'Nothing to collect'
-              : 'All paid up. Nice!'
-            : `${stats.unpaid} unpaid${stats.waiting ? ` · ${stats.waiting} waiting` : ''}`}
-        </p>
-        {!isOwner && stats.owed > 0 ? (
-          <button
-            type="button"
-            onClick={onPay}
-            className="h-10 shrink-0 rounded-full bg-white px-5 text-[14px] font-semibold text-ink shadow-lg shadow-black/20 transition active:scale-95"
-          >
-            Pay now
-          </button>
-        ) : (
-          people.length > 0 && <AvatarStack people={people} />
-        )}
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+            {isOwner ? 'You lend' : 'You borrow'}
+          </p>
+          <p className="mt-0.5 font-mono text-[14px] tracking-[0.18em] text-white/90">
+            •••• {last4}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          {!isOwner && stats.owed > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPay();
+              }}
+              className="h-10 shrink-0 rounded-full bg-white px-5 text-[14px] font-bold text-ink shadow-lg shadow-black/25 transition active:scale-95 hover:bg-white/90"
+            >
+              Pay now
+            </button>
+          ) : (
+            people.length > 0 && <AvatarStack people={people} />
+          )}
+        </div>
       </div>
     </WalletCard>
   );

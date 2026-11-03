@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-/** iOS "inset grouped" list: white rounded block with thin lines between rows. */
+/** iOS "inset grouped" list: clean white rounded block with thin lines between rows */
 export function GroupList({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div className={`overflow-hidden rounded-[20px] bg-white ${className}`}>
@@ -12,8 +12,8 @@ export function GroupList({ children, className = '' }: { children: ReactNode; c
 
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mb-2 flex items-end gap-2 px-1">
-      <h2 className="min-w-0 flex-1 truncate text-[20px] font-bold tracking-tight">{children}</h2>
+    <div className="mb-2 flex items-end gap-2 px-1 select-none">
+      <h2 className="min-w-0 flex-1 truncate text-[20px] font-bold tracking-tight text-ink">{children}</h2>
       {right}
     </div>
   );
@@ -38,7 +38,7 @@ export function GroupRow({ icon, label, detail, tone = 'default', chevron = true
   return (
     <button
       type="button"
-      className={`flex min-h-[52px] w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition active:bg-fill disabled:opacity-50 ${className}`}
+      className={`flex min-h-[52px] w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition select-none active:bg-fill disabled:opacity-50 ${className}`}
       {...rest}
     >
       {icon && <span className="shrink-0">{icon}</span>}

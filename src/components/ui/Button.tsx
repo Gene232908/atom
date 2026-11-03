@@ -13,11 +13,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-ink text-white hover:bg-black',
+  primary: 'bg-ink text-white hover:bg-black shadow-sm',
   secondary: 'bg-fill text-ink hover:bg-fill-strong',
   ghost: 'bg-transparent text-accent hover:bg-fill',
-  danger: 'bg-bad text-white hover:brightness-95',
-  success: 'bg-ok text-white hover:brightness-95',
+  danger: 'bg-bad text-white hover:brightness-95 shadow-sm',
+  success: 'bg-ok text-white hover:brightness-95 shadow-sm',
   white: 'bg-white text-ink shadow-sm hover:bg-white/90',
   glass: 'bg-white/20 text-white backdrop-blur-md hover:bg-white/28',
 };
@@ -44,7 +44,9 @@ export function Button({
     <button
       type={type}
       disabled={disabled || loading}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold whitespace-nowrap transition duration-150 active:scale-[0.96] disabled:opacity-50 disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${full ? 'w-full' : ''} ${className}`}
+      className={`inline-flex items-center justify-center rounded-full font-semibold whitespace-nowrap transition duration-150 select-none active:scale-[0.96] disabled:opacity-50 disabled:active:scale-100 ${
+        variants[variant]
+      } ${sizes[size]} ${full ? 'w-full' : 'shrink-0'} ${className}`}
       {...rest}
     >
       {loading ? <Spinner className="size-4" /> : icon}

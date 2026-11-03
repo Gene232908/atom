@@ -30,18 +30,19 @@ export function ConfirmSheet({ open, onClose, title, message, confirmText, dange
       open={open}
       onClose={busy ? () => undefined : onClose}
       title={title}
+      zIndex="z-[70]"
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" full onClick={onClose} disabled={busy}>
+        <div className="grid grid-cols-2 gap-3 w-full">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant={danger ? 'danger' : 'primary'} full onClick={handleConfirm} loading={busy}>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={handleConfirm} loading={busy}>
             {confirmText}
           </Button>
         </div>
       }
     >
-      <div className="text-[15px] leading-relaxed text-muted">{message}</div>
+      <div className="text-[15px] leading-relaxed text-muted pt-1 pb-2">{message}</div>
     </Sheet>
   );
 }

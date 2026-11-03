@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { Trash2, UserPlus } from 'lucide-react';
+import { CircleAlert, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useSafeWrite } from '../../hooks/useToast';
 import { addItem, deleteItem, updateItem } from '../../services/items';
 import { centsToInput, cleanMoneyInput, formatMoney, splitEvenly, toCents } from '../../lib/money';
@@ -23,15 +23,22 @@ interface Props {
 
 export function ItemFormSheet(props: Props) {
   if (!props.open) return null;
-  // Mounting fresh each time makes the form start from the right values.
   return <ItemForm key={props.item?.id ?? 'new'} {...props} />;
 }
 
 type Errors = Partial<Record<'description' | 'price' | 'people' | 'split', string>>;
 
+function slugId(name: string): string {
+  return 'borrower_' + name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
+}
+
 function ItemForm({ onClose, group, item, onInvite }: Props) {
   const write = useSafeWrite();
   const ownerId = group.ownerId;
+
+  // Custom named borrowers added directly
+  const [customBorrowerName, setCustomBorrowerName] = useState('');
+  const [customBorrowers, setCustomBorrowers] = useState<PickPerson[]>([]);
 
   const people = useMemo<PickPerson[]>(() => {
     const list: PickPerson[] = group.memberIds
@@ -42,12 +49,23 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
         photo: group.members[uid].photo,
         isMe: uid === ownerId,
       }));
-    // Keep people who were removed from the list but are still on this item.
+
+    // Keep people already saved on this item
     for (const [uid, share] of Object.entries(item?.shares ?? {})) {
-      if (!list.some((p) => p.uid === uid)) list.push({ uid, name: share.name, photo: '', isMe: false });
+      if (!list.some((p) => p.uid === uid)) {
+        list.push({ uid, name: share.name, photo: '', isMe: uid === ownerId });
+      }
     }
+
+    // Add local named borrowers
+    for (const cb of customBorrowers) {
+      if (!list.some((p) => p.uid === cb.uid)) {
+        list.push(cb);
+      }
+    }
+
     return list.sort((a, b) => (a.isMe ? -1 : b.isMe ? 1 : a.name.localeCompare(b.name)));
-  }, [group.memberIds, group.members, item, ownerId]);
+  }, [group.memberIds, group.members, item, ownerId, customBorrowers]);
 
   const [description, setDescription] = useState(item?.description ?? '');
   const [price, setPrice] = useState(item ? centsToInput(item.priceCents) : '');
@@ -67,7 +85,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
   const priceCents = toCents(price) ?? 0;
   const autoSplit = splitEvenly(priceCents, selected.size);
   const splitCents = custom ? (toCents(splitInput) ?? 0) : autoSplit;
-  const nobodyElse = people.every((p) => p.isMe);
+  const hasOtherMembers = people.some((p) => !p.isMe);
 
   const toggle = (uid: string) => {
     setSelected((prev) => {
@@ -79,32 +97,72 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
     setErrors((e) => ({ ...e, people: undefined }));
   };
 
+  const addCustomBorrower = () => {
+    const trimmed = customBorrowerName.trim();
+    if (!trimmed) return;
+    const uid = slugId(trimmed);
+    const newPerson: PickPerson = { uid, name: trimmed, photo: '', isMe: false };
+    setCustomBorrowers((prev) => [...prev, newPerson]);
+    setSelected((prev) => new Set([...prev, uid]));
+    setCustomBorrowerName('');
+    setErrors((e) => ({ ...e, people: undefined }));
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const next: Errors = {};
     const desc = description.trim();
     if (!desc) next.description = 'Please type what this item is.';
-    if (priceCents <= 0) next.price = 'Please type the price.';
-    if (![...selected].some((uid) => uid !== ownerId)) next.people = 'Pick at least one person who owes you.';
-    if (splitCents <= 0) next.split = 'Please type how much each person pays.';
+    if (priceCents <= 0) next.price = 'Please type the total price.';
+
+    // If no one is selected, but user typed a borrower name, add them automatically
+    let activeSelected = new Set(selected);
+    if (customBorrowerName.trim() && activeSelected.size === 0) {
+      const trimmed = customBorrowerName.trim();
+      const uid = slugId(trimmed);
+      const newPerson: PickPerson = { uid, name: trimmed, photo: '', isMe: false };
+      setCustomBorrowers((prev) => [...prev, newPerson]);
+      activeSelected.add(uid);
+      setCustomBorrowerName('');
+    }
+
+    if (activeSelected.size === 0) {
+      next.people = 'Please choose or type who owes this item.';
+    }
+    if (splitCents <= 0) {
+      next.split = 'Please type how much each person pays.';
+    }
+
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
     const now = Date.now();
     const shares: Record<string, Share> = {};
-    for (const uid of selected) {
-      const name = group.members[uid]?.name ?? item?.shares[uid]?.name ?? 'Someone';
+    for (const uid of activeSelected) {
+      const foundPerson = people.find((p) => p.uid === uid) ?? customBorrowers.find((p) => p.uid === uid);
+      const name = foundPerson?.name ?? group.members[uid]?.name ?? item?.shares[uid]?.name ?? 'Someone';
       const prev = item?.shares[uid];
       shares[uid] = prev
         ? { ...prev, name }
-        : { name, status: uid === ownerId ? 'paid' : 'unpaid', updatedAt: now };
+        : { name, status: 'unpaid', updatedAt: now };
     }
-    const input = { description: desc.slice(0, 200), priceCents, splitCents, shares, dueDate: dueDate || null, store: store.trim().slice(0, 40), color };
+
+    const input = {
+      description: desc.slice(0, 200),
+      priceCents,
+      splitCents,
+      shares,
+      dueDate: dueDate || null,
+      store: store.trim().slice(0, 40),
+      color,
+    };
 
     if (item) write(updateItem(group.id, item.id, input), 'Changes saved');
     else write(addItem(group.id, input), 'Item added');
     onClose();
   };
+
+  const errorList = Object.values(errors).filter(Boolean);
 
   return (
     <>
@@ -133,6 +191,21 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
         }
       >
         <form id="item-form" onSubmit={submit} className="space-y-5 pt-1" noValidate>
+          {/* Prominent error summary if save was blocked */}
+          {errorList.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-[18px] bg-bad/10 p-3.5 text-[14px] font-medium text-bad-ink border border-bad/20">
+              <CircleAlert className="size-4.5 shrink-0 mt-0.5 text-bad" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-bad-ink">Please fix the following:</p>
+                <ul className="mt-1 list-disc pl-4 space-y-0.5 text-[13px]">
+                  {errorList.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
           <TextField
             id="item-desc"
             label="Item description"
@@ -164,7 +237,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     type="button"
                     onClick={() => setStore(on ? '' : name)}
                     className={`h-8 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition active:scale-95 ${
-                      on ? 'text-white' : 'bg-white text-ink'
+                      on ? 'text-white' : 'bg-white text-ink shadow-sm ring-1 ring-hairline'
                     }`}
                     style={on ? { backgroundImage: storeGradient(name, name) } : undefined}
                   >
@@ -198,32 +271,101 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             }}
           />
 
-          {nobodyElse ? (
-            <div className="rounded-[20px] bg-white p-4 text-[14px]">
-              <p className="font-semibold">No one has joined this list yet.</p>
-              <p className="mt-1 text-muted">Invite the people who owe you first, then add items for them.</p>
-              <Button
-                size="sm"
-                className="mt-3"
-                icon={<UserPlus className="size-4" />}
-                onClick={() => {
-                  onClose();
-                  onInvite();
-                }}
-              >
-                Invite people
-              </Button>
-            </div>
-          ) : (
-            <PeoplePicker
-              people={people}
-              selected={selected}
-              onToggle={toggle}
-              onSelectAll={() => setSelected(new Set(people.map((p) => p.uid)))}
-              onClear={() => setSelected(new Set())}
-              error={errors.people}
-            />
-          )}
+          {/* People / Borrowers Section: Works whether someone joined or not */}
+          <div className="space-y-3">
+            {hasOtherMembers ? (
+              <PeoplePicker
+                people={people}
+                selected={selected}
+                onToggle={toggle}
+                onSelectAll={() => setSelected(new Set(people.map((p) => p.uid)))}
+                onClear={() => setSelected(new Set())}
+                error={errors.people}
+              />
+            ) : (
+              <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3">
+                <div>
+                  <p className="font-semibold text-ink text-[15px]">Who owes this item?</p>
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    Type their name below to list what they owe right now:
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. Juan, Mark, Friend, or Me"
+                    value={customBorrowerName}
+                    onChange={(e) => {
+                      setCustomBorrowerName(e.target.value);
+                      setErrors((x) => ({ ...x, people: undefined }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addCustomBorrower();
+                      }
+                    }}
+                    className="h-10 flex-1 min-w-0 rounded-xl bg-fill px-3 text-[14px] text-ink placeholder-muted outline-none ring-1 ring-hairline focus:ring-2 focus:ring-accent"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={addCustomBorrower}
+                    disabled={!customBorrowerName.trim()}
+                    icon={<Plus className="size-4" />}
+                  >
+                    Add
+                  </Button>
+                </div>
+
+                {/* Show already added custom borrowers or Me */}
+                {people.length > 0 && (
+                  <div className="pt-1">
+                    <p className="text-[12px] font-medium text-muted mb-1.5">Selected borrower:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {people.map((p) => {
+                        const on = selected.has(p.uid);
+                        return (
+                          <button
+                            key={p.uid}
+                            type="button"
+                            onClick={() => toggle(p.uid)}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                              on
+                                ? 'bg-ink text-white shadow-sm'
+                                : 'bg-fill text-muted hover:text-ink'
+                            }`}
+                          >
+                            <span>{p.name}</span>
+                            {on && <span>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {errors.people && (
+                  <p className="text-[13px] font-medium text-bad">{errors.people}</p>
+                )}
+
+                <div className="pt-2 border-t border-hairline flex items-center justify-between text-[13px]">
+                  <span className="text-muted">Want them to see this on their phone?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onInvite();
+                    }}
+                    className="font-semibold text-accent inline-flex items-center gap-1 hover:underline"
+                  >
+                    <UserPlus className="size-3.5" />
+                    Invite link
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <WalletCard seed="split-cost" background={storeGradient(store, 'split-cost', color)} className="p-5">
             <p className="mb-3 truncate text-[13px] font-bold tracking-[0.12em] uppercase">
@@ -268,7 +410,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             <p className="mt-1 text-[12px] text-white/80">
               {selected.size > 0
                 ? `${formatMoney(priceCents)} split by ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
-                : 'Pick people above to split the price.'}
+                : 'Add a person above to split the price.'}
             </p>
             {errors.split && (
               <p className="mt-2 rounded-xl bg-white px-3 py-1.5 text-[13px] font-semibold text-bad">{errors.split}</p>

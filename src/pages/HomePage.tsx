@@ -52,7 +52,7 @@ export function HomePage() {
         title="Wallet"
         right={
           <>
-            <IconButton label="New list" dark onClick={() => setPanel("create")}>
+            <IconButton label="New list" dark onClick={() => setPanel('create')}>
               <Plus className="size-5" strokeWidth={2.5} />
             </IconButton>
             <button
@@ -76,7 +76,7 @@ export function HomePage() {
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Button size="lg" icon={<Plus className="size-5" />} onClick={() => setPanel('create')}>
+          <Button size="lg" icon={<Plus className="size-5" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
             New list
           </Button>
           <Button size="lg" variant="white" icon={<KeyRound className="size-[18px]" />} onClick={() => setPanel('join')}>
@@ -128,16 +128,18 @@ export function HomePage() {
 function SummaryTile({ label, amount, tone }: { label: string; amount: number; tone: 'ok' | 'bad' }) {
   const Icon = tone === 'ok' ? ArrowDownLeft : ArrowUpRight;
   return (
-    <div className="min-w-0 rounded-[20px] bg-white p-4">
+    <div className="min-w-0 rounded-[20px] bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <span
-          className={`grid size-7 place-items-center rounded-full ${tone === 'ok' ? 'bg-ok/12 text-ok-ink' : 'bg-bad/10 text-bad-ink'}`}
+          className={`grid size-7 place-items-center rounded-full ${
+            tone === 'ok' ? 'bg-ok/12 text-ok-ink' : 'bg-bad/10 text-bad-ink'
+          }`}
         >
           <Icon className="size-4" strokeWidth={2.5} />
         </span>
         <p className="truncate text-[13px] font-medium text-muted">{label}</p>
       </div>
-      <p className="mt-2 truncate text-[20px] font-bold tracking-tight tabular-nums sm:text-[24px]">
+      <p className="mt-2 truncate text-[20px] font-bold tracking-tight text-ink tabular-nums sm:text-[24px]">
         {formatMoney(amount)}
       </p>
     </div>
