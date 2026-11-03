@@ -91,7 +91,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
     e.preventDefault();
     const next: Errors = {};
     const desc = description.trim();
-    if (!desc) next.description = 'Please type what this item is.';
+    if (!desc) next.description = 'Please type a title or item name (e.g. Cacaolat).';
     if (priceCents <= 0) next.price = 'Please type the total price.';
 
     if (selected.size === 0) {
@@ -181,8 +181,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
 
           <TextField
             id="item-desc"
-            label="Item description"
-            placeholder="e.g. Rubber shoes - month 1 of 3"
+            label="Title / Item name"
+            placeholder="e.g. Cacaolat, Dinner bill, Shoes"
             value={description}
             maxLength={200}
             error={errors.description}
