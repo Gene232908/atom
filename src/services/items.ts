@@ -152,19 +152,28 @@ export async function confirmPayment(
 
   const share = item.shares[uid];
   const borrowerName = share?.name ?? 'Borrower';
-  const amt = share?.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
-  const refNum = share?.refNumber || 'Verified by lender';
+  const expectedCutoff =
+    item.monthlyCents ||
+    (item.installmentsCount && item.installmentsCount > 1
+      ? Math.round(item.splitCents / item.installmentsCount)
+      : item.splitCents);
 
   // Check if there is an existing pending record or claim
   const foundIndex = payments.findIndex(
     (p) => p.id === paymentId || (p.uid === uid && p.status === 'pending'),
   );
 
+  let thisPaymentAmount = expectedCutoff;
+  let refNum = share?.refNumber || 'Verified by lender';
+
   if (foundIndex >= 0) {
+    thisPaymentAmount = payments[foundIndex].amountCents || expectedCutoff;
+    refNum = payments[foundIndex].refNumber || refNum;
     payments[foundIndex] = {
       ...payments[foundIndex],
       status: 'confirmed',
-      refNumber: payments[foundIndex].refNumber || refNum,
+      amountCents: thisPaymentAmount,
+      refNumber: refNum,
       paidAt: payments[foundIndex].paidAt || now,
     };
   } else {
@@ -173,9 +182,9 @@ export async function confirmPayment(
         id: `pay-${uid}-${now}`,
         uid,
         payerName: borrowerName,
-        amountCents: amt,
+        amountCents: thisPaymentAmount,
         refNumber: refNum,
-        note: share?.refNumber ? `Ref: ${share.refNumber}` : 'Payment confirmed',
+        note: share?.refNumber ? `Ref: ${share.refNumber}` : 'Cut-off payment confirmed',
         status: 'confirmed',
         paidAt: now,
       },
@@ -183,10 +192,19 @@ export async function confirmPayment(
     ];
   }
 
+  // Calculate cumulative paid amount from all confirmed payments for this user
+  const totalPaidCents = payments
+    .filter((p) => p.uid === uid && p.status === 'confirmed')
+    .reduce((sum, p) => sum + p.amountCents, 0);
+
+  const isFullyPaid = totalPaidCents >= item.splitCents;
+  const nextStatus: ShareStatus = isFullyPaid ? 'paid' : 'unpaid';
+
   const updates: Record<string, unknown> = {
     payments,
-    [`shares.${uid}.status`]: 'paid',
-    [`shares.${uid}.paidCents`]: amt,
+    [`shares.${uid}.status`]: nextStatus,
+    [`shares.${uid}.paidCents`]: totalPaidCents,
+    [`shares.${uid}.refNumber`]: refNum,
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   };

@@ -31,8 +31,10 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
           : [];
       for (const s of shares) {
         if (s.status === 'paid') continue;
-        owed += item.splitCents;
-        unpaid += 1;
+        const paid = s.paidCents ?? 0;
+        const remaining = Math.max(0, item.splitCents - paid);
+        owed += remaining;
+        if (remaining > 0) unpaid += 1;
         if (s.status === 'claimed') waiting += 1;
       }
     }

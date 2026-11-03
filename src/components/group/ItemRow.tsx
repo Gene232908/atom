@@ -34,6 +34,9 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
     } else if (share.status === 'claimed') {
       statusText = 'Waiting confirmation';
       statusColor = 'text-warn-ink';
+    } else if (share.paidCents && share.paidCents > 0) {
+      statusText = `Partial · ${formatMoney(share.paidCents)} paid`;
+      statusColor = 'text-accent';
     } else {
       statusText = 'Not paid';
       statusColor = 'text-bad-ink';

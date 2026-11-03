@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
-import { useToast } from '../hooks/useToast';
+import { useAllItems, type GroupItem } from '../hooks/useAllItems';
+import { useSafeWrite, useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
-import { sumOwed } from '../lib/items';
+import { firstName } from '../lib/items';
+import type { Group, Item, ShareStatus } from '../lib/types';
+import { createGroup } from '../services/groups';
+import { confirmPayment, recordPayment, setShareStatus, undoPayment } from '../services/items';
 import { NavBar, PageBody } from '../components/layout/AppHeader';
-import { WalletCardsView } from '../components/home/GroupWalletCard';
+import { ItemCardsView } from '../components/home/ItemWalletCard';
 import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { ProfileMenu } from '../components/home/ProfileMenu';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
+import { ItemSheet } from '../components/group/ItemSheet';
+import { ItemFormSheet } from '../components/group/ItemFormSheet';
+import { PaySheet } from '../components/group/PaySheet';
+import { InviteSheet } from '../components/group/InviteSheet';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
@@ -46,14 +54,26 @@ function getStoredLayout(): CardLayoutMode {
 export function HomePage() {
   const user = useUser();
   const toast = useToast();
-  const { groups, loading, error, retry } = useGroups();
+  const write = useSafeWrite();
+  const { groups, loading: groupsLoading, error, retry } = useGroups();
+  const { items, loading: itemsLoading } = useAllItems(groups);
+
   const [panel, setPanel] = useState<Panel>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
   const [tab, setTab] = useState<'lend' | 'owe'>('lend');
+  const [selectedStore, setSelectedStore] = useState<string>('all');
   const [hasResolvedDefault, setHasResolvedDefault] = useState(false);
+
+  // Modal sheet states
+  const [viewingItemId, setViewingItemId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [payingItemId, setPayingItemId] = useState<string | null>(null);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
+  const [inviteGroupId, setInviteGroupId] = useState<string | null>(null);
 
   const onSelectLayoutMode = (mode: CardLayoutMode) => {
     setCardLayout(mode);
@@ -69,28 +89,71 @@ export function HomePage() {
     );
   };
 
-  const close = () => setPanel(null);
+  const closePanel = () => setPanel(null);
   const name = user.displayName || 'there';
 
+  // Lending vs Owing items
+  const lendingItems = useMemo(
+    () => items.filter((it) => it.group.ownerId === user.uid),
+    [items, user.uid],
+  );
+
+  const owingItems = useMemo(
+    () => items.filter((it) => it.group.ownerId !== user.uid && it.shares && it.shares[user.uid]),
+    [items, user.uid],
+  );
+
+  // Compute live accurate totals from all items
   const { youOwe, owedToYou } = useMemo(() => {
     let owe = 0;
     let owed = 0;
-    for (const g of groups) {
-      if (g.ownerId === user.uid) owed += sumOwed(g.totals);
-      else owe += g.totals[user.uid] ?? 0;
+
+    for (const item of items) {
+      const isOwner = item.group.ownerId === user.uid;
+      if (isOwner) {
+        for (const [pid, share] of Object.entries(item.shares || {})) {
+          if (pid === user.uid) continue;
+          if (share?.status === 'paid') continue;
+          const paidCents = share?.paidCents || 0;
+          owed += Math.max(0, item.splitCents - paidCents);
+        }
+      } else {
+        const myShare = item.shares ? item.shares[user.uid] : undefined;
+        if (myShare && myShare.status !== 'paid') {
+          const paidCents = myShare.paidCents || 0;
+          owe += Math.max(0, item.splitCents - paidCents);
+        }
+      }
     }
+
     return { youOwe: owe, owedToYou: owed };
-  }, [groups, user.uid]);
+  }, [items, user.uid]);
 
-  const owing = groups.filter((g) => g.ownerId !== user.uid);
-  const lending = groups.filter((g) => g.ownerId === user.uid);
+  // Unique stores for filter chips based on current tab
+  const storeList = useMemo(() => {
+    const currentList = tab === 'lend' ? lendingItems : owingItems;
+    const map = new Map<string, number>();
+    for (const it of currentList) {
+      const s = (it.store || '').trim() || 'Credit Card';
+      map.set(s, (map.get(s) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [tab, lendingItems, owingItems]);
 
-  // Automatically determine the initial tab on open/login:
-  // - If user has an explicit preference ('lend' or 'owe'), use it.
-  // - If 'auto':
-  //     1. If you have "you lend", show "You lend" first.
-  //     2. If both exist, show "You lend" first.
-  //     3. If no "you lend" but you have "you owe", show "You owe" first.
+  // Filtered items based on selected store
+  const displayItems = useMemo(() => {
+    const currentList = tab === 'lend' ? lendingItems : owingItems;
+    if (selectedStore === 'all') return currentList;
+    return currentList.filter((it) => ((it.store || '').trim() || 'Credit Card') === selectedStore);
+  }, [tab, lendingItems, owingItems, selectedStore]);
+
+  // When tab changes, reset store filter to 'all'
+  const handleTabChange = (newTab: 'lend' | 'owe') => {
+    setTab(newTab);
+    setSelectedStore('all');
+  };
+
+  // Automatically determine the initial tab on open/login
   useEffect(() => {
     if (hasResolvedDefault) return;
 
@@ -100,17 +163,17 @@ export function HomePage() {
     } else if (pref === 'owe') {
       setTab('owe');
       setHasResolvedDefault(true);
-    } else if (!loading || groups.length > 0) {
-      if (lending.length > 0) {
+    } else if (!groupsLoading || items.length > 0) {
+      if (lendingItems.length > 0) {
         setTab('lend');
-      } else if (owing.length > 0) {
+      } else if (owingItems.length > 0) {
         setTab('owe');
       } else {
         setTab('lend');
       }
       setHasResolvedDefault(true);
     }
-  }, [loading, groups.length, lending.length, owing.length, pref, hasResolvedDefault]);
+  }, [groupsLoading, items.length, lendingItems.length, owingItems.length, pref, hasResolvedDefault]);
 
   const onSelectPref = (newPref: DefaultViewPref) => {
     setPref(newPref);
@@ -120,12 +183,12 @@ export function HomePage() {
       // ignore
     }
 
-    if (newPref === 'lend') setTab('lend');
-    else if (newPref === 'owe') setTab('owe');
+    if (newPref === 'lend') handleTabChange('lend');
+    else if (newPref === 'owe') handleTabChange('owe');
     else {
-      if (lending.length > 0) setTab('lend');
-      else if (owing.length > 0) setTab('owe');
-      else setTab('lend');
+      if (lendingItems.length > 0) handleTabChange('lend');
+      else if (owingItems.length > 0) handleTabChange('owe');
+      else handleTabChange('lend');
     }
 
     toast(
@@ -134,6 +197,131 @@ export function HomePage() {
         : `Default view set to ${newPref === 'lend' ? 'You lend' : 'You owe'}.`,
     );
   };
+
+  // Direct item addition flow
+  const handleStartAddItem = async () => {
+    const owned = groups.find((g) => g.ownerId === user.uid);
+    if (owned) {
+      setTargetGroupId(owned.id);
+      setIsAddingItem(true);
+    } else {
+      try {
+        const { id, saved } = createGroup(user, 'My Cards');
+        setTargetGroupId(id);
+        setIsAddingItem(true);
+        await saved;
+      } catch (err) {
+        toast('Could not create card list: ' + String(err));
+      }
+    }
+  };
+
+  // Active target group for adding items
+  const activeAddGroup = useMemo<Group | null>(() => {
+    if (targetGroupId) {
+      const found = groups.find((g) => g.id === targetGroupId);
+      if (found) return found;
+    }
+    const owned = groups.find((g) => g.ownerId === user.uid);
+    if (owned) return owned;
+    if (!targetGroupId) return null;
+    return {
+      id: targetGroupId,
+      name: 'My Cards',
+      ownerId: user.uid,
+      memberIds: [user.uid],
+      members: {
+        [user.uid]: {
+          name: user.displayName || 'Me',
+          email: user.email || '',
+          photo: user.photoURL || '',
+          joinedAt: Date.now(),
+        },
+      },
+      inviteCode: '',
+      paymentNote: '',
+      hasQr: false,
+      color: '',
+      totals: {},
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+  }, [targetGroupId, groups, user]);
+
+  // Reactive items for modals
+  const viewingItem = useMemo(
+    () => (viewingItemId ? items.find((i) => i.id === viewingItemId) ?? null : null),
+    [viewingItemId, items],
+  );
+
+  const editingItem = useMemo(
+    () => (editingItemId ? items.find((i) => i.id === editingItemId) ?? null : null),
+    [editingItemId, items],
+  );
+
+  const payingItem = useMemo(
+    () => (payingItemId ? items.find((i) => i.id === payingItemId) ?? null : null),
+    [payingItemId, items],
+  );
+
+  const activeInviteGroup = useMemo(
+    () => (inviteGroupId ? groups.find((g) => g.id === inviteGroupId) ?? null : null),
+    [inviteGroupId, groups],
+  );
+
+  // Payment confirmation & status handling
+  const onSetStatus = useCallback(
+    (item: Item, personUid: string, status: ShareStatus) => {
+      const parent = items.find((it) => it.id === item.id)?.group || (item as GroupItem).group;
+      if (!parent) return;
+      const who = firstName(parent.members[personUid]?.name ?? item.shares[personUid]?.name ?? 'They');
+      if (status === 'paid') {
+        const pendingPayment = item.payments?.find((p) => p.uid === personUid && p.status === 'pending');
+        const paymentId = pendingPayment?.id || `claim-${personUid}`;
+        write(
+          confirmPayment(parent.id, item, paymentId, personUid),
+          `Payment for ${who} confirmed and recorded!`,
+        );
+      } else if (status === 'unpaid') {
+        write(
+          undoPayment(parent.id, item, personUid),
+          `Reverted ${who} to unpaid`,
+        );
+      } else {
+        write(setShareStatus(parent.id, item.id, personUid, status), `Status updated for ${who}`);
+      }
+    },
+    [items, write],
+  );
+
+  // Payee submitting a payment
+  const onPaid = (item: Item | null, amountCents?: number, refNumber?: string, note?: string) => {
+    if (item) {
+      const parent = items.find((it) => it.id === item.id)?.group || (item as GroupItem).group;
+      if (!parent) return;
+      const ownerName = firstName(parent.members[parent.ownerId]?.name ?? 'The lender');
+      if (refNumber || (amountCents && amountCents !== item.splitCents)) {
+        const payAmount = amountCents ?? item.splitCents;
+        const payerName = parent.members[user.uid]?.name ?? item.shares[user.uid]?.name ?? 'You';
+        write(
+          recordPayment(parent.id, item, {
+            uid: user.uid,
+            payerName,
+            amountCents: payAmount,
+            refNumber: refNumber || 'Manual',
+            note: note || 'Cut-off payment',
+            status: 'pending',
+          }),
+          `Payment of ${formatMoney(payAmount)} sent! ${ownerName} will confirm it.`,
+        );
+      } else {
+        write(setShareStatus(parent.id, item.id, user.uid, 'claimed', refNumber), `Sent! ${ownerName} will confirm it.`);
+      }
+    }
+    setPayingItemId(null);
+  };
+
+  const loading = groupsLoading || (groups.length > 0 && itemsLoading && items.length === 0);
 
   return (
     <>
@@ -144,7 +332,7 @@ export function HomePage() {
             <IconButton label="Join a list" onClick={() => setPanel('join')}>
               <UserPlus className="size-[18px]" strokeWidth={2.2} />
             </IconButton>
-            <IconButton label="New list" dark onClick={() => setPanel('create')}>
+            <IconButton label="New item" dark onClick={handleStartAddItem}>
               <Plus className="size-5" strokeWidth={2.5} />
             </IconButton>
             <button
@@ -176,12 +364,12 @@ export function HomePage() {
 
             {/* Right Column: Cards & Toggle Switch */}
             <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
-              {/* Compact Segmented Control between You lend & You owe + Settings icon */}
+              {/* Top Bar: Tabs + Settings */}
               <div className="flex items-center justify-between gap-3">
                 <div className="inline-flex items-center rounded-full bg-[#e5e5ea] p-1 ring-1 ring-black/[0.04]">
                   <button
                     type="button"
-                    onClick={() => setTab('lend')}
+                    onClick={() => handleTabChange('lend')}
                     className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
                       tab === 'lend'
                         ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
@@ -189,20 +377,20 @@ export function HomePage() {
                     }`}
                   >
                     <span>You lend</span>
-                    {lending.length > 0 && (
+                    {lendingItems.length > 0 && (
                       <span
                         className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
                           tab === 'lend' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
                         }`}
                       >
-                        {lending.length}
+                        {lendingItems.length}
                       </span>
                     )}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setTab('owe')}
+                    onClick={() => handleTabChange('owe')}
                     className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
                       tab === 'owe'
                         ? 'bg-white text-ink shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
@@ -210,13 +398,13 @@ export function HomePage() {
                     }`}
                   >
                     <span>You owe</span>
-                    {owing.length > 0 && (
+                    {owingItems.length > 0 && (
                       <span
                         className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[10px] font-bold ${
                           tab === 'owe' ? 'bg-ink text-white' : 'bg-black/10 text-muted'
                         }`}
                       >
-                        {owing.length}
+                        {owingItems.length}
                       </span>
                     )}
                   </button>
@@ -233,32 +421,110 @@ export function HomePage() {
                 </button>
               </div>
 
+              {/* Store Filter Chips (All cards vs Individual Card/Store) */}
+              {storeList.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStore('all')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition active:scale-95 shrink-0 ${
+                      selectedStore === 'all'
+                        ? 'bg-ink text-white shadow-sm'
+                        : 'bg-white text-muted hover:bg-black/[0.04] hover:text-ink ring-1 ring-hairline'
+                    }`}
+                  >
+                    <span>All cards</span>
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] ${
+                        selectedStore === 'all' ? 'bg-white/20 text-white' : 'bg-black/10 text-muted'
+                      }`}
+                    >
+                      {tab === 'lend' ? lendingItems.length : owingItems.length}
+                    </span>
+                  </button>
+
+                  {storeList.map(([store, count]) => (
+                    <button
+                      key={store}
+                      type="button"
+                      onClick={() => setSelectedStore(store)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition active:scale-95 shrink-0 ${
+                        selectedStore === store
+                          ? 'bg-ink text-white shadow-sm'
+                          : 'bg-white text-muted hover:bg-black/[0.04] hover:text-ink ring-1 ring-hairline'
+                      }`}
+                    >
+                      <span>{store}</span>
+                      <span
+                        className={`rounded-full px-1.5 text-[10px] ${
+                          selectedStore === store ? 'bg-white/20 text-white' : 'bg-black/10 text-muted'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {error && <ErrorBanner message={error} onRetry={retry} />}
 
+              {/* Cards Display */}
               {tab === 'lend' ? (
-                lending.length > 0 ? (
-                  <WalletCardsView groups={lending} uid={user.uid} mode={cardLayout} />
+                lendingItems.length > 0 ? (
+                  displayItems.length > 0 ? (
+                    <ItemCardsView
+                      items={displayItems}
+                      uid={user.uid}
+                      mode={cardLayout}
+                      onOpen={(it) => setViewingItemId(it.id)}
+                    />
+                  ) : (
+                    <p className="rounded-[20px] bg-white px-4 py-10 text-center text-[14px] text-muted shadow-sm">
+                      No cards found under "{selectedStore}". Tap "All cards" to see all items.
+                    </p>
+                  )
                 ) : (
                   <EmptyState
                     icon={<WalletCards className="size-7" />}
-                    title="No lending lists yet"
-                    text="Create a list if people owe you money, or if you paid for shared orders."
+                    title="No cards added yet"
+                    text="Add your credit card or store installment (e.g. UnionBank, Atome, Shopee) and split with members."
                     action={
-                      <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
-                        New list
+                      <Button
+                        size="sm"
+                        icon={<Plus className="size-4" strokeWidth={2.5} />}
+                        onClick={handleStartAddItem}
+                      >
+                        New item
                       </Button>
                     }
                   />
                 )
-              ) : owing.length > 0 ? (
-                <WalletCardsView groups={owing} uid={user.uid} mode={cardLayout} />
+              ) : owingItems.length > 0 ? (
+                displayItems.length > 0 ? (
+                  <ItemCardsView
+                    items={displayItems}
+                    uid={user.uid}
+                    mode={cardLayout}
+                    onOpen={(it) => setViewingItemId(it.id)}
+                  />
+                ) : (
+                  <p className="rounded-[20px] bg-white px-4 py-10 text-center text-[14px] text-muted shadow-sm">
+                    No cards found under "{selectedStore}". Tap "All cards" to see all items.
+                  </p>
+                )
               ) : (
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
-                  title="You don't owe anyone right now"
-                  text="When someone lends you money or splits a bill with you, tap Join to enter their code."
+                  title="You don't owe anything right now"
+                  text="When someone lends you money or splits an item or installment with you, tap Join to enter their code."
                   action={
-                    <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('join')}>
+                    <Button
+                      size="sm"
+                      variant="white"
+                      icon={<UserPlus className="size-4" />}
+                      onClick={() => setPanel('join')}
+                    >
                       Join a list
                     </Button>
                   }
@@ -269,8 +535,76 @@ export function HomePage() {
         )}
       </PageBody>
 
-      <CreateGroupSheet open={panel === 'create'} onClose={close} />
-      <JoinCodeSheet open={panel === 'join'} onClose={close} />
+      {/* Item Details Sheet */}
+      {viewingItem && (
+        <ItemSheet
+          item={viewingItem}
+          group={viewingItem.group}
+          uid={user.uid}
+          onClose={() => setViewingItemId(null)}
+          onEdit={(it) => {
+            setEditingItemId(it.id);
+            setViewingItemId(null);
+          }}
+          onPay={(it) => {
+            setPayingItemId(it.id);
+            setViewingItemId(null);
+          }}
+          onSetStatus={onSetStatus}
+        />
+      )}
+
+      {/* Edit Item Sheet */}
+      {editingItem && (
+        <ItemFormSheet
+          open={Boolean(editingItem)}
+          onClose={() => setEditingItemId(null)}
+          group={(editingItem as GroupItem).group}
+          item={editingItem}
+          onInvite={() => setInviteGroupId((editingItem as GroupItem).group.id)}
+        />
+      )}
+
+      {/* Add New Item Sheet */}
+      {isAddingItem && activeAddGroup && (
+        <ItemFormSheet
+          open={isAddingItem}
+          onClose={() => setIsAddingItem(false)}
+          group={activeAddGroup}
+          item={null}
+          onInvite={() => setInviteGroupId(activeAddGroup.id)}
+        />
+      )}
+
+      {/* Pay Sheet */}
+      {payingItem && (
+        <PaySheet
+          open={Boolean(payingItem)}
+          onClose={() => setPayingItemId(null)}
+          group={(payingItem as GroupItem).group}
+          uid={user.uid}
+          item={payingItem}
+          totalCents={
+            payingItem.shares?.[user.uid]?.paidCents
+              ? Math.max(0, payingItem.splitCents - payingItem.shares[user.uid].paidCents!)
+              : payingItem.splitCents
+          }
+          unpaidCount={1}
+          onPaid={onPaid}
+        />
+      )}
+
+      {/* Invite Sheet */}
+      {activeInviteGroup && (
+        <InviteSheet
+          open={Boolean(activeInviteGroup)}
+          onClose={() => setInviteGroupId(null)}
+          group={activeInviteGroup}
+        />
+      )}
+
+      <CreateGroupSheet open={panel === 'create'} onClose={closePanel} />
+      <JoinCodeSheet open={panel === 'join'} onClose={closePanel} />
       <DefaultViewSheet
         open={defaultViewOpen}
         onClose={() => setDefaultViewOpen(false)}
