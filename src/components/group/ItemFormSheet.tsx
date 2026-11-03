@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CircleAlert, CreditCard, Plus, Trash2, UserPlus } from 'lucide-react';
+import { CircleAlert, CreditCard, Trash2, UserPlus } from 'lucide-react';
 import { useSafeWrite } from '../../hooks/useToast';
 import { addItem, deleteItem, updateItem } from '../../services/items';
 import { centsToInput, cleanMoneyInput, formatMoney, splitEvenly, toCents } from '../../lib/money';
@@ -27,18 +27,11 @@ export function ItemFormSheet(props: Props) {
 
 type Errors = Partial<Record<'description' | 'price' | 'people' | 'split', string>>;
 
-function slugId(name: string): string {
-  return 'borrower_' + name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
-}
-
 function ItemForm({ onClose, group, item, onInvite }: Props) {
   const write = useSafeWrite();
   const ownerId = group.ownerId;
 
-  // Custom named borrowers added directly
-  const [customBorrowerName, setCustomBorrowerName] = useState('');
-  const [customBorrowers, setCustomBorrowers] = useState<PickPerson[]>([]);
-
+  // Only actual members of the group can be selected
   const people = useMemo<PickPerson[]>(() => {
     const list: PickPerson[] = group.memberIds
       .filter((uid) => group.members[uid])
@@ -49,22 +42,15 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
         isMe: uid === ownerId,
       }));
 
-    // Keep people already saved on this item
+    // If an item was previously saved with someone who later left, keep them so data isn't lost
     for (const [uid, share] of Object.entries(item?.shares ?? {})) {
       if (!list.some((p) => p.uid === uid)) {
         list.push({ uid, name: share.name, photo: '', isMe: uid === ownerId });
       }
     }
 
-    // Add local named borrowers
-    for (const cb of customBorrowers) {
-      if (!list.some((p) => p.uid === cb.uid)) {
-        list.push(cb);
-      }
-    }
-
     return list.sort((a, b) => (a.isMe ? -1 : b.isMe ? 1 : a.name.localeCompare(b.name)));
-  }, [group.memberIds, group.members, item, ownerId, customBorrowers]);
+  }, [group.memberIds, group.members, item, ownerId]);
 
   const [description, setDescription] = useState(item?.description ?? '');
   const [price, setPrice] = useState(item ? centsToInput(item.priceCents) : '');
@@ -78,6 +64,9 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
   const [dueDate, setDueDate] = useState(item?.dueDate ?? '');
   const [billingCycle, setBillingCycle] = useState(item?.billingCycle ?? '');
   const [installmentsCount, setInstallmentsCount] = useState<number>(item?.installmentsCount ?? 1);
+  const [monthlyInput, setMonthlyInput] = useState(
+    item?.monthlyCents ? centsToInput(item.monthlyCents) : '',
+  );
   const [store, setStore] = useState(item?.store ?? '');
   const [color, setColor] = useState(item?.color ?? '');
   const [errors, setErrors] = useState<Errors>({});
@@ -98,17 +87,6 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
     setErrors((e) => ({ ...e, people: undefined }));
   };
 
-  const addCustomBorrower = () => {
-    const trimmed = customBorrowerName.trim();
-    if (!trimmed) return;
-    const uid = slugId(trimmed);
-    const newPerson: PickPerson = { uid, name: trimmed, photo: '', isMe: false };
-    setCustomBorrowers((prev) => [...prev, newPerson]);
-    setSelected((prev) => new Set([...prev, uid]));
-    setCustomBorrowerName('');
-    setErrors((e) => ({ ...e, people: undefined }));
-  };
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const next: Errors = {};
@@ -116,19 +94,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
     if (!desc) next.description = 'Please type what this item is.';
     if (priceCents <= 0) next.price = 'Please type the total price.';
 
-    // If no one is selected, but user typed a borrower name, add them automatically
-    let activeSelected = new Set(selected);
-    if (customBorrowerName.trim() && activeSelected.size === 0) {
-      const trimmed = customBorrowerName.trim();
-      const uid = slugId(trimmed);
-      const newPerson: PickPerson = { uid, name: trimmed, photo: '', isMe: false };
-      setCustomBorrowers((prev) => [...prev, newPerson]);
-      activeSelected.add(uid);
-      setCustomBorrowerName('');
-    }
-
-    if (activeSelected.size === 0) {
-      next.people = 'Please choose or type who owes this item.';
+    if (selected.size === 0) {
+      next.people = 'Please select which member owes this item.';
     }
     if (splitCents <= 0) {
       next.split = 'Please type how much each person pays.';
@@ -139,14 +106,16 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
 
     const now = Date.now();
     const shares: Record<string, Share> = {};
-    for (const uid of activeSelected) {
-      const foundPerson = people.find((p) => p.uid === uid) ?? customBorrowers.find((p) => p.uid === uid);
+    for (const uid of selected) {
+      const foundPerson = people.find((p) => p.uid === uid);
       const name = foundPerson?.name ?? group.members[uid]?.name ?? item?.shares[uid]?.name ?? 'Someone';
       const prev = item?.shares[uid];
       shares[uid] = prev
         ? { ...prev, name }
         : { name, status: 'unpaid', updatedAt: now };
     }
+
+    const manualMonthlyCents = toCents(monthlyInput);
 
     const input = {
       description: desc.slice(0, 200),
@@ -156,6 +125,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
       dueDate: dueDate || null,
       billingCycle: billingCycle.trim() || undefined,
       installmentsCount: installmentsCount > 1 ? installmentsCount : undefined,
+      monthlyCents: manualMonthlyCents && manualMonthlyCents > 0 ? manualMonthlyCents : undefined,
       store: store.trim().slice(0, 40),
       color,
     };
@@ -274,7 +244,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             }}
           />
 
-          {/* People / Borrowers Section: Works whether someone joined or not */}
+          {/* People / Borrowers Section: Only group members can be selected */}
           <div className="space-y-2">
             {hasOtherMembers ? (
               <PeoplePicker
@@ -286,86 +256,24 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                 error={errors.people}
               />
             ) : (
-              <div className="rounded-[18px] bg-white p-3.5 shadow-sm ring-1 ring-hairline space-y-2.5">
+              <div className="rounded-[18px] bg-white p-4 text-center shadow-sm ring-1 ring-hairline space-y-2.5">
                 <div>
-                  <p className="font-semibold text-ink text-[14px]">Who owes this?</p>
-                  <p className="text-[12px] text-muted">
-                    Type a name below to add them to this item:
+                  <p className="font-semibold text-ink text-[14px]">No members in this list yet</p>
+                  <p className="mt-0.5 text-[12px] text-muted">
+                    Only members of this list can be selected. Share code <span className="font-mono font-bold text-ink">{group.inviteCode}</span> so they can join!
                   </p>
                 </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. Juan, Mark, or Me"
-                    value={customBorrowerName}
-                    onChange={(e) => {
-                      setCustomBorrowerName(e.target.value);
-                      setErrors((x) => ({ ...x, people: undefined }));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCustomBorrower();
-                      }
-                    }}
-                    className="h-9 flex-1 min-w-0 rounded-lg bg-fill px-3 text-[13px] text-ink placeholder-muted outline-none ring-1 ring-hairline focus:ring-2 focus:ring-accent"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={addCustomBorrower}
-                    disabled={!customBorrowerName.trim()}
-                    icon={<Plus className="size-3.5" />}
-                  >
-                    Add
-                  </Button>
-                </div>
-
-                {/* Show already added custom borrowers or Me */}
-                {people.length > 0 && (
-                  <div className="pt-1">
-                    <p className="text-[11px] font-medium text-muted mb-1">Selected:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {people.map((p) => {
-                        const on = selected.has(p.uid);
-                        return (
-                          <button
-                            key={p.uid}
-                            type="button"
-                            onClick={() => toggle(p.uid)}
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition active:scale-95 ${
-                              on
-                                ? 'bg-ink text-white shadow-sm'
-                                : 'bg-fill text-muted hover:text-ink'
-                            }`}
-                          >
-                            <span>{p.name}</span>
-                            {on && <span>✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {errors.people && (
-                  <p className="text-[12px] font-medium text-bad">{errors.people}</p>
-                )}
-
-                <div className="pt-2 border-t border-hairline flex items-center justify-between text-[12px]">
-                  <span className="text-muted">Want them to see this?</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onInvite();
-                    }}
-                    className="font-semibold text-accent inline-flex items-center gap-1 hover:underline"
-                  >
-                    <UserPlus className="size-3" />
-                    Invite
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onInvite();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:bg-accent/90 active:scale-95"
+                >
+                  <UserPlus className="size-3.5" />
+                  <span>Invite members</span>
+                </button>
               </div>
             )}
           </div>
@@ -417,7 +325,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             <p className="mt-1 text-[11px] text-white/80">
               {selected.size > 0
                 ? `${formatMoney(priceCents)} split by ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
-                : 'Add a person above to split the price.'}
+                : 'Select members above to split the price.'}
             </p>
             {errors.split && (
               <p className="mt-1.5 rounded-lg bg-white px-2.5 py-1 text-[12px] font-semibold text-bad">{errors.split}</p>
@@ -425,7 +333,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
           </div>
 
           {/* Credit Card Installments & Cutoff schedule */}
-          <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3">
+          <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3.5">
             <div className="flex items-center gap-2">
               <CreditCard className="size-4 text-accent" />
               <p className="text-[13px] font-bold text-ink">Credit Card / Payment Terms</p>
@@ -438,7 +346,14 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                   <button
                     key={n}
                     type="button"
-                    onClick={() => setInstallmentsCount(n)}
+                    onClick={() => {
+                      setInstallmentsCount(n);
+                      if (n > 1 && splitCents > 0) {
+                        setMonthlyInput(centsToInput(Math.round(splitCents / n)));
+                      } else if (n === 1) {
+                        setMonthlyInput('');
+                      }
+                    }}
                     className={`rounded-full px-3 py-1 text-[12px] font-semibold transition active:scale-95 ${
                       installmentsCount === n
                         ? 'bg-ink text-white shadow-sm'
@@ -449,11 +364,38 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                   </button>
                 ))}
               </div>
-              {installmentsCount > 1 && splitCents > 0 && (
-                <p className="mt-1.5 text-[12px] font-semibold text-accent">
-                  Estimated: {formatMoney(Math.round(splitCents / installmentsCount))} per month
-                </p>
-              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="block text-[12px] font-semibold text-ink">
+                  Monthly / Cut-off amount (₱)
+                </label>
+                {installmentsCount > 1 && splitCents > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMonthlyInput(centsToInput(Math.round(splitCents / installmentsCount)))}
+                    className="text-[11px] font-semibold text-accent hover:underline"
+                  >
+                    Auto calculate ({formatMoney(Math.round(splitCents / installmentsCount))})
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={monthlyInput}
+                onChange={(e) => setMonthlyInput(cleanMoneyInput(e.target.value))}
+                placeholder={
+                  installmentsCount > 1 && splitCents > 0
+                    ? centsToInput(Math.round(splitCents / installmentsCount))
+                    : '0.00'
+                }
+                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[15px] font-bold text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+              />
+              <p className="mt-1 text-[11px] text-muted">
+                Type the exact monthly or cut-off bill stated on your billing statement (SOA).
+              </p>
             </div>
 
             <div>

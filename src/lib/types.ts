@@ -57,10 +57,11 @@ export interface Item {
   shares: Record<string, Share>;
   /** Format: YYYY-MM-DD */
   dueDate: string | null;
-  /** Billing cycle or cutoff info, e.g. "Monthly (Every 15th)", "Every cutoff" */
   billingCycle?: string;
   /** Number of months / terms if installment (e.g. 6, 12, 24) */
   installmentsCount?: number;
+  /** Exact manual monthly or per cut-off installment bill from Statement of Account (in centavos) */
+  monthlyCents?: number;
   /** Transaction / payment history log for this item */
   payments?: PaymentRecord[];
   /** Where the debt came from, like Shopee or Lazada. Can be empty. */

@@ -4,7 +4,6 @@ import {
   Check,
   CheckCircle2,
   Clock,
-  CreditCard,
   Pencil,
   Plus,
   ReceiptText,
@@ -109,47 +108,62 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
       }
     >
       <WalletCard seed={item.id} background={storeGradient(item.store, item.id, item.color)} className="p-5">
-        <div className="flex items-center gap-2">
-          <ShoppingBag className="size-4 shrink-0" />
-          <p className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-[0.12em] uppercase">
-            {item.store.trim() || 'Credit Card / Item'}
-          </p>
-          {due && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
-              <CalendarClock className="size-3" />
-              {due.text}
+        {/* Top Header: Store on left, Cycle on top right, Due Date directly below it */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/20 backdrop-blur">
+              <ShoppingBag className="size-3.5 text-white" />
             </span>
-          )}
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-bold tracking-[0.08em] text-white uppercase drop-shadow-sm">
+                {item.store.trim() || 'Credit Card'}
+              </p>
+              {item.installmentsCount && item.installmentsCount > 1 && (
+                <p className="text-[11px] text-white/80 font-medium">
+                  {item.installmentsCount} mos installment
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Upper Right Corner: Cycle on top, Due Date below */}
+          <div className="flex flex-col items-end gap-1 shrink-0 text-right">
+            {item.billingCycle && (
+              <span className="inline-flex items-center rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-medium text-white/95 backdrop-blur">
+                {item.billingCycle}
+              </span>
+            )}
+            {due && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  due.tone === 'slate' ? 'bg-white/15 text-white' : 'bg-white text-bad-ink'
+                }`}
+              >
+                <CalendarClock className="size-3" />
+                {due.text}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Credit Card / Installment badges */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {item.installmentsCount && item.installmentsCount > 1 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
-              <CreditCard className="size-3" />
-              {item.installmentsCount} months installment
-            </span>
-          )}
-          {item.billingCycle && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
-              Cycle: {item.billingCycle}
-            </span>
-          )}
-        </div>
+        {/* Bottom Row: Total Charge on left, Monthly Cutoff small & aligned right */}
+        <div className="mt-8 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-white/70 uppercase tracking-wider">Total Charge</p>
+            <p className="truncate text-[26px] leading-tight font-bold tracking-tight tabular-nums text-white drop-shadow sm:text-[30px]">
+              {formatMoney(item.priceCents)}
+            </p>
+          </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-white/70">Total Card Charge</p>
-            <p className="truncate text-[20px] font-bold tabular-nums">{formatMoney(item.priceCents)}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-white/70">
-              {installmentMonthly ? 'Monthly Cutoff (est.)' : 'Split cost (each)'}
-            </p>
-            <p className="truncate text-[20px] font-bold tabular-nums">
-              {installmentMonthly ? `${formatMoney(installmentMonthly)}/mo` : formatMoney(item.splitCents)}
-            </p>
-          </div>
+          {(item.monthlyCents || installmentMonthly) && (
+            <div className="shrink-0 text-right">
+              <p className="text-[11px] font-medium text-white/70 uppercase tracking-wider">Monthly cutoff</p>
+              <p className="text-[17px] font-bold text-white tabular-nums">
+                {formatMoney(item.monthlyCents || installmentMonthly!)}
+                <span className="text-[12px] font-normal text-white/80">/mo</span>
+              </p>
+            </div>
+          )}
         </div>
 
         {!isOwner && (

@@ -25,6 +25,7 @@ export interface ItemInput {
   dueDate: string | null;
   billingCycle?: string;
   installmentsCount?: number;
+  monthlyCents?: number;
   store: string;
   color: string;
 }

@@ -92,6 +92,7 @@ export function toItem(id: string, d: DocumentData): Item {
     dueDate: typeof d.dueDate === 'string' && d.dueDate ? d.dueDate : null,
     billingCycle: typeof d.billingCycle === 'string' && d.billingCycle ? d.billingCycle : undefined,
     installmentsCount: typeof d.installmentsCount === 'number' ? Math.round(d.installmentsCount) : undefined,
+    monthlyCents: typeof d.monthlyCents === 'number' ? Math.round(d.monthlyCents) : undefined,
     payments,
     store: str(d.store).slice(0, 40),
     color: isCardColor(str(d.color)) ? str(d.color) : '',
