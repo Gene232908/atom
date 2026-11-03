@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function groupDoc(gid) {
+      return get(/databases/$(database)/documents/groups/$(gid)).data;
+    }
+
+    function isMemberOf(gid) {
+      return signedIn() && request.auth.uid in groupDoc(gid).memberIds;
+    }
+
+    function isOwnerOf(gid) {
+      return signedIn() && groupDoc(gid).ownerId == request.auth.uid;
+    }
+
+    // A person joining a list with the right invite code.
+    // They can only add themselves and nothing else.
+    function isJoining() {
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      return !(uid in before.memberIds)
+        && after.diff(before).affectedKeys().hasOnly(['memberIds', 'members'])
+        && after.memberIds.hasAll(before.memberIds)
+        && after.memberIds.size() == before.memberIds.size() + 1
+        && uid in after.memberIds
+        && after.members.diff(before.members).affectedKeys().hasOnly([uid])
+        && after.members[uid].code == before.inviteCode;
+    }
+
+    // A person (not the lender) saying "I paid" or undoing it.
+    // Only on their own share, and never after the lender confirmed it.
+    function isClaimingOwnShare() {
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      return uid in before.shares
+        && after.diff(before).affectedKeys().hasOnly(['shares', 'updatedAt'])
+        && after.shares.diff(before.shares).affectedKeys().hasOnly([uid])
+        && after.shares[uid].diff(before.shares[uid]).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && before.shares[uid].status != 'paid'
+        && after.shares[uid].status in ['unpaid', 'claimed'];
+    }
+
+    function validItem() {
+      let d = request.resource.data;
+      return d.description is string
+        && d.description.size() > 0
+        && d.description.size() <= 200
+        && d.priceCents is int
+        && d.priceCents >= 0
+        && d.splitCents is int
+        && d.splitCents >= 0
+        && d.shares is map;
+    }
+
+    match /groups/{gid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 80;
+      allow update: if signedIn() && (
+        (resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.inviteCode == resource.data.inviteCode)
+        || isJoining()
+      );
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /items/{itemId} {
+        allow read: if isMemberOf(gid);
+        allow create: if isOwnerOf(gid) && validItem();
+        allow update: if (isOwnerOf(gid) && validItem())
+          || (isMemberOf(gid) && isClaimingOwnShare());
+        allow delete: if isOwnerOf(gid);
+      }
+    }
+
+    // Invite codes. Anyone signed in can open one if they know the code,
+    // but nobody can list all of them.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && getAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.inviteCode == code;
+      allow update: if signedIn()
+        && request.resource.data.groupId == resource.data.groupId
+        && isOwnerOf(resource.data.groupId);
+      allow delete: if signedIn() && isOwnerOf(resource.data.groupId);
+    }
+
+    // Payment QR picture. Kept in its own place so it only loads when needed.
+    match /qr/{gid} {
+      allow read: if isMemberOf(gid);
+      allow create, update: if isOwnerOf(gid)
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 900000;
+      allow delete: if isOwnerOf(gid);
+    }
+  }
+}

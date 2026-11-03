@@ -1,0 +1,44 @@
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import { GroupsProvider } from './hooks/useGroups';
+import { ToastProvider } from './hooks/useToast';
+import { useRoute } from './hooks/useRoute';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { OfflineBanner } from './components/layout/OfflineBanner';
+import { FullScreenLoader } from './components/ui/Spinner';
+import { LoginPage } from './pages/LoginPage';
+import { HomePage } from './pages/HomePage';
+import { GroupPage } from './pages/GroupPage';
+import { JoinPage } from './pages/JoinPage';
+
+function Screens() {
+  const { user, loading } = useAuth();
+  const route = useRoute();
+
+  if (loading) return <FullScreenLoader />;
+  if (!user) return <LoginPage joining={route.name === 'join'} />;
+
+  return (
+    <GroupsProvider uid={user.uid}>
+      <OfflineBanner />
+      {route.name === 'group' ? (
+        <GroupPage key={route.id} id={route.id} />
+      ) : route.name === 'join' ? (
+        <JoinPage key={route.code} code={route.code} />
+      ) : (
+        <HomePage />
+      )}
+    </GroupsProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <Screens />
+        </AuthProvider>
+      </ToastProvider>
+    </ErrorBoundary>
+  );
+}

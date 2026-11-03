@@ -1,0 +1,157 @@
+import type { User } from 'firebase/auth';
+import {
+  arrayRemove,
+  arrayUnion,
+  collection,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { toGroup, toInvite } from '../lib/convert';
+import type { Group, Invite } from '../lib/types';
+
+const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function makeInviteCode(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => CODE_LETTERS[b % CODE_LETTERS.length]).join('');
+}
+
+function memberFromUser(user: User) {
+  return {
+    name: user.displayName || user.email?.split('@')[0] || 'Someone',
+    email: user.email ?? '',
+    photo: user.photoURL ?? '',
+    joinedAt: Date.now(),
+  };
+}
+
+/** One live listener for all lists the user belongs to. */
+export function subscribeGroups(
+  uid: string,
+  onData: (groups: Group[]) => void,
+  onError: (err: unknown) => void,
+): () => void {
+  const q = query(collection(db, 'groups'), where('memberIds', 'array-contains', uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const groups = snap.docs.map((d) => toGroup(d.id, d.data()));
+      groups.sort((a, b) => b.createdAt - a.createdAt);
+      onData(groups);
+    },
+    onError,
+  );
+}
+
+/** Creates a list. Returns the new id right away; `saved` finishes when the server confirms. */
+export function createGroup(user: User, name: string): { id: string; saved: Promise<void> } {
+  const ref = doc(collection(db, 'groups'));
+  const code = makeInviteCode();
+  const now = Date.now();
+  const batch = writeBatch(db);
+  batch.set(ref, {
+    name,
+    ownerId: user.uid,
+    memberIds: [user.uid],
+    members: { [user.uid]: memberFromUser(user) },
+    inviteCode: code,
+    paymentNote: '',
+    hasQr: false,
+    color: '',
+    totals: {},
+    createdAt: now,
+    updatedAt: now,
+  });
+  batch.set(doc(db, 'invites', code), {
+    groupId: ref.id,
+    groupName: name,
+    ownerName: user.displayName || 'Someone',
+  });
+  return { id: ref.id, saved: batch.commit() };
+}
+
+export async function fetchInvite(code: string): Promise<Invite | null> {
+  const snap = await getDoc(doc(db, 'invites', code));
+  return snap.exists() ? toInvite(snap.data()) : null;
+}
+
+export async function joinGroup(user: User, groupId: string, code: string): Promise<void> {
+  await updateDoc(doc(db, 'groups', groupId), {
+    memberIds: arrayUnion(user.uid),
+    [`members.${user.uid}`]: { ...memberFromUser(user), code },
+  });
+}
+
+export function removeMember(groupId: string, uid: string): Promise<void> {
+  return updateDoc(doc(db, 'groups', groupId), {
+    memberIds: arrayRemove(uid),
+    [`members.${uid}`]: deleteField(),
+    updatedAt: Date.now(),
+  });
+}
+
+export function saveTotals(groupId: string, totals: Record<string, number>): Promise<void> {
+  return updateDoc(doc(db, 'groups', groupId), { totals });
+}
+
+export interface GroupSettings {
+  name: string;
+  paymentNote: string;
+  /** string = new picture, null = remove picture, undefined = keep as is */
+  qr: string | null | undefined;
+  color: string;
+}
+
+export function saveGroupSettings(group: Group, settings: GroupSettings): Promise<void> {
+  const now = Date.now();
+  const batch = writeBatch(db);
+  const changes: Record<string, unknown> = {
+    name: settings.name,
+    paymentNote: settings.paymentNote,
+    color: settings.color,
+    updatedAt: now,
+  };
+  if (settings.qr !== undefined) changes.hasQr = settings.qr !== null;
+  batch.update(doc(db, 'groups', group.id), changes);
+
+  if (settings.name !== group.name && group.inviteCode) {
+    batch.update(doc(db, 'invites', group.inviteCode), { groupName: settings.name });
+  }
+  if (typeof settings.qr === 'string') {
+    batch.set(doc(db, 'qr', group.id), { image: settings.qr, updatedAt: now });
+  } else if (settings.qr === null) {
+    batch.delete(doc(db, 'qr', group.id));
+  }
+  return batch.commit();
+}
+
+export async function loadQr(groupId: string): Promise<string | null> {
+  const snap = await getDoc(doc(db, 'qr', groupId));
+  const image = snap.exists() ? snap.data().image : null;
+  return typeof image === 'string' ? image : null;
+}
+
+/** Deletes a list together with all its items, its invite and its QR picture. */
+export async function deleteGroup(group: Group): Promise<void> {
+  const items = await getDocs(collection(db, 'groups', group.id, 'items'));
+  const refs = items.docs.map((d) => d.ref);
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+  const batch = writeBatch(db);
+  if (group.inviteCode) batch.delete(doc(db, 'invites', group.inviteCode));
+  if (group.hasQr) batch.delete(doc(db, 'qr', group.id));
+  batch.delete(doc(db, 'groups', group.id));
+  await batch.commit();
+}

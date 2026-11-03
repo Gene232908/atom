@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* iOS-like palette */
+  --color-canvas: #f2f2f7;
+  --color-ink: #1c1c1e;
+  --color-muted: #8e8e93;
+  --color-hairline: rgb(60 60 67 / 0.12);
+  --color-fill: rgb(118 118 128 / 0.12);
+  --color-fill-strong: rgb(118 118 128 / 0.2);
+  --color-ok: #34c759;
+  --color-ok-ink: #248a3d;
+  --color-warn: #ff9500;
+  --color-warn-ink: #c93400;
+  --color-bad: #ff3b30;
+  --color-bad-ink: #d70015;
+  --color-accent: #007aff;
+
+  --animate-sheet-up: sheet-up 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-pop: pop 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-rise: rise 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+    font-feature-settings: 'tnum' 0;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  /* 16px stops iPhones from zooming in when you tap a box */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
