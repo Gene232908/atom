@@ -42,7 +42,10 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
     statusText = 'Not included';
     statusColor = 'text-muted';
   } else {
-    if (done) {
+    if (total === 0) {
+      statusText = 'Waiting for members';
+      statusColor = 'text-warn-ink';
+    } else if (done) {
       statusText = 'All paid';
       statusColor = 'text-ok-ink';
     } else if (waiting) {

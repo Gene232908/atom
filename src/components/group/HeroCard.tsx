@@ -43,8 +43,26 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
     .filter((id) => id !== group.ownerId)
     .map((id) => group.members[id])
     .filter(Boolean);
+  const hasOtherMembers = people.length > 0;
+  const itemsTotal = useMemo(() => items.reduce((sum, it) => sum + it.priceCents, 0), [items]);
 
   const last4 = group.inviteCode.slice(-4) || '0000';
+
+  const subtitle = isOwner
+    ? !hasOtherMembers
+      ? items.length > 0
+        ? 'Total lent • Waiting for members'
+        : 'No members yet • Share invite code'
+      : stats.owed > 0
+        ? 'Still owed to you'
+        : 'All debts settled'
+    : stats.owed > 0
+      ? `You still owe ${ownerName}`
+      : `All paid to ${ownerName}`;
+
+  const displayAmount = isOwner && !hasOtherMembers && itemsTotal > 0
+    ? itemsTotal
+    : stats.owed;
 
   return (
     <WalletCard
@@ -63,10 +81,10 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
       </div>
 
       <p className="mt-4 text-[13px] font-medium text-white/75">
-        {isOwner ? 'Still owed to you' : `You still owe ${ownerName}`}
+        {subtitle}
       </p>
       <p className="text-[36px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[42px]">
-        {formatMoney(stats.owed)}
+        {formatMoney(displayAmount)}
       </p>
 
       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
@@ -91,9 +109,13 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
             >
               Pay now
             </button>
-          ) : (
-            people.length > 0 && <AvatarStack people={people} />
-          )}
+          ) : people.length > 0 ? (
+            <AvatarStack people={people} />
+          ) : isOwner ? (
+            <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold text-white/90 backdrop-blur">
+              No members yet
+            </span>
+          ) : null}
         </div>
       </div>
     </WalletCard>

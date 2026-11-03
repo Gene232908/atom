@@ -1,5 +1,4 @@
-import { useState, useRef, type TouchEvent } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useRef } from 'react';
 import { listGradient } from '../../lib/cardTheme';
 import { navigate } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
@@ -19,6 +18,8 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
     .filter(Boolean);
   const last4 = group.inviteCode.slice(-4) || '0000';
 
+  const hasOtherMembers = people.length > 0;
+
   return (
     <button
       type="button"
@@ -37,15 +38,17 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
             {group.name}
           </p>
           <p className="shrink-0 text-[17px] font-semibold text-white tabular-nums">
-            {amount > 0 ? formatMoney(amount) : 'Paid ✓'}
+            {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : 'Paid ✓'}
           </p>
         </div>
 
         <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
           {isOwner
-            ? amount > 0
-              ? 'Left to collect'
-              : 'Nothing to collect'
+            ? !hasOtherMembers
+              ? 'Waiting for members to join'
+              : amount > 0
+                ? 'Left to collect'
+                : 'All debts settled'
             : amount > 0
               ? `You owe ${ownerName}`
               : `All paid to ${ownerName}`}
@@ -60,7 +63,13 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
               •••• {last4}
             </p>
           </div>
-          {people.length > 0 && <AvatarStack people={people} />}
+          {people.length > 0 ? (
+            <AvatarStack people={people} />
+          ) : isOwner ? (
+            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
+              Waiting to join
+            </span>
+          ) : null}
         </div>
       </WalletCard>
     </button>
@@ -80,86 +89,345 @@ export function WalletStack({ groups, uid }: { groups: Group[]; uid: string }) {
   );
 }
 
-/** Single card mode: displays 1 card at a time with smooth swipe left / right */
+/** Single card item inside the 3D deck */
+function DeckCardItem({
+  group,
+  uid,
+  isFront,
+}: {
+  group: Group;
+  uid: string;
+  isFront: boolean;
+}) {
+  const isOwner = group.ownerId === uid;
+  const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
+  const amount = isOwner ? sumOwed(group.totals) : (group.totals[uid] ?? 0);
+  const people = group.memberIds
+    .filter((id) => id !== group.ownerId)
+    .map((id) => group.members[id])
+    .filter(Boolean);
+  const last4 = group.inviteCode.slice(-4) || '0000';
+  const hasOtherMembers = people.length > 0;
+
+  return (
+    <WalletCard
+      seed={group.id}
+      background={listGradient(group.id, group.color)}
+      interactive={isFront}
+      className="flex h-[196px] flex-col p-5 ring-1 ring-white/15 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow-sm">
+          {group.name}
+        </p>
+        <p className="shrink-0 text-[17px] font-semibold text-white tabular-nums">
+          {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : 'Paid ✓'}
+        </p>
+      </div>
+
+      <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
+        {isOwner
+          ? !hasOtherMembers
+            ? 'Waiting for members to join'
+            : amount > 0
+              ? 'Left to collect'
+              : 'All debts settled'
+          : amount > 0
+            ? `You owe ${ownerName}`
+            : `All paid to ${ownerName}`}
+      </p>
+
+      <div className="mt-auto flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+            {isOwner ? 'You lend' : 'You borrow'}
+          </p>
+          <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">
+            •••• {last4}
+          </p>
+        </div>
+        {people.length > 0 ? (
+          <AvatarStack people={people} />
+        ) : isOwner ? (
+          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
+            Waiting to join
+          </span>
+        ) : null}
+      </div>
+    </WalletCard>
+  );
+}
+
+/** 3D stacked card deck: cards behind peek out; swipe left/right flips & cycles seamlessly */
 export function SingleCardCarousel({ groups, uid }: { groups: Group[]; uid: string }) {
   const [index, setIndex] = useState(0);
-  const touchStartRef = useRef<number | null>(null);
-  const touchStartYRef = useRef<number | null>(null);
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [animating, setAnimating] = useState<'left' | 'right' | null>(null);
+
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const startTimeRef = useRef(0);
+  const isSwipingRef = useRef<boolean | null>(null);
+  const currentDragXRef = useRef(0);
+  const didMoveRef = useRef(false);
 
   const total = groups.length;
   if (total === 0) return null;
-  const current = Math.max(0, Math.min(total - 1, index));
-  const group = groups[current];
 
-  const onTouchStart = (e: TouchEvent) => {
-    touchStartRef.current = e.touches[0].clientX;
-    touchStartYRef.current = e.touches[0].clientY;
+  const current = ((index % total) + total) % total;
+
+  // Next card (card 1 behind)
+  // When dragging right or animating right, show previous card underneath
+  const isSwipingRight = (isDragging && dragX > 0) || animating === 'right';
+  const midIndex = isSwipingRight
+    ? (current - 1 + total) % total
+    : (current + 1) % total;
+
+  // Back card (card 2 further behind)
+  const backIndex = isSwipingRight
+    ? (current - 2 + total) % total
+    : (current + 2) % total;
+
+  const frontGroup = groups[current];
+  const midGroup = total > 1 ? groups[midIndex] : null;
+  const backGroup = total > 2 ? groups[backIndex] : null;
+
+  const triggerSwipe = (direction: 'left' | 'right') => {
+    setAnimating(direction);
+    setDragX(direction === 'left' ? -380 : 380);
+
+    setTimeout(() => {
+      setIndex((i) => (direction === 'left' ? (i + 1) % total : (i - 1 + total) % total));
+      setAnimating(null);
+      setDragX(0);
+      currentDragXRef.current = 0;
+      didMoveRef.current = false;
+    }, 320);
   };
 
-  const onTouchEnd = (e: TouchEvent) => {
-    if (touchStartRef.current === null || touchStartYRef.current === null) return;
-    const diffX = e.changedTouches[0].clientX - touchStartRef.current;
-    const diffY = e.changedTouches[0].clientY - touchStartYRef.current;
-    touchStartRef.current = null;
-    touchStartYRef.current = null;
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (animating || total <= 1) return;
+    const touch = e.touches[0];
+    startXRef.current = touch.clientX;
+    startYRef.current = touch.clientY;
+    startTimeRef.current = Date.now();
+    isSwipingRef.current = null;
+    currentDragXRef.current = 0;
+    didMoveRef.current = false;
+    setIsDragging(true);
+  };
 
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
-      if (diffX > 0) {
-        setIndex((i) => Math.max(0, i - 1));
-      } else {
-        setIndex((i) => Math.min(total - 1, i + 1));
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || animating || total <= 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - startXRef.current;
+    const dy = touch.clientY - startYRef.current;
+
+    if (isSwipingRef.current === null) {
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (absX < 8 && absY < 8) return;
+
+      if (absY > absX) {
+        // Vertical scroll detected: release horizontal capture so page scrolls smoothly
+        isSwipingRef.current = false;
+        setIsDragging(false);
+        setDragX(0);
+        return;
       }
+      isSwipingRef.current = true;
+    }
+
+    if (isSwipingRef.current === true) {
+      didMoveRef.current = true;
+      currentDragXRef.current = dx;
+      setDragX(dx);
     }
   };
 
+  const onTouchEnd = () => {
+    if (!isDragging && !didMoveRef.current) return;
+    setIsDragging(false);
+
+    if (isSwipingRef.current === true) {
+      const dx = currentDragXRef.current;
+      const elapsed = Date.now() - startTimeRef.current;
+      const velocity = Math.abs(dx) / (elapsed || 1);
+
+      if (Math.abs(dx) > 60 || velocity > 0.35) {
+        triggerSwipe(dx < 0 ? 'left' : 'right');
+      } else {
+        setDragX(0);
+      }
+    } else {
+      setDragX(0);
+    }
+    isSwipingRef.current = null;
+    setTimeout(() => {
+      didMoveRef.current = false;
+    }, 50);
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    if (animating || total <= 1) return;
+    startXRef.current = e.clientX;
+    startTimeRef.current = Date.now();
+    currentDragXRef.current = 0;
+    didMoveRef.current = false;
+    setIsDragging(true);
+
+    const onPointerMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startXRef.current;
+      if (Math.abs(dx) > 6) {
+        didMoveRef.current = true;
+      }
+      currentDragXRef.current = dx;
+      setDragX(dx);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      setIsDragging(false);
+
+      const dx = currentDragXRef.current;
+      const elapsed = Date.now() - startTimeRef.current;
+      const velocity = Math.abs(dx) / (elapsed || 1);
+
+      if (Math.abs(dx) > 60 || velocity > 0.35) {
+        triggerSwipe(dx < 0 ? 'left' : 'right');
+      } else {
+        setDragX(0);
+      }
+      setTimeout(() => {
+        didMoveRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  const handleFrontClick = (e: React.MouseEvent) => {
+    if (didMoveRef.current || Math.abs(currentDragXRef.current) > 8) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    navigate(`/g/${frontGroup.id}`);
+  };
+
+  // Interpolations
+  const dragProgress = Math.min(1, Math.abs(dragX) / 140);
+  const rotateZ = dragX * 0.05;
+  const rotateY = dragX * -0.06;
+
+  // Front card transform & transition
+  const frontTransform = isDragging
+    ? `translate3d(${dragX}px, 0, 0) rotateZ(${rotateZ}deg) rotateY(${rotateY}deg) scale(1.02)`
+    : animating === 'left'
+      ? 'translate3d(-130%, 15px, 0) rotateZ(-22deg) rotateY(35deg) scale(0.85)'
+      : animating === 'right'
+        ? 'translate3d(130%, 15px, 0) rotateZ(22deg) rotateY(-35deg) scale(0.85)'
+        : 'translate3d(0, 0, 0) rotateZ(0deg) rotateY(0deg) scale(1)';
+
+  const frontOpacity = animating ? 0 : 1;
+  const frontTransition = isDragging
+    ? 'none'
+    : 'transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 260ms ease';
+
+  // Middle card (Card 1 behind)
+  const midY = -14 + dragProgress * 14;
+  const midScale = 0.95 + dragProgress * 0.05;
+  const midOpacity = 0.85 + dragProgress * 0.15;
+  const midBrightness = 0.92 + dragProgress * 0.08;
+
+  const midTransform = isDragging
+    ? `translate3d(0, ${midY}px, 0) scale(${midScale})`
+    : animating
+      ? 'translate3d(0, 0, 0) scale(1)'
+      : 'translate3d(0, -14px, 0) scale(0.95)';
+
+  // Back card (Card 2 further behind)
+  const backY = -26 + dragProgress * 12;
+  const backScale = 0.90 + dragProgress * 0.05;
+  const backOpacity = 0.65 + dragProgress * 0.20;
+  const backBrightness = 0.85 + dragProgress * 0.07;
+
+  const backTransform = isDragging
+    ? `translate3d(0, ${backY}px, 0) scale(${backScale})`
+    : animating
+      ? 'translate3d(0, -14px, 0) scale(0.95)'
+      : 'translate3d(0, -26px, 0) scale(0.90)';
+
   return (
-    <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <div className="relative">
-        <GroupWalletCard group={group} uid={uid} index={0} />
-      </div>
-
-      {total > 1 && (
-        <div className="flex items-center justify-between px-2 pt-1">
-          <button
-            type="button"
-            disabled={current === 0}
-            onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            className="flex items-center gap-1 text-[13px] font-semibold text-accent disabled:opacity-20 disabled:pointer-events-none transition active:scale-95"
+    <div
+      className="relative w-full pt-8 pb-3 select-none touch-pan-y"
+      style={{ perspective: '1200px' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
+      onPointerDown={onPointerDown}
+    >
+      <div className="relative mx-auto w-full max-w-[420px] h-[196px]" style={{ transformStyle: 'preserve-3d' }}>
+        {/* Layer 2: Back Card (peeking furthest behind) */}
+        {backGroup && (
+          <div
+            onClick={() => !animating && triggerSwipe('left')}
+            className="absolute inset-0 cursor-pointer pointer-events-auto"
+            style={{
+              transform: backTransform,
+              transformOrigin: 'top center',
+              opacity: animating ? 0.85 : backOpacity,
+              filter: animating ? 'brightness(0.92)' : `brightness(${backBrightness})`,
+              transition: isDragging
+                ? 'none'
+                : 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 320ms ease, filter 320ms ease',
+              zIndex: 10,
+            }}
           >
-            <ChevronLeft className="size-4" strokeWidth={2.5} />
-            <span>Prev</span>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-muted">
-              {current + 1} of {total}
-            </span>
-            <div className="flex items-center gap-1.5">
-              {groups.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setIndex(i)}
-                  aria-label={`Go to card ${i + 1}`}
-                  className={`h-2 rounded-full transition-all ${
-                    i === current ? 'w-5 bg-ink' : 'w-2 bg-muted/25 hover:bg-muted/45'
-                  }`}
-                />
-              ))}
-            </div>
+            <DeckCardItem group={backGroup} uid={uid} isFront={false} />
           </div>
+        )}
 
-          <button
-            type="button"
-            disabled={current === total - 1}
-            onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
-            className="flex items-center gap-1 text-[13px] font-semibold text-accent disabled:opacity-20 disabled:pointer-events-none transition active:scale-95"
+        {/* Layer 1: Middle Card (peeking directly behind front card) */}
+        {midGroup && (
+          <div
+            onClick={() => !animating && triggerSwipe('left')}
+            className="absolute inset-0 cursor-pointer pointer-events-auto"
+            style={{
+              transform: midTransform,
+              transformOrigin: 'top center',
+              opacity: animating ? 1 : midOpacity,
+              filter: animating ? 'brightness(1)' : `brightness(${midBrightness})`,
+              transition: isDragging
+                ? 'none'
+                : 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 320ms ease, filter 320ms ease',
+              zIndex: 20,
+            }}
           >
-            <span>Next</span>
-            <ChevronRight className="size-4" strokeWidth={2.5} />
-          </button>
+            <DeckCardItem group={midGroup} uid={uid} isFront={false} />
+          </div>
+        )}
+
+        {/* Layer 0: Front Active Card */}
+        <div
+          onClick={handleFrontClick}
+          className="absolute inset-0 cursor-grab active:cursor-grabbing pointer-events-auto"
+          style={{
+            transform: frontTransform,
+            transformOrigin: 'top center',
+            opacity: frontOpacity,
+            transition: frontTransition,
+            zIndex: 30,
+          }}
+        >
+          <DeckCardItem group={frontGroup} uid={uid} isFront={true} />
         </div>
-      )}
+      </div>
     </div>
   );
 }

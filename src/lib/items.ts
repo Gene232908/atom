@@ -8,7 +8,9 @@ export function otherShares(item: Item, ownerId: string): [string, Share][] {
 }
 
 export function isItemDone(item: Item, ownerId: string): boolean {
-  return otherShares(item, ownerId).every(([, s]) => s.status === 'paid');
+  const others = otherShares(item, ownerId);
+  if (others.length === 0) return false;
+  return others.every(([, s]) => s.status === 'paid');
 }
 
 export function itemProgress(item: Item, ownerId: string): { paid: number; total: number } {
@@ -35,11 +37,11 @@ export function matchesFilter(
     case 'all':
       return true;
     case 'unpaid':
-      return shares.some((s) => s.status !== 'paid');
+      return shares.length === 0 || shares.some((s) => s.status !== 'paid');
     case 'waiting':
       return shares.some((s) => s.status === 'claimed');
     case 'paid':
-      return shares.every((s) => s.status === 'paid');
+      return shares.length > 0 && shares.every((s) => s.status === 'paid');
   }
 }
 

@@ -174,8 +174,28 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           <div className="space-y-6 lg:sticky lg:top-20 lg:col-span-5">
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
 
-            {/* Celebratory badge for owner when all items are fully paid */}
-            {isOwner && items.length > 0 && waitingCount === 0 && Object.values(group.totals).every((v) => v === 0) && (
+            {/* When no other members have joined yet */}
+            {isOwner && people.length === 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-[20px] bg-accent/10 p-4 ring-1 ring-accent/20">
+                <div className="flex items-center gap-2.5">
+                  <UserPlus className="size-5 shrink-0 text-accent" />
+                  <div>
+                    <p className="text-[14px] font-semibold text-ink">Waiting for members to join</p>
+                    <p className="text-[12px] text-muted">No members yet. Share code {group.inviteCode} so others can join.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanel({ kind: 'invite' })}
+                  className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:bg-accent/90 active:scale-95"
+                >
+                  Invite
+                </button>
+              </div>
+            )}
+
+            {/* Celebratory badge for owner ONLY when there are actual members and all debts are settled */}
+            {isOwner && people.length > 0 && items.length > 0 && waitingCount === 0 && Object.values(group.totals).every((v) => v === 0) && (
               <div className="flex items-center justify-between gap-3 rounded-[20px] bg-ok/10 p-4 ring-1 ring-ok/20">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="size-5 shrink-0 text-ok" />
