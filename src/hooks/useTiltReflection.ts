@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type TouchEvent } from 'react';
 
 interface TiltState {
   rotateX: number;
@@ -13,50 +13,91 @@ const DEFAULT_STATE: TiltState = {
   rotateX: 0,
   rotateY: 0,
   shineX: 50,
-  shineY: 50,
+  shineY: 45,
   shineAngle: 125,
-  glareOpacity: 0.35,
+  glareOpacity: 0.45,
 };
 
 /**
- * High-performance hook for 3D card tilt and holographic reflection.
- * Responds to:
- * 1. Mobile Gyroscope / DeviceOrientation (tilting phone left/right/up/down)
- * 2. Pointer / Mouse Movement (hovering / dragging over card)
- * 3. Touch Drag (sliding finger across the card)
- * 4. Ambient idle gleam when resting
+ * High-performance 3D card tilt & Apple Card holographic reflection hook.
+ * Features:
+ * 1. Mobile Gyroscope / DeviceOrientation with automatic iOS permission request.
+ * 2. Mobile Touch Screen Drag / Swipe: user can drag finger directly across the card.
+ * 3. Desktop Mouse / Pointer move and tilt.
+ * 4. Ambient idle gleam / shimmer so card is continuously vibrant and alive.
  */
 export function useTiltReflection(enabled = true) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<TiltState>(DEFAULT_STATE);
   const targetRef = useRef<TiltState>(DEFAULT_STATE);
   const rafRef = useRef<number | null>(null);
-  const activePointerRef = useRef(false);
+  const isInteractingRef = useRef(false);
+  const gyroActiveRef = useRef(false);
+  const requestedIosRef = useRef(false);
 
-  // Smooth lerp loop for 60fps buttery animations
+  // Request iOS 13+ gyroscope permission on first user touch / pointer down
+  const maybeRequestIosGyro = () => {
+    if (requestedIosRef.current || typeof window === 'undefined') return;
+    requestedIosRef.current = true;
+    try {
+      const DOE = window.DeviceOrientationEvent as unknown as {
+        requestPermission?: () => Promise<'granted' | 'denied'>;
+      };
+      if (typeof DOE?.requestPermission === 'function') {
+        DOE.requestPermission()
+          .then((res) => {
+            if (res === 'granted') {
+              gyroActiveRef.current = true;
+            }
+          })
+          .catch(() => {});
+      } else {
+        gyroActiveRef.current = true;
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // Smooth lerp loop (60-120fps) + ambient breathing shimmer when idle
   useEffect(() => {
     if (!enabled) return;
 
     let mounted = true;
+    let t = 0;
     const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
 
     const tick = () => {
       if (!mounted) return;
+      t += 0.02;
+
+      // When resting (no touch, no tilt), add a subtle ambient shimmer
+      if (!isInteractingRef.current && !gyroActiveRef.current) {
+        targetRef.current = {
+          rotateX: Math.sin(t * 0.7) * 2.5,
+          rotateY: Math.cos(t * 0.9) * 3,
+          shineX: 50 + Math.sin(t) * 28,
+          shineY: 45 + Math.cos(t * 0.8) * 22,
+          shineAngle: 120 + Math.sin(t * 0.5) * 35,
+          glareOpacity: 0.5 + Math.sin(t * 1.2) * 0.15,
+        };
+      }
+
       setState((prev) => {
         const target = targetRef.current;
-        const rx = lerp(prev.rotateX, target.rotateX, 0.12);
-        const ry = lerp(prev.rotateY, target.rotateY, 0.12);
-        const sx = lerp(prev.shineX, target.shineX, 0.14);
-        const sy = lerp(prev.shineY, target.shineY, 0.14);
-        const sa = lerp(prev.shineAngle, target.shineAngle, 0.12);
-        const go = lerp(prev.glareOpacity, target.glareOpacity, 0.14);
+        const speed = isInteractingRef.current ? 0.22 : 0.08;
+        const rx = lerp(prev.rotateX, target.rotateX, speed);
+        const ry = lerp(prev.rotateY, target.rotateY, speed);
+        const sx = lerp(prev.shineX, target.shineX, speed + 0.04);
+        const sy = lerp(prev.shineY, target.shineY, speed + 0.04);
+        const sa = lerp(prev.shineAngle, target.shineAngle, speed);
+        const go = lerp(prev.glareOpacity, target.glareOpacity, speed + 0.04);
 
-        // Check if movement is negligible to save re-renders
         if (
-          Math.abs(rx - target.rotateX) < 0.05 &&
-          Math.abs(ry - target.rotateY) < 0.05 &&
-          Math.abs(sx - target.shineX) < 0.2 &&
-          Math.abs(sy - target.shineY) < 0.2
+          Math.abs(rx - target.rotateX) < 0.04 &&
+          Math.abs(ry - target.rotateY) < 0.04 &&
+          Math.abs(sx - target.shineX) < 0.15 &&
+          Math.abs(sy - target.shineY) < 0.15
         ) {
           return prev;
         }
@@ -81,29 +122,30 @@ export function useTiltReflection(enabled = true) {
     };
   }, [enabled]);
 
-  // Device orientation / Gyroscope listener
+  // Hardware Gyroscope (DeviceOrientation) listener
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
 
     const handleOrientation = (e: DeviceOrientationEvent) => {
-      // If user is actively touching or hovering with mouse, let pointer take priority
-      if (activePointerRef.current) return;
+      if (isInteractingRef.current) return;
+      if (e.gamma === null && e.beta === null) return;
+      gyroActiveRef.current = true;
 
       const gamma = e.gamma ?? 0; // Left-to-right tilt (-90 to 90)
       const beta = e.beta ?? 45;   // Front-to-back tilt (-180 to 180). Normal phone hold is ~45deg
 
-      // Clamp values to natural phone viewing range
-      const clampedGamma = Math.max(-35, Math.min(35, gamma));
-      const clampedBeta = Math.max(15, Math.min(75, beta)) - 45; // Center around 45deg hold
+      // Clamp to natural phone holding angles
+      const clampedGamma = Math.max(-40, Math.min(40, gamma));
+      const clampedBeta = Math.max(10, Math.min(80, beta)) - 45; // Center around 45deg hold
 
-      // Map to card rotation (degrees)
-      const rotateY = (clampedGamma / 35) * 12;
-      const rotateX = -(clampedBeta / 30) * 10;
+      // Map to 3D rotation
+      const rotateY = (clampedGamma / 40) * 16;
+      const rotateX = -(clampedBeta / 35) * 14;
 
-      // Map to specular shine position (0% - 100%)
-      const shineX = 50 + (clampedGamma / 35) * 42;
-      const shineY = 50 + (clampedBeta / 30) * 42;
-      const shineAngle = 125 + (clampedGamma / 35) * 35;
+      // Map to glossy reflection coordinates
+      const shineX = 50 + (clampedGamma / 40) * 45;
+      const shineY = 50 + (clampedBeta / 35) * 45;
+      const shineAngle = 125 + (clampedGamma / 40) * 45;
 
       targetRef.current = {
         rotateX,
@@ -111,7 +153,7 @@ export function useTiltReflection(enabled = true) {
         shineX,
         shineY,
         shineAngle,
-        glareOpacity: 0.55,
+        glareOpacity: 0.72,
       };
     };
 
@@ -121,23 +163,21 @@ export function useTiltReflection(enabled = true) {
     };
   }, [enabled]);
 
-  // Pointer / Mouse move handler
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!enabled || !containerRef.current) return;
-    activePointerRef.current = true;
-
+  // Update target from element client coordinates (for both mouse and finger touch)
+  const updateFromCoords = (clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
     const px = Math.max(0, Math.min(1, x / rect.width));
     const py = Math.max(0, Math.min(1, y / rect.height));
 
-    const rotateX = (0.5 - py) * 16;
-    const rotateY = (px - 0.5) * 18;
+    const rotateX = (0.5 - py) * 22;
+    const rotateY = (px - 0.5) * 24;
     const shineX = px * 100;
     const shineY = py * 100;
-    const shineAngle = 100 + px * 50;
+    const shineAngle = 90 + px * 90;
 
     targetRef.current = {
       rotateX,
@@ -145,17 +185,55 @@ export function useTiltReflection(enabled = true) {
       shineX,
       shineY,
       shineAngle,
-      glareOpacity: 0.65,
+      glareOpacity: 0.9,
     };
   };
 
-  const handlePointerLeave = () => {
-    activePointerRef.current = false;
+  // Pointer / Mouse events
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    maybeRequestIosGyro();
+    isInteractingRef.current = true;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    updateFromCoords(e.clientX, e.clientY);
+  };
+
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!enabled || !isInteractingRef.current) return;
+    updateFromCoords(e.clientX, e.clientY);
+  };
+
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    isInteractingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    targetRef.current = DEFAULT_STATE;
+  };
+
+  // Touch Screen events (for mobile swiping/dragging directly across the card)
+  const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    maybeRequestIosGyro();
+    isInteractingRef.current = true;
+    if (e.touches[0]) {
+      updateFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (!enabled || !isInteractingRef.current) return;
+    if (e.touches[0]) {
+      updateFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const onTouchEnd = () => {
+    isInteractingRef.current = false;
     targetRef.current = DEFAULT_STATE;
   };
 
   const style: CSSProperties = {
-    // Custom CSS properties for the card
     ['--rx' as string]: `${state.rotateX}deg`,
     ['--ry' as string]: `${state.rotateY}deg`,
     ['--shine-x' as string]: `${state.shineX}%`,
@@ -164,14 +242,21 @@ export function useTiltReflection(enabled = true) {
     ['--glare-opacity' as string]: state.glareOpacity,
     transform: `perspective(1000px) rotateX(${state.rotateX}deg) rotateY(${state.rotateY}deg)`,
     transformStyle: 'preserve-3d',
-    transition: activePointerRef.current ? 'none' : 'transform 0.4s ease-out',
+    willChange: 'transform',
+    touchAction: 'none', // Allows fluid swiping & dragging across the card on touchscreens
   };
 
   return {
     ref: containerRef,
     style,
     state,
-    onPointerMove: handlePointerMove,
-    onPointerLeave: handlePointerLeave,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel: onPointerUp,
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    onTouchCancel: onTouchEnd,
   };
 }

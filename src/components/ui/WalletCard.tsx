@@ -34,9 +34,15 @@ export function WalletCard({
   return (
     <div
       ref={tilt.ref}
+      onPointerDown={tilt.onPointerDown}
       onPointerMove={tilt.onPointerMove}
-      onPointerLeave={tilt.onPointerLeave}
-      className="relative select-none touch-manipulation perspective-[1000px] [-webkit-touch-callout:none] [-webkit-user-select:none]"
+      onPointerUp={tilt.onPointerUp}
+      onPointerCancel={tilt.onPointerCancel}
+      onTouchStart={tilt.onTouchStart}
+      onTouchMove={tilt.onTouchMove}
+      onTouchEnd={tilt.onTouchEnd}
+      onTouchCancel={tilt.onTouchCancel}
+      className="relative select-none touch-none perspective-[1000px] [-webkit-touch-callout:none] [-webkit-user-select:none] rounded-[22px]"
       style={{
         ...style,
         ...(interactive ? tilt.style : {}),
@@ -48,50 +54,46 @@ export function WalletCard({
           backgroundImage: background ?? cardGradient(seed),
         }}
       >
-        {/* Ambient atmospheric lighting */}
+        {/* Soft top-right ambient glow */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 -right-16 -z-10 size-64 rounded-full bg-white/20 blur-2xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 -left-16 -z-10 size-60 rounded-full bg-black/35 blur-2xl"
+          className="pointer-events-none absolute -top-16 -right-12 size-48 rounded-full bg-white/25 blur-2xl"
         />
 
         {/* Diagonal metallic brushed shimmer */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(125deg,transparent_20%,rgba(255,255,255,0.12)_45%,transparent_65%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,transparent_20%,rgba(255,255,255,0.14)_45%,transparent_65%)]"
         />
 
-        {/* DYNAMIC HOLOGRAPHIC FOIL LAYER (Reacts to tilting phone) */}
+        {/* DYNAMIC HOLOGRAPHIC FOIL LAYER (Reacts to tilting phone and touch drag) */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 transition-opacity duration-300"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-200"
           style={{
-            opacity: interactive ? 'var(--glare-opacity, 0.4)' : 0.2,
+            opacity: interactive ? 'var(--glare-opacity, 0.45)' : 0.25,
             background:
-              'linear-gradient(var(--shine-angle, 125deg), rgba(255,0,128,0.2) 0%, rgba(0,240,255,0.22) 30%, rgba(255,220,0,0.22) 65%, rgba(160,32,240,0.2) 100%)',
+              'linear-gradient(var(--shine-angle, 125deg), rgba(255,0,128,0.28) 0%, rgba(0,240,255,0.3) 30%, rgba(255,220,0,0.3) 65%, rgba(160,32,240,0.28) 100%)',
             mixBlendMode: 'color-dodge',
           }}
         />
 
-        {/* DYNAMIC SPECULAR GLARE REFLECTION (Moves with phone tilt or mouse) */}
+        {/* DYNAMIC SPECULAR GLARE REFLECTION (Moves with touch drag or phone tilt) */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 transition-opacity duration-200"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-150"
           style={{
-            opacity: interactive ? 'var(--glare-opacity, 0.5)' : 0.25,
+            opacity: interactive ? 'var(--glare-opacity, 0.65)' : 0.35,
             background:
-              'radial-gradient(circle 300px at var(--shine-x, 50%) var(--shine-y, 50%), rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 35%, transparent 70%)',
+              'radial-gradient(circle 260px at var(--shine-x, 50%) var(--shine-y, 45%), rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.2) 30%, transparent 65%)',
             mixBlendMode: 'overlay',
           }}
         />
 
-        {/* Inner rim lighting (subtle border) */}
+        {/* Inner rim lighting (crisp Apple card border) */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[22px] ring-1 ring-white/18 ring-inset"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-white/20 ring-inset"
         />
 
         {/* Card content */}
