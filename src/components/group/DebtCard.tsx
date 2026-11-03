@@ -40,7 +40,7 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
         seed={item.id}
         background={storeGradient(store, item.id, item.color)}
         interactive={true}
-        className={`flex h-[240px] flex-col p-5 sm:h-[250px] ${status === 'paid' ? 'opacity-75 saturate-50' : ''}`}
+        className={`flex w-full min-h-[208px] sm:min-h-[224px] flex-col p-5 sm:p-6 ${status === 'paid' ? 'opacity-75 saturate-50' : ''}`}
       >
         <div className="flex items-center justify-between gap-2.5">
           <div className="flex min-w-0 items-center gap-2">

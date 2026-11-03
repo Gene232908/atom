@@ -40,9 +40,9 @@ service cloud.firestore {
       let before = resource.data;
       let after = request.resource.data;
       return uid in before.shares
-        && after.diff(before).affectedKeys().hasOnly(['shares', 'updatedAt'])
+        && after.diff(before).affectedKeys().hasOnly(['shares', 'updatedAt', 'payments'])
         && after.shares.diff(before.shares).affectedKeys().hasOnly([uid])
-        && after.shares[uid].diff(before.shares[uid]).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && after.shares[uid].diff(before.shares[uid]).affectedKeys().hasOnly(['status', 'updatedAt', 'refNumber', 'paidCents'])
         && before.shares[uid].status != 'paid'
         && after.shares[uid].status in ['unpaid', 'claimed'];
     }

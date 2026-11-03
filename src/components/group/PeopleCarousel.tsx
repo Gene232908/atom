@@ -30,9 +30,7 @@ export function PeopleCarousel({ people, uid, isOwner, onOpen, onInvite }: Props
             onClick={() => onOpen(p.uid)}
             className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-2.5 py-1.5 text-left shadow-sm ring-1 ring-hairline transition hover:ring-black/15 active:scale-95 select-none"
           >
-            <div className="size-6 shrink-0 rounded-full overflow-hidden">
-              <Avatar name={p.name} photo={p.photo} size="sm" />
-            </div>
+            <Avatar name={p.name} photo={p.photo} size="xs" />
 
             <span className="truncate max-w-[80px] sm:max-w-[100px] text-[13px] font-semibold text-ink">
               {name}

@@ -17,16 +17,14 @@ interface Action {
   style: string;
 }
 
-function actionFor(ownerViewing: boolean, viewerUid: string, personUid: string, ownerId: string, status: ShareStatus): Action | null {
+function actionFor(ownerViewing: boolean, personUid: string, ownerId: string, status: ShareStatus): Action | null {
   if (personUid === ownerId) return null;
   if (ownerViewing) {
     return status === 'paid'
       ? { label: 'Undo', next: 'unpaid', style: 'bg-fill text-ink' }
       : { label: 'Mark paid', next: 'paid', style: 'bg-ok text-white' };
   }
-  if (personUid !== viewerUid) return null;
-  if (status === 'unpaid') return { label: 'I paid', next: 'claimed', style: 'bg-ink text-white' };
-  if (status === 'claimed') return { label: 'Undo', next: 'unpaid', style: 'bg-fill text-ink' };
+  // Borrowers use the "Pay now" card flow to pay, so no redundant button inside information
   return null;
 }
 
@@ -35,7 +33,7 @@ export function ShareRow({ personUid, share, group, viewerUid, onSetStatus }: Pr
   const member = group.members[personUid];
   const name = member?.name ?? share.name;
   const isLender = personUid === group.ownerId;
-  const action = actionFor(ownerViewing, viewerUid, personUid, group.ownerId, share.status);
+  const action = actionFor(ownerViewing, personUid, group.ownerId, share.status);
 
   let note = '';
   if (isLender) note = 'Lender’s own share';

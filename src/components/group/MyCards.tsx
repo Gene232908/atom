@@ -44,19 +44,21 @@ export function MyCards({ items, uid, onPay, onOpen }: Props) {
       >
         Your cards
       </SectionLabel>
-      <Carousel
-        dots
-        slideClass="w-[86%] max-w-[380px] md:w-auto md:max-w-none"
-        wideClass={
-          mine.length === 1
-            ? 'md:mx-0 md:max-w-[460px] md:overflow-visible md:px-0'
-            : 'md:mx-0 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-4 md:overflow-visible md:px-0'
-        }
-      >
-        {mine.map((item) => (
-          <DebtCard key={item.id} item={item} personUid={uid} onPay={onPay} onOpen={onOpen} />
-        ))}
-      </Carousel>
+      {mine.length === 1 ? (
+        <div className="w-full">
+          <DebtCard item={mine[0]} personUid={uid} onPay={onPay} onOpen={onOpen} />
+        </div>
+      ) : (
+        <Carousel
+          dots
+          slideClass="w-[90%] sm:w-full max-w-[480px] md:w-auto md:max-w-none"
+          wideClass="md:mx-0 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-4 md:overflow-visible md:px-0"
+        >
+          {mine.map((item) => (
+            <DebtCard key={item.id} item={item} personUid={uid} onPay={onPay} onOpen={onOpen} />
+          ))}
+        </Carousel>
+      )}
     </section>
   );
 }

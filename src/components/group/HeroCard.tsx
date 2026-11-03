@@ -107,7 +107,7 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
               }}
               className="h-10 shrink-0 rounded-full bg-white px-5 text-[14px] font-bold text-ink shadow-lg shadow-black/25 transition active:scale-95 hover:bg-white/90"
             >
-              Pay now
+              Pay total
             </button>
           ) : people.length > 0 ? (
             <AvatarStack people={people} />
