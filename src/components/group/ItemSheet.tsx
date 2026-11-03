@@ -40,11 +40,13 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   const [recNote, setRecNote] = useState('');
 
   const people = useMemo(() => {
-    if (!item) return [];
-    const rank = (pid: string, status: ShareStatus) =>
+    if (!item?.shares) return [];
+    const rank = (pid: string, status?: ShareStatus) =>
       pid === uid ? 0 : pid === group.ownerId ? 3 : status === 'paid' ? 2 : 1;
     return Object.entries(item.shares).sort(
-      ([a, sa], [b, sb]) => rank(a, sa.status) - rank(b, sb.status) || sa.name.localeCompare(sb.name),
+      ([a, sa], [b, sb]) =>
+        rank(a, sa?.status) - rank(b, sb?.status) ||
+        (sa?.name ?? '').localeCompare(sb?.name ?? ''),
     );
   }, [item, uid, group.ownerId]);
 
@@ -53,27 +55,32 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   const done = isItemDone(item, group.ownerId);
   const due = dueInfo(item.dueDate, done);
   const { paid, total } = itemProgress(item, group.ownerId);
-  const mine = item.shares[uid];
+  const mine = item.shares ? item.shares[uid] : undefined;
 
   const myPaid = mine?.paidCents ?? (mine?.status === 'paid' ? item.splitCents : 0);
   const myRemaining = Math.max(0, item.splitCents - myPaid);
   const canPay = !isOwner && myRemaining > 0;
 
   const installmentMonthly =
-    item.installmentsCount && item.installmentsCount > 1
+    item.installmentsCount && item.installmentsCount > 1 && item.splitCents > 0
       ? Math.round(item.splitCents / item.installmentsCount)
       : null;
 
   // Auto-record borrower payments in Transaction History: includes recorded payments AND any borrower claimed payments
   const payments = useMemo(() => {
-    const list: PaymentRecord[] = [...(item.payments ?? [])];
+    if (!item) return [];
+    const list: PaymentRecord[] = Array.isArray(item.payments) ? [...item.payments] : [];
     const existingUidsWithPending = new Set(list.filter((p) => p.status === 'pending').map((p) => p.uid));
 
-    for (const [pid, share] of Object.entries(item.shares)) {
-      if (pid === group.ownerId) continue;
+    const shares = item.shares ?? {};
+    for (const [pid, share] of Object.entries(shares)) {
+      if (!share || pid === group.ownerId) continue;
       if (share.status === 'claimed' && !existingUidsWithPending.has(pid)) {
         const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
-        const amt = share.paidCents && share.paidCents > 0 ? share.paidCents : (item.monthlyCents || installmentMonthly || item.splitCents);
+        const amt =
+          share.paidCents && share.paidCents > 0
+            ? share.paidCents
+            : item.monthlyCents || installmentMonthly || item.splitCents || 0;
         list.unshift({
           id: `claim-${pid}`,
           uid: pid,
@@ -82,12 +89,12 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
           refNumber: share.refNumber || 'Pending verification',
           note: 'Submitted via Pay now',
           status: 'pending',
-          paidAt: share.updatedAt,
+          paidAt: share.updatedAt && !isNaN(share.updatedAt) && share.updatedAt > 0 ? share.updatedAt : Date.now(),
         });
       }
     }
     return list;
-  }, [item.payments, item.shares, item.monthlyCents, item.splitCents, installmentMonthly, group.members, group.ownerId]);
+  }, [item, installmentMonthly, group.members, group.ownerId]);
 
   const handleRecordPaymentSubmit = () => {
     const targetUid = recUid || (people[0] ? people[0][0] : '');
@@ -224,23 +231,34 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
       </WalletCard>
 
       {/* Split With People List */}
-      <p className="mt-5 mb-2 px-1 text-[13px] font-medium text-muted">
-        Split with {people.length} {people.length === 1 ? 'person' : 'people'}
-      </p>
-      <div className="overflow-hidden rounded-[20px] bg-white ring-1 ring-hairline shadow-sm">
-        <div className="divide-y divide-hairline">
-          {people.map(([pid, share]) => (
-            <ShareRow
-              key={pid}
-              personUid={pid}
-              share={share}
-              group={group}
-              viewerUid={uid}
-              onSetStatus={(personUid, status) => onSetStatus(item, personUid, status)}
-            />
-          ))}
+      {people.length === 0 ? (
+        <div className="mt-5 rounded-[20px] bg-white p-5 text-center ring-1 ring-hairline shadow-sm">
+          <p className="text-[14px] font-semibold text-ink">Waiting for members</p>
+          <p className="mt-1 text-[12px] text-muted">
+            No members have been assigned to this item yet. Tap <span className="font-semibold text-ink">Edit item</span> below or share invite code <span className="font-mono font-bold text-ink">{group.inviteCode}</span>.
+          </p>
         </div>
-      </div>
+      ) : (
+        <>
+          <p className="mt-5 mb-2 px-1 text-[13px] font-medium text-muted">
+            Split with {people.length} {people.length === 1 ? 'person' : 'people'}
+          </p>
+          <div className="overflow-hidden rounded-[20px] bg-white ring-1 ring-hairline shadow-sm">
+            <div className="divide-y divide-hairline">
+              {people.map(([pid, share]) => (
+                <ShareRow
+                  key={pid}
+                  personUid={pid}
+                  share={share}
+                  group={group}
+                  viewerUid={uid}
+                  onSetStatus={(personUid, status) => onSetStatus(item, personUid, status)}
+                />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* TRANSACTION & PAYMENT HISTORY SECTION */}
       <div className="mt-6 space-y-3">
@@ -357,13 +375,19 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
             <div className="divide-y divide-hairline">
               {payments.map((p) => {
                 const isConfirmed = p.status === 'confirmed';
-                const dateStr = new Date(p.paidAt).toLocaleDateString('en-PH', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+                const validTs = typeof p.paidAt === 'number' && !isNaN(p.paidAt) && p.paidAt > 0 ? p.paidAt : Date.now();
+                let dateStr = 'Recent';
+                try {
+                  dateStr = new Date(validTs).toLocaleDateString('en-PH', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                } catch {
+                  dateStr = 'Recent';
+                }
 
                 return (
                   <div key={p.id} className="flex items-center justify-between gap-3 p-3.5">
