@@ -341,8 +341,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
 
             <div>
               <label className="block text-[12px] font-medium text-muted">Installment Terms</label>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {[1, 3, 6, 12, 24].map((n) => (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {[1, 2, 3, 6, 12, 24].map((n) => (
                   <button
                     key={n}
                     type="button"
@@ -360,9 +360,33 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                         : 'bg-fill text-muted hover:text-ink'
                     }`}
                   >
-                    {n === 1 ? '1x (Full)' : `${n} months`}
+                    {n === 1 ? '1x (Full)' : `${n} mos`}
                   </button>
                 ))}
+
+                <div className="flex items-center gap-1 rounded-full bg-fill pl-2.5 pr-2 py-0.5 text-[12px] ring-1 ring-hairline">
+                  <span className="text-muted text-[11px] font-medium">Custom:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    placeholder="e.g. 4"
+                    value={![1, 2, 3, 6, 12, 24].includes(installmentsCount) && installmentsCount > 0 ? installmentsCount : ''}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) {
+                        setInstallmentsCount(val);
+                        if (val > 1 && splitCents > 0) {
+                          setMonthlyInput(centsToInput(Math.round(splitCents / val)));
+                        } else if (val === 1) {
+                          setMonthlyInput('');
+                        }
+                      }
+                    }}
+                    className="w-12 bg-transparent text-center font-bold text-ink outline-none"
+                  />
+                  <span className="text-[11px] text-muted">mos</span>
+                </div>
               </div>
             </div>
 
