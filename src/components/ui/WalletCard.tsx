@@ -10,22 +10,31 @@ interface Props {
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
-  /** Tilt the card in 3D with the phone (or mouse). Light effects always follow the phone. */
+  /** Let the shine follow the mouse on laptops. On phones it always follows the gyroscope. */
   interactive?: boolean;
 }
 
-// Every value below reads --tx / --ty (-1..1) written by lib/motion.ts, so it moves with the phone.
-const TILT = 'perspective(900px) rotateX(calc(var(--ty, 0) * -6deg)) rotateY(calc(var(--tx, 0) * 8deg))';
+// The card itself never moves. Only the light reads --tx / --ty (-1..1) from lib/motion.ts.
+const SHADOW = '0 18px 36px -16px rgba(0,0,0,0.45), 0 4px 10px -4px rgba(0,0,0,0.18)';
 
-const SHADOW =
-  'calc(var(--tx, 0) * -10px) calc(16px + var(--ty, 0) * -6px) 34px -12px rgba(0,0,0,0.45), 0 4px 10px -4px rgba(0,0,0,0.18)';
+const MOVE = 'calc(50% + var(--tx, 0) * 30%) calc(50% + var(--ty, 0) * 25%)';
 
-// One wide, soft sheen that glides across the card as the phone tilts. No lines, no spots.
+// Wide glossy light: overlay makes the card's own color glow brighter, like light on a real card.
+const GLOSS: CSSProperties = {
+  background:
+    'linear-gradient(115deg, transparent 26%, rgba(255,255,255,0.25) 38%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0.25) 62%, transparent 74%)',
+  backgroundSize: '220% 220%',
+  backgroundPosition: MOVE,
+  backgroundRepeat: 'no-repeat',
+  mixBlendMode: 'overlay',
+};
+
+// Soft white glow on top so the shine is still visible on dark cards.
 const SHEEN: CSSProperties = {
   background:
-    'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.10) 38%, rgba(255,255,255,0.20) 48%, rgba(255,255,255,0.10) 58%, transparent 76%)',
-  backgroundSize: '250% 100%',
-  backgroundPosition: 'calc(50% - var(--tx, 0) * 45%) 0',
+    'linear-gradient(115deg, transparent 32%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.08) 58%, transparent 68%)',
+  backgroundSize: '220% 220%',
+  backgroundPosition: MOVE,
   backgroundRepeat: 'no-repeat',
 };
 
@@ -45,13 +54,14 @@ export function WalletCard({ seed, background, className = '', style, children, 
       onPointerMove={tilt.onPointerMove}
       onPointerLeave={tilt.onPointerLeave}
       className="relative rounded-[22px] select-none [-webkit-touch-callout:none]"
-      style={{ ...style, transform: interactive ? TILT : undefined, willChange: interactive ? 'transform' : undefined }}
+      style={style}
     >
       <div
         className={`relative isolate flex flex-col overflow-hidden rounded-[22px] text-white select-none ${className}`}
         style={{ backgroundImage: background ?? cardGradient(seed), boxShadow: SHADOW }}
       >
         <div aria-hidden className="pointer-events-none absolute inset-0" style={DEPTH} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={GLOSS} />
         <div aria-hidden className="pointer-events-none absolute inset-0" style={SHEEN} />
         <div
           aria-hidden
