@@ -113,17 +113,25 @@ export function HomePage() {
     return groups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
   }, [groups, items]);
 
+  const isLoanGroup = useCallback(
+    (g: Group) => {
+      if (g.groupType === 'loan') return true;
+      return items.some((it) => it.group.id === g.id && (it.isPersonalLoan || (it as any).group?.groupType === 'loan'));
+    },
+    [items],
+  );
+
   const lendingGroups = useMemo(
-    () => liveGroups.filter((g) => g.ownerId === user.uid && g.groupType !== 'loan'),
-    [liveGroups, user.uid],
+    () => liveGroups.filter((g) => g.ownerId === user.uid && !isLoanGroup(g)),
+    [liveGroups, user.uid, isLoanGroup],
   );
   const owingGroups = useMemo(
-    () => liveGroups.filter((g) => g.ownerId !== user.uid && g.groupType !== 'loan'),
-    [liveGroups, user.uid],
+    () => liveGroups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g)),
+    [liveGroups, user.uid, isLoanGroup],
   );
   const loanGroups = useMemo(
-    () => liveGroups.filter((g) => g.groupType === 'loan' && g.ownerId === user.uid),
-    [liveGroups, user.uid],
+    () => liveGroups.filter((g) => isLoanGroup(g) && g.ownerId === user.uid),
+    [liveGroups, user.uid, isLoanGroup],
   );
 
   // Total remaining balance and paid amount across all personal loans

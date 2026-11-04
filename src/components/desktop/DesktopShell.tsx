@@ -30,13 +30,20 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
   const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | null>(null);
   const name = user.displayName || user.email || 'You';
 
+  // Robust loan classification: checks groupType or if items inside have isPersonalLoan
+  const isLoanGroup = (g: Group) => {
+    if (g.groupType === 'loan') return true;
+    const groupItems = items.filter((it) => it.group.id === g.id);
+    return groupItems.some((it) => it.isPersonalLoan);
+  };
+
   // Organized into three distinct categories matching mobile view:
   // 1. You lend (cards you created to lend money to others)
   // 2. You owe (cards you joined where you owe money)
   // 3. My Loan (self-loans where you pay personal installments)
-  const lending = groups.filter((g) => g.ownerId === user.uid && g.groupType !== 'loan');
-  const owing = groups.filter((g) => g.ownerId !== user.uid && g.groupType !== 'loan');
-  const myLoans = groups.filter((g) => g.ownerId === user.uid && g.groupType === 'loan');
+  const lending = groups.filter((g) => g.ownerId === user.uid && !isLoanGroup(g));
+  const owing = groups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g));
+  const myLoans = groups.filter((g) => isLoanGroup(g));
   const activeId = route.name === 'group' ? route.id : null;
 
   return (
@@ -140,16 +147,18 @@ function ListGroup({
   isLoan?: boolean;
   items?: GroupItem[];
 }) {
-  if (groups.length === 0) return null;
   return (
-    <div className="mt-3">
+    <div className="mt-3.5">
       <div className="flex items-center justify-between px-3 pb-1">
         <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</p>
         {typeof count === 'number' && (
-          <span className="text-[11px] font-medium text-muted/70">{count}</span>
+          <span className="text-[11px] font-medium text-muted/70 tabular-nums">{count}</span>
         )}
       </div>
-      <div className="space-y-0.5">
+      {groups.length === 0 ? (
+        <p className="px-3 py-1 text-[12px] text-muted/40 italic">No cards</p>
+      ) : (
+        <div className="space-y-0.5">
         {groups.map((g) => {
           let label = 'Paid';
           let tone = 'text-muted/60';
@@ -200,6 +209,7 @@ function ListGroup({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
