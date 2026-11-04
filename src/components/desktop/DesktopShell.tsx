@@ -5,10 +5,12 @@ import { useGroups } from '../../hooks/useGroups';
 import { navigate, type Route } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
 import { computeTotals, sumOwed } from '../../lib/items';
+import { computeLoanStats } from '../../lib/loanUtils';
 import { useAllItems, type GroupItem } from '../../hooks/useAllItems';
 import type { Group } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { CreateGroupSheet } from '../home/CreateGroupSheet';
+import { CreateLoanSheet } from '../loan/CreateLoanSheet';
 import { JoinCodeSheet } from '../home/JoinCodeSheet';
 
 const SIDEBAR = 'w-[260px]';
@@ -25,11 +27,16 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
     for (const it of items) byGroup.set(it.group.id, [...(byGroup.get(it.group.id) ?? []), it]);
     return savedGroups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
   }, [savedGroups, items]);
-  const [panel, setPanel] = useState<'create' | 'join' | null>(null);
+  const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | null>(null);
   const name = user.displayName || user.email || 'You';
 
-  const lending = groups.filter((g) => g.ownerId === user.uid);
-  const owing = groups.filter((g) => g.ownerId !== user.uid);
+  // Organized into three distinct categories matching mobile view:
+  // 1. You lend (cards you created to lend money to others)
+  // 2. You owe (cards you joined where you owe money)
+  // 3. My Loan (self-loans where you pay personal installments)
+  const lending = groups.filter((g) => g.ownerId === user.uid && g.groupType !== 'loan');
+  const owing = groups.filter((g) => g.ownerId !== user.uid && g.groupType !== 'loan');
+  const myLoans = groups.filter((g) => g.ownerId === user.uid && g.groupType === 'loan');
   const activeId = route.name === 'group' ? route.id : null;
 
   return (
@@ -47,12 +54,16 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
         </nav>
 
         <div className="no-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          <ListGroup title="You lend" groups={lending} uid={user.uid} activeId={activeId} />
-          <ListGroup title="You owe" groups={owing} uid={user.uid} activeId={activeId} />
+          <ListGroup title="You lend" count={lending.length} groups={lending} uid={user.uid} activeId={activeId} />
+          <ListGroup title="You owe" count={owing.length} groups={owing} uid={user.uid} activeId={activeId} />
+          <ListGroup title="My Loan" count={myLoans.length} groups={myLoans} uid={user.uid} activeId={activeId} isLoan items={items} />
 
           <div className="mt-4 space-y-0.5">
             <SideLink onClick={() => setPanel('create')} icon={<Plus className="size-[18px]" />}>
               Add a card
+            </SideLink>
+            <SideLink onClick={() => setPanel('create_loan')} icon={<Plus className="size-[18px]" />}>
+              Add a loan
             </SideLink>
             <SideLink onClick={() => setPanel('join')} icon={<KeyRound className="size-[18px]" />}>
               Join a card
@@ -81,6 +92,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
       <div className="pl-[260px]">{children}</div>
 
       <CreateGroupSheet open={panel === 'create'} onClose={() => setPanel(null)} />
+      <CreateLoanSheet open={panel === 'create_loan'} onClose={() => setPanel(null)} />
       <JoinCodeSheet open={panel === 'join'} onClose={() => setPanel(null)} />
     </div>
   );
@@ -111,15 +123,63 @@ function SideLink({
   );
 }
 
-function ListGroup({ title, groups, uid, activeId }: { title: string; groups: Group[]; uid: string; activeId: string | null }) {
+function ListGroup({
+  title,
+  count,
+  groups,
+  uid,
+  activeId,
+  isLoan = false,
+  items = [],
+}: {
+  title: string;
+  count?: number;
+  groups: Group[];
+  uid: string;
+  activeId: string | null;
+  isLoan?: boolean;
+  items?: GroupItem[];
+}) {
   if (groups.length === 0) return null;
   return (
     <div className="mt-3">
-      <p className="px-3 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">{title}</p>
+      <div className="flex items-center justify-between px-3 pb-1">
+        <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</p>
+        {typeof count === 'number' && (
+          <span className="text-[11px] font-medium text-muted/70">{count}</span>
+        )}
+      </div>
       <div className="space-y-0.5">
         {groups.map((g) => {
-          const isOwner = g.ownerId === uid;
-          const amount = isOwner ? sumOwed(g.totals) : (g.totals[uid] ?? 0);
+          let label = 'Paid';
+          let tone = 'text-muted/60';
+
+          if (isLoan) {
+            const groupItems = items.filter((it) => it.group.id === g.id);
+            const remaining = groupItems.reduce((sum, it) => {
+              const stats = computeLoanStats(it);
+              return sum + stats.remainingCents;
+            }, 0);
+
+            if (remaining > 0) {
+              label = formatMoney(remaining).replace('.00', '');
+              tone = 'text-bad-ink';
+            } else {
+              label = 'Paid';
+              tone = 'text-muted/60';
+            }
+          } else {
+            const isOwner = g.ownerId === uid;
+            const amount = isOwner ? sumOwed(g.totals) : (g.totals[uid] ?? 0);
+            if (amount > 0) {
+              label = formatMoney(amount).replace('.00', '');
+              tone = isOwner ? 'text-ok-ink' : 'text-bad-ink';
+            } else {
+              label = 'Paid';
+              tone = 'text-muted/60';
+            }
+          }
+
           const active = g.id === activeId;
           return (
             <button
@@ -133,8 +193,8 @@ function ListGroup({ title, groups, uid, activeId }: { title: string; groups: Gr
               <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? 'font-semibold text-accent' : 'font-medium text-ink/80'}`}>
                 {g.name}
               </span>
-              <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${amount > 0 ? (isOwner ? 'text-ok-ink' : 'text-bad-ink') : 'text-muted/60'}`}>
-                {amount > 0 ? formatMoney(amount).replace('.00', '') : 'Paid'}
+              <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${tone}`}>
+                {label}
               </span>
             </button>
           );
