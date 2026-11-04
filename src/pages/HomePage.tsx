@@ -5,7 +5,7 @@ import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
 import { useSafeWrite, useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
-import { confirmedPaid, firstName } from '../lib/items';
+import { computeTotals, confirmedPaid, firstName } from '../lib/items';
 import { computeBalances } from '../lib/balances';
 import type { Item, ShareStatus } from '../lib/types';
 import { confirmPayment, recordPayment, undoPayment } from '../services/items';
@@ -84,8 +84,14 @@ export function HomePage() {
     [items, user.uid],
   );
 
-  const lendingGroups = useMemo(() => groups.filter((g) => g.ownerId === user.uid), [groups, user.uid]);
-  const owingGroups = useMemo(() => groups.filter((g) => g.ownerId !== user.uid), [groups, user.uid]);
+  // Card balances come from live items, so a partial payment shows the real amount left right away.
+  const liveGroups = useMemo(() => {
+    const byGroup = new Map<string, Item[]>();
+    for (const it of items) byGroup.set(it.group.id, [...(byGroup.get(it.group.id) ?? []), it]);
+    return groups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
+  }, [groups, items]);
+  const lendingGroups = useMemo(() => liveGroups.filter((g) => g.ownerId === user.uid), [liveGroups, user.uid]);
+  const owingGroups = useMemo(() => liveGroups.filter((g) => g.ownerId !== user.uid), [liveGroups, user.uid]);
 
   // Live remaining balances, counting partial and confirmed payments
   const { youOwe, owedToYou } = useMemo(() => computeBalances(items, groups, user.uid), [items, groups, user.uid]);

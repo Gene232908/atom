@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toItem } from '../lib/convert';
-import { confirmedPaid } from '../lib/items';
+import { cleanRef, confirmedPaid, pendingClaim, withAmountTag } from '../lib/items';
 import type { Item, PaymentRecord, Share, ShareStatus } from '../lib/types';
 
 /** Safety cap so a single list can never use up the daily free reads. */
@@ -170,28 +170,40 @@ export async function recordPayment(
       payments,
       [`shares.${payment.uid}.paidCents`]: newPaid,
       [`shares.${payment.uid}.status`]: done ? 'paid' : share?.status === 'claimed' ? 'claimed' : 'unpaid',
-      [`shares.${payment.uid}.refNumber`]: payment.refNumber,
+      [`shares.${payment.uid}.refNumber`]: cleanRef(payment.refNumber),
       [`shares.${payment.uid}.updatedAt`]: now,
       updatedAt: now,
     });
     return;
   }
 
-  // Pending: add to what they already sent but the lender has not confirmed yet.
-  const claim = (share?.status === 'claimed' ? share.claimCents ?? 0 : 0) + payment.amountCents;
-  try {
-    await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), {
-      payments,
-      [`shares.${payment.uid}.status`]: 'claimed',
-      [`shares.${payment.uid}.claimCents`]: claim,
-      [`shares.${payment.uid}.refNumber`]: payment.refNumber,
-      [`shares.${payment.uid}.updatedAt`]: now,
-      updatedAt: now,
-    });
-  } catch {
-    // Older Firebase rules only allow the status. The lender will type the amount when confirming.
-    await setShareStatus(groupId, item.id, payment.uid, 'claimed', payment.refNumber);
+  // Pending: the person says they sent money. The balance does NOT change until the lender says Yes.
+  // Add to anything they already sent that is still waiting.
+  const claim = pendingClaim(item, payment.uid) + payment.amountCents;
+  const tagged = withAmountTag(payment.refNumber, claim);
+  const base = {
+    [`shares.${payment.uid}.status`]: 'claimed',
+    [`shares.${payment.uid}.updatedAt`]: now,
+    updatedAt: now,
+  };
+  // Try the fullest save first. Each next try works with older Firebase rules.
+  // Every try keeps the exact amount, so the lender always sees the real value.
+  const attempts: Record<string, unknown>[] = [
+    { ...base, payments, [`shares.${payment.uid}.claimCents`]: claim, [`shares.${payment.uid}.refNumber`]: tagged },
+    { ...base, [`shares.${payment.uid}.claimCents`]: claim, [`shares.${payment.uid}.refNumber`]: tagged },
+    { ...base, payments, [`shares.${payment.uid}.refNumber`]: tagged },
+    { ...base, [`shares.${payment.uid}.refNumber`]: tagged },
+  ];
+  let lastError: unknown = null;
+  for (const updates of attempts) {
+    try {
+      await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), updates);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
   }
+  throw lastError;
 }
 
 /**
@@ -215,12 +227,11 @@ export async function confirmPayment(
   const alreadyPaid = confirmedPaid(item, uid);
   const left = Math.max(0, item.splitCents - alreadyPaid);
   const pendingId = payments.find((p) => p.uid === uid && p.status === 'pending')?.id ?? null;
-  const pendingTotal = payments.filter((p) => p.uid === uid && p.status === 'pending').reduce((s, p) => s + (p.amountCents || 0), 0);
-  const suggested = (share?.status === 'claimed' ? share.claimCents : 0) || pendingTotal || left;
+  const suggested = pendingClaim(item, uid) || left;
   const amount = Math.min(left, Math.max(0, amountCents ?? suggested));
   if (amount <= 0) return;
 
-  const refNum = share?.refNumber || 'Confirmed by lender';
+  const refNum = cleanRef(share?.refNumber) || 'Confirmed by lender';
   // All pending records of this person become one confirmed record with the real amount.
   payments = payments.filter((p) => !(p.uid === uid && p.status === 'pending'));
   payments.unshift({
@@ -253,9 +264,7 @@ export async function confirmPayment(
  */
 export async function rejectPayment(groupId: string, item: Item, uid: string): Promise<void> {
   const now = Date.now();
-  const share = item.shares[uid];
-  const pending = (item.payments ?? []).filter((p) => p.uid === uid && p.status === 'pending');
-  const claimed = share?.claimCents || pending.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+  const claimed = pendingClaim(item, uid);
   await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
     payments: (item.payments ?? []).filter((p) => !(p.uid === uid && p.status === 'pending')),
     [`shares.${uid}.status`]: 'unpaid',
@@ -299,19 +308,20 @@ export async function markPersonPaid(groupId: string, items: Item[], uid: string
   }
 }
 
-/** Person (not the lender) says they paid all of their unpaid items at once. */
+/** Person (not the lender) says they paid everything they still owe. Each item saves its exact amount. */
 export async function claimAll(groupId: string, items: Item[], uid: string): Promise<void> {
-  const targets = items.filter((it) => it.shares[uid]?.status === 'unpaid');
-  const now = Date.now();
-  for (let i = 0; i < targets.length; i += 400) {
-    const batch = writeBatch(db);
-    for (const item of targets.slice(i, i + 400)) {
-      batch.update(doc(db, 'groups', groupId, 'items', item.id), {
-        [`shares.${uid}.status`]: 'claimed',
-        [`shares.${uid}.updatedAt`]: now,
-        updatedAt: now,
-      });
-    }
-    await batch.commit();
+  for (const item of items) {
+    const share = item.shares[uid];
+    if (!share || share.status !== 'unpaid') continue;
+    const left = Math.max(0, item.splitCents - confirmedPaid(item, uid));
+    if (left <= 0) continue;
+    await recordPayment(groupId, item, {
+      uid,
+      payerName: share.name,
+      amountCents: left,
+      refNumber: 'Paid total',
+      note: 'Paid all at once',
+      status: 'pending',
+    });
   }
 }

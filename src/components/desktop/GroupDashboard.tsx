@@ -165,7 +165,7 @@ export function GroupDashboard(p: GroupDashboardProps) {
                 <EmptyState
                   icon={<ReceiptText className="size-7" />}
                   title={items.length ? 'Nothing here' : 'No items yet'}
-                  text={items.length ? 'Try another filter.' : isOwner ? 'Click Add item to list what people owe you.' : `${ownerName} has not added items yet.`}
+                  text={items.length ? 'Try another filter.' : isOwner ? 'Click Add item to list what people owe you.' : `No items for you yet. When ${ownerName} adds one for you, it shows here.`}
                   action={!items.length && isOwner ? <Button size="sm" icon={<Plus className="size-4" />} onClick={p.onAdd}>Add item</Button> : undefined}
                 />
               }

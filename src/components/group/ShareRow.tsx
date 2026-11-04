@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Clock, Copy, X } from 'lucide-react';
 import { formatMoney } from '../../lib/money';
 import { copyText } from '../../lib/clipboard';
-import { confirmedPaid, firstName } from '../../lib/items';
+import { cleanRef, confirmedPaid, firstName, pendingClaim } from '../../lib/items';
 import type { Group, Item, Share, ShareStatus } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -17,16 +17,6 @@ interface Props {
   onSetStatus: (personUid: string, status: ShareStatus, amountCents?: number) => void;
   /** Lender says they did NOT receive the payment. */
   onReject: (personUid: string) => void;
-}
-
-/** Amount the person says they sent but the lender has not confirmed yet. */
-function sentAmount(item: Item, uid: string, share?: Share): number {
-  if (share?.status !== 'claimed') return 0;
-  if (share.claimCents && share.claimCents > 0) return share.claimCents;
-  const pending = (item.payments ?? [])
-    .filter((p) => p.uid === uid && p.status === 'pending')
-    .reduce((sum, p) => sum + (p.amountCents || 0), 0);
-  return pending;
 }
 
 const yesBtn = 'h-9 flex-1 rounded-full bg-ok text-[13px] font-semibold text-white transition active:scale-95';
@@ -45,7 +35,8 @@ export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus
 
   const paid = confirmedPaid(item, personUid);
   const left = Math.max(0, item.splitCents - paid);
-  const sent = sentAmount(item, personUid, share);
+  const sent = pendingClaim(item, personUid);
+  const ref = cleanRef(share?.refNumber);
   const askAmount = Math.min(left, sent || left);
   const lenderName = firstName(group.members[group.ownerId]?.name ?? 'The lender');
 
@@ -104,8 +95,8 @@ export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus
             <span className="font-semibold">{firstName(name)}</span> says they sent{' '}
             <span className="font-semibold tabular-nums">{formatMoney(askAmount)}</span>
           </p>
-          {share?.refNumber && <RefLine value={share.refNumber} copied={copied} onCopy={() => {
-            copyText(share.refNumber!);
+          {ref && <RefLine value={ref} copied={copied} onCopy={() => {
+            copyText(ref);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }} />}

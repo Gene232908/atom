@@ -164,3 +164,31 @@ export function amountProgress(item: Item, ownerId: string): { paid: number; tot
   const paid = others.reduce((sum, [uid]) => sum + confirmedPaid(item, uid), 0);
   return { paid, total, percent: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0 };
 }
+
+/*
+ * The amount someone says they sent is saved in up to three places, so it is never lost
+ * even if Firebase rejects part of the save: share.claimCents, the pending payment record,
+ * and a small tag at the end of the reference text (" | amount:50000").
+ */
+const AMOUNT_TAG = /\s*\|\s*amount:(\d+)\s*$/;
+
+export function cleanRef(ref?: string): string {
+  return (ref ?? '').replace(AMOUNT_TAG, '').trim();
+}
+
+export function withAmountTag(ref: string, cents: number): string {
+  return `${cleanRef(ref)} | amount:${Math.round(cents)}`;
+}
+
+/** Amount the person says they sent that the lender has not confirmed yet. 0 if none. */
+export function pendingClaim(item: Item, uid: string): number {
+  const share = item.shares?.[uid];
+  if (!share || share.status !== 'claimed') return 0;
+  if (share.claimCents && share.claimCents > 0) return share.claimCents;
+  const fromRecords = (item.payments ?? [])
+    .filter((p) => p && p.uid === uid && p.status === 'pending')
+    .reduce((sum, p) => sum + (p.amountCents || 0), 0);
+  if (fromRecords > 0) return fromRecords;
+  const tag = share.refNumber?.match(AMOUNT_TAG);
+  return tag ? Number(tag[1]) : 0;
+}

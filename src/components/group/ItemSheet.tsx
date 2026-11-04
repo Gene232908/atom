@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, Pencil, Plus, ReceiptText } from 'lucide-react';
 import { itemGradient } from '../../lib/cardTheme';
 import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
-import { amountProgress, confirmedPaid, dueInfo, isItemDone, itemProgress } from '../../lib/items';
+import { amountProgress, cleanRef, confirmedPaid, dueInfo, isItemDone, itemProgress } from '../../lib/items';
 import { recordPayment, rejectPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
 import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
@@ -54,7 +54,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
           uid: pid,
           payerName: group.members[pid]?.name ?? share.name ?? 'Borrower',
           amountCents: share.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents,
-          refNumber: share.refNumber || '',
+          refNumber: cleanRef(share.refNumber),
           status: 'confirmed',
           paidAt: share.updatedAt || item.updatedAt || 0,
         });
@@ -216,7 +216,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                   <p className="truncate text-[13px] font-medium text-ink">{p.payerName}</p>
                   <p className="truncate text-[11px] text-muted">
                     {p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Earlier'}
-                    {p.refNumber ? ` · ${p.refNumber}` : ''}
+                    {cleanRef(p.refNumber) ? ` · ${cleanRef(p.refNumber)}` : ''}
                   </p>
                 </div>
                 <p className="shrink-0 text-[13px] font-semibold text-ok-ink tabular-nums">+{formatMoney(p.amountCents)}</p>

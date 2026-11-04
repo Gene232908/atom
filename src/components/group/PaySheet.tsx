@@ -4,7 +4,7 @@ import { loadQr } from '../../services/groups';
 import { copyText } from '../../lib/clipboard';
 import { groupGradient, itemGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
-import { formatMoney, toCents, centsToInput } from '../../lib/money';
+import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
 import { confirmedPaid, firstName } from '../../lib/items';
 import type { Group, Item } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
@@ -82,7 +82,10 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
   };
 
   const customCents = toCents(customAmountInput) ?? 0;
-  const amountToPay = item && payMode === 'custom' && customCents > 0 ? customCents : remainingCents;
+  const isPartial = Boolean(item) && payMode === 'custom';
+  // Partial: exactly what they typed (never more than they owe). Empty means nothing to pay yet.
+  const amountToPay = isPartial ? Math.min(customCents, remainingCents) : remainingCents;
+  const tooMuch = isPartial && customCents > remainingCents;
   const nothing = !group.hasQr && !group.paymentNote;
   const canMark = item ? remainingCents > 0 : unpaidCount > 0;
 
@@ -102,14 +105,15 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
       title="Pay now"
       description={`Send your payment to ${ownerName}, then tap the button below.`}
       footer={
-        canMark && amountToPay > 0 ? (
+        canMark ? (
           <Button
             size="lg"
             full
             icon={<Check className="size-5" strokeWidth={2.5} />}
             onClick={handlePaidSubmit}
+            disabled={amountToPay <= 0}
           >
-            I paid {formatMoney(amountToPay)}
+            {amountToPay > 0 ? `I paid ${formatMoney(amountToPay)}` : 'Type the amount you paid'}
           </Button>
         ) : undefined
       }
@@ -187,10 +191,15 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
                 type="text"
                 inputMode="decimal"
                 value={customAmountInput}
-                onChange={(e) => setCustomAmountInput(e.target.value)}
-                placeholder={centsToInput(remainingCents)}
+                onChange={(e) => setCustomAmountInput(cleanMoneyInput(e.target.value))}
+                placeholder="0.00"
                 className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[14px] font-semibold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
               />
+              <p className={`mt-1 text-[12px] ${tooMuch ? 'font-semibold text-bad' : 'text-muted'}`}>
+                {tooMuch
+                  ? `You only owe ${formatMoney(remainingCents)}. We will use that amount.`
+                  : `You still owe ${formatMoney(remainingCents)}.`}
+              </p>
             </div>
           )}
         </div>

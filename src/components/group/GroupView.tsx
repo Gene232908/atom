@@ -60,7 +60,12 @@ const FILTERS: ItemFilter[] = ['all', 'unpaid', 'waiting', 'paid'];
 export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const user = useUser();
   const isOwner = group.ownerId === uid;
-  const { items, loading, fromServer, error, retry } = useItems(group.id, isOwner);
+  const { items: allItems, loading, fromServer, error, retry } = useItems(group.id, isOwner);
+  // The lender sees every item. Someone who owes only sees the items they are part of.
+  const items = useMemo(
+    () => (isOwner ? allItems : allItems.filter((it) => Boolean(it.shares?.[uid]))),
+    [allItems, isOwner, uid],
+  );
   const write = useSafeWrite();
   const toast = useToast();
   const [filter, setFilter] = useState<ItemFilter>('all');
@@ -353,7 +358,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                       text={
                         isOwner
                           ? 'Tap Add item to list what people owe you. Everyone in the list will see it.'
-                          : `${ownerName} has not added any items yet. They will show here right away.`
+                          : `No items for you yet. When ${ownerName} adds one for you, it shows here right away.`
                       }
                     />
                   </div>
