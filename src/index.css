@@ -124,6 +124,11 @@
 }
 
 /* Refined, rich card shadow without harsh white inset banding */
+/* Pause card shine/animations when a sheet is open (sheet is a portal outside #root) */
+body.sheet-open #root * {
+  animation-play-state: paused !important;
+}
+
 .apple-card-shadow {
   box-shadow:
     0 12px 30px -8px rgba(0, 0, 0, 0.22),

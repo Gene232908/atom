@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, Pencil, Plus, ReceiptText } from 'lucide-react';
 import { itemGradient } from '../../lib/cardTheme';
 import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
-import { amountProgress, cleanRef, confirmedPaid, dueInfo, isItemDone, itemProgress } from '../../lib/items';
+import { amountProgress, cleanRef, confirmedPaid, itemProgress } from '../../lib/items';
+import { nextDueInfo } from '../../lib/itemStatus';
 import { recordPayment, rejectPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
 import { confirmedHistory } from '../../lib/transactions';
@@ -47,8 +48,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
 
   if (!item) return null;
   const isOwner = group.ownerId === uid;
-  const done = isItemDone(item, group.ownerId);
-  const due = dueInfo(item.dueDate, done);
+  const due = nextDueInfo(item, group.ownerId, uid);
   const { total } = itemProgress(item, group.ownerId);
   const progress = amountProgress(item, group.ownerId);
   const mine = item.shares?.[uid];

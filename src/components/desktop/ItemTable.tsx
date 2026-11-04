@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatMoney } from '../../lib/money';
-import { rowStatus, shortDue } from '../../lib/itemStatus';
+import { effectiveDueDate, rowStatus, shortDue } from '../../lib/itemStatus';
 import type { Group, Item } from '../../lib/types';
 import { StatusPill } from './Panel';
 
@@ -42,7 +42,7 @@ export function ItemTable({ rows, uid, focusUid = null, showList = false, amount
         {rows.map((row) => {
           const { item, group } = row;
           const st = rowStatus(item, group.ownerId, uid, focusUid);
-          const due = shortDue(item.dueDate, st.done);
+          const due = shortDue(effectiveDueDate(item, group.ownerId, uid, focusUid), st.done);
           const store = (item.store || '').trim();
           const sub = [
             showList ? group.name : store,

@@ -31,14 +31,14 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
     if (!open) return;
     openedAt.current = Date.now();
     const unlock = lockScroll();
-    document.documentElement.style.backdropFilter = 'blur(8px)';
+    document.body.classList.add('sheet-open');
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.documentElement.style.backdropFilter = '';
+      document.body.classList.remove('sheet-open');
       unlock();
     };
   }, [open]);
@@ -76,7 +76,7 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
       aria-label={title}
     >
       <div
-        className="absolute inset-0 animate-fade-in bg-black/40 transition-opacity"
+        className="absolute inset-0 animate-fade-in bg-black/20 backdrop-blur-md backdrop-saturate-125 transition-opacity"
         style={{ opacity: Math.max(0.2, 1 - drag / 400) }}
         onClick={() => {
           if (Date.now() - openedAt.current > 400) closeRef.current();

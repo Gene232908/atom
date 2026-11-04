@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatMoney } from '../../lib/money';
-import { dueInfo, isItemDone, itemProgress } from '../../lib/items';
+import { amountProgress, isItemDone, itemProgress } from '../../lib/items';
+import { nextDueInfo } from '../../lib/itemStatus';
 import type { Group, Item } from '../../lib/types';
 
 interface Props {
@@ -17,12 +18,12 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
   const isOwner = group.ownerId === uid;
   const viewer = focusUid ?? (isOwner ? null : uid);
   const share = viewer ? item.shares[viewer] : undefined;
-  const { paid, total } = itemProgress(item, group.ownerId);
+  const { total } = itemProgress(item, group.ownerId);
   const done = share ? share.status === 'paid' : isItemDone(item, group.ownerId);
   const waiting = share
     ? share.status === 'claimed'
     : Object.values(item.shares).some((s) => s.status === 'claimed');
-  const due = dueInfo(item.dueDate, done);
+  const due = nextDueInfo(item, group.ownerId, uid, focusUid);
 
   let statusText = '';
   let statusColor = '';
@@ -57,8 +58,9 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
       statusText = received > 0 ? `${formatMoney(received)} received, waiting` : 'Waiting confirmation';
       statusColor = 'text-warn-ink';
     } else {
-      statusText = `${paid} of ${total} paid`;
-      statusColor = 'text-muted';
+      const pct = amountProgress(item, group.ownerId).percent;
+      statusText = pct > 0 ? `${pct}% paid` : 'Not paid yet';
+      statusColor = pct > 0 ? 'text-accent' : 'text-muted';
     }
   }
 
