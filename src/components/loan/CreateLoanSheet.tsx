@@ -42,7 +42,7 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
   const [totalTermsInput, setTotalTermsInput] = useState('18');
   const [isExisting, setIsExisting] = useState(false);
   const [alreadyPaidMonthsInput, setAlreadyPaidMonthsInput] = useState('0');
-  const [dueDay, setDueDay] = useState(15);
+  const [dueDayInput, setDueDayInput] = useState('15');
   const [startMonthOffset, setStartMonthOffset] = useState(() => {
     return new Date().getDate() <= 15 ? 0 : 1;
   });
@@ -63,11 +63,27 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
   const remainingCents = Math.max(0, priceCents - initialPaidCents);
   const progressPercent = totalTerms > 0 ? Math.min(100, Math.round((alreadyPaidTerms / totalTerms) * 100)) : 0;
 
+  const dueDay = Math.min(31, Math.max(1, parseInt(dueDayInput, 10) || 15));
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const list: { offset: number; label: string }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const mName = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      list.push({
+        offset: i,
+        label: i === 0 ? `This month (${mName})` : i === 1 ? `Next month (${mName})` : mName,
+      });
+    }
+    return list;
+  }, []);
+
   const computedNextDueDate = useMemo(() => {
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth() + startMonthOffset, 1);
     const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-    const day = dueDay === 31 ? maxDays : Math.min(Math.max(1, dueDay), maxDays);
+    const day = Math.min(dueDay, maxDays);
     target.setDate(day);
 
     const y = target.getFullYear();
@@ -79,26 +95,6 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
   const computedFirstDueDate = useMemo(() => {
     return computeFirstDueDate(computedNextDueDate, alreadyPaidTerms);
   }, [computedNextDueDate, alreadyPaidTerms]);
-
-  const currentMonthLabel = useMemo(() => {
-    return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  }, []);
-
-  const nextMonthLabel = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-    });
-  }, []);
-
-  const formatMonthDay = (offset: number, dayNum: number) => {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-    target.setDate(dayNum === 31 ? maxDays : Math.min(Math.max(1, dayNum), maxDays));
-    return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
 
   const handleAutoDivide = () => {
     if (autoMonthlyCents > 0) {
@@ -120,6 +116,11 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
     if (totalTerms <= 0) newErrors.terms = 'Please enter total number of months.';
     if (monthlyCents <= 0) newErrors.monthly = 'Please enter monthly cut-off amount.';
 
+    const parsedDueDay = parseInt(dueDayInput, 10);
+    if (isNaN(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 31) {
+      newErrors.dueDay = 'Enter a valid day of the month (1 – 31).';
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
@@ -131,7 +132,7 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
 
       // 2. Add personal loan item
       const now = Date.now();
-      const billingCycleLabel = dueDay === 31 ? 'Tuwing katapusan ng buwan' : `Tuwing ika-${dueDay} ng buwan`;
+      const billingCycleLabel = `Every ${dueDay}th of the month`;
       const itemId = await addItem(groupId, {
         description: cleanDesc,
         priceCents,
@@ -376,7 +377,7 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
               }`}
             >
               <p className="text-[13px] font-bold">Brand New Loan</p>
-              <p className="text-[11px] text-muted leading-tight mt-0.5">Start from Month #1</p>
+              <p className="text-[11px] text-muted leading-tight mt-0.5">Starts from Month #1</p>
             </button>
 
             <button
@@ -389,14 +390,14 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
               }`}
             >
               <p className="text-[13px] font-bold">Ongoing Loan</p>
-              <p className="text-[11px] text-muted leading-tight mt-0.5">May nahulugan na dati</p>
+              <p className="text-[11px] text-muted leading-tight mt-0.5">Has existing payments</p>
             </button>
           </div>
 
           {isExisting && (
             <div className="mt-3 pt-3 border-t border-hairline animate-fade-in">
               <label htmlFor="already-paid" className="block text-[12.5px] font-semibold text-ink">
-                Pang-ilang hulog mo na ngayon? (Months already paid)
+                Months Already Paid
               </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
@@ -409,122 +410,53 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
                   className="w-24 rounded-[12px] bg-white px-3 py-2 text-[15px] font-bold text-ink text-center outline-none ring-1 ring-hairline focus:ring-accent"
                 />
                 <span className="text-[12.5px] text-muted">
-                  months paid so far
+                  months completed
                 </span>
               </div>
               <p className="mt-1.5 text-[11.5px] font-medium text-accent">
-                {totalTerms} - {alreadyPaidTerms} = <span className="font-bold">{termsLeft} months left</span> to pay.
+                {totalTerms} total months - {alreadyPaidTerms} paid = <span className="font-bold">{termsLeft} months left</span> to pay.
               </p>
             </div>
           )}
         </div>
 
-        {/* Payment Due Day (Tuwing anong araw ng buwan) */}
-        <div className="rounded-[18px] bg-fill p-3.5 sm:p-4 ring-1 ring-hairline">
-          <div className="flex items-center justify-between">
-            <label className="block text-[12.5px] font-bold text-ink">
-              Tuwing kailan ang hulog mo? (Payment Due Day)
+        {/* Due Day and Billing Month */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <TextField
+            id="loan-due-day"
+            label="Monthly Due Day"
+            type="number"
+            min={1}
+            max={31}
+            placeholder="15"
+            value={dueDayInput}
+            error={errors.dueDay}
+            hint="Day of each month (1 – 31)"
+            onChange={(e) => {
+              setDueDayInput(e.target.value);
+              setErrors((prev) => ({ ...prev, dueDay: '' }));
+            }}
+          />
+
+          <div>
+            <label htmlFor="loan-due-month" className="block text-[13px] font-medium text-ink">
+              {isExisting ? 'Next Due Month' : 'First Payment Month'}
             </label>
-            <span className="text-[12px] font-bold text-accent">
-              {dueDay === 31 ? 'Katapusan ng buwan' : `Tuwing ika-${dueDay}`}
-            </span>
-          </div>
-
-          <p className="mt-0.5 text-[11.5px] text-muted">
-            Piliin kung anong araw ng buwan ang regular mong cut-off bill.
-          </p>
-
-          {/* Quick Day Chips */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {[5, 10, 15, 20, 25, 30].map((d) => {
-              const on = dueDay === d;
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDueDay(d)}
-                  className={`h-8 min-w-[44px] rounded-full px-2.5 text-[12px] font-semibold transition active:scale-95 ${
-                    on
-                      ? 'bg-accent text-white shadow-sm ring-1 ring-accent'
-                      : 'bg-white text-ink shadow-sm ring-1 ring-hairline hover:bg-black/[0.02]'
-                  }`}
-                >
-                  {d}th
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setDueDay(31)}
-              className={`h-8 rounded-full px-3 text-[12px] font-semibold transition active:scale-95 ${
-                dueDay === 31
-                  ? 'bg-accent text-white shadow-sm ring-1 ring-accent'
-                  : 'bg-white text-ink shadow-sm ring-1 ring-hairline hover:bg-black/[0.02]'
-              }`}
+            <select
+              id="loan-due-month"
+              value={startMonthOffset}
+              onChange={(e) => setStartMonthOffset(parseInt(e.target.value, 10))}
+              className="mt-1 w-full rounded-[14px] bg-fill px-3.5 py-2.5 text-[14px] font-semibold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
             >
-              Katapusan (31st)
-            </button>
-          </div>
-
-          {/* Custom Day Input */}
-          <div className="mt-2.5 flex items-center gap-2">
-            <span className="text-[12px] font-medium text-muted">O kaya custom day:</span>
-            <input
-              type="number"
-              min="1"
-              max="31"
-              value={dueDay}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) setDueDay(Math.min(31, Math.max(1, val)));
-              }}
-              className="w-16 rounded-[10px] bg-white px-2.5 py-1 text-center text-[13px] font-bold text-ink ring-1 ring-hairline focus:ring-accent outline-none"
-            />
-            <span className="text-[12px] text-muted">ng bawat buwan</span>
-          </div>
-
-          {/* Starting / Next Due Month */}
-          <div className="mt-3.5 pt-3 border-t border-hairline">
-            <label className="block text-[12px] font-semibold text-ink">
-              {isExisting ? 'Kailan ang susunod mong hulog?' : 'Kailan magsisimula ang unang hulog?'}
-            </label>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setStartMonthOffset(0)}
-                className={`rounded-[12px] p-2.5 text-left transition active:scale-95 ${
-                  startMonthOffset === 0
-                    ? 'bg-white shadow-sm ring-1.5 ring-accent text-ink'
-                    : 'bg-white/60 text-muted hover:text-ink ring-1 ring-hairline/80'
-                }`}
-              >
-                <p className="text-[12px] font-bold">Ngayong {currentMonthLabel}</p>
-                <p className="text-[11px] text-muted mt-0.5">{formatMonthDay(0, dueDay)}</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStartMonthOffset(1)}
-                className={`rounded-[12px] p-2.5 text-left transition active:scale-95 ${
-                  startMonthOffset === 1
-                    ? 'bg-white shadow-sm ring-1.5 ring-accent text-ink'
-                    : 'bg-white/60 text-muted hover:text-ink ring-1 ring-hairline/80'
-                }`}
-              >
-                <p className="text-[12px] font-bold">Susunod na {nextMonthLabel}</p>
-                <p className="text-[11px] text-muted mt-0.5">{formatMonthDay(1, dueDay)}</p>
-              </button>
-            </div>
-          </div>
-
-          {/* Schedule Confirmation Banner */}
-          <div className="mt-3 flex items-center justify-between rounded-[12px] bg-accent/10 px-3 py-2 text-[12px] text-accent">
-            <span className="font-semibold">
-              🗓️ {dueDay === 31 ? 'Tuwing katapusan' : `Tuwing ika-${dueDay}`} ng buwan
-            </span>
-            <span className="font-bold">
-              Due: {formatDueDateReadable(computedNextDueDate)}
-            </span>
+              {monthOptions.map((opt) => (
+                <option key={opt.offset} value={opt.offset}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted">
+              {isExisting ? 'Next bill due' : 'First bill due'}: {formatDueDateReadable(computedNextDueDate)}
+            </p>
           </div>
         </div>
 
