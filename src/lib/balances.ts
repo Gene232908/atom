@@ -20,7 +20,7 @@ export function computeBalances(items: GroupItem[], groups: Group[], uid: string
     for (const g of groups) {
       if (g.groupType === 'loan') continue;
       if (g.ownerId === uid) owed += sumOwed(g.totals);
-      else owe += g.totals[uid] ?? 0;
+      else if (g.members[uid]?.status !== 'pending') owe += g.totals[uid] ?? 0;
     }
     return { youOwe: owe, owedToYou: owed };
   }
@@ -35,7 +35,9 @@ export function computeBalances(items: GroupItem[], groups: Group[], uid: string
       }
     } else {
       const mine = item.shares?.[uid];
-      if (mine && mine.status !== 'paid') owe += Math.max(0, item.splitCents - confirmedPaid(item, uid));
+      if (mine && mine.status !== 'paid' && item.group.members[uid]?.status !== 'pending') {
+        owe += Math.max(0, item.splitCents - confirmedPaid(item, uid));
+      }
     }
   }
   return { youOwe: owe, owedToYou: owed };

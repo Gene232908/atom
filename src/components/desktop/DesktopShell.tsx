@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { KeyRound, LayoutDashboard, LogOut, Plus, Sparkles } from 'lucide-react';
+import { KeyRound, LayoutDashboard, LogOut, Plus, Sparkles, Users } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { useGroups } from '../../hooks/useGroups';
 import { navigate, type Route } from '../../hooks/useRoute';
@@ -13,6 +13,8 @@ import { CreateGroupSheet } from '../home/CreateGroupSheet';
 import { CreateLoanSheet } from '../loan/CreateLoanSheet';
 import { JoinCodeSheet } from '../home/JoinCodeSheet';
 import { AppIconSheet } from '../home/AppIconSheet';
+import { FriendsSheet } from '../home/FriendsSheet';
+import { useFriends } from '../../hooks/useFriends';
 
 const SIDEBAR = 'w-[260px]';
 
@@ -28,7 +30,8 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
     for (const it of items) byGroup.set(it.group.id, [...(byGroup.get(it.group.id) ?? []), it]);
     return savedGroups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
   }, [savedGroups, items]);
-  const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | null>(null);
+  const { requestsCount: friendRequestsCount } = useFriends();
+  const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | 'friends' | null>(null);
   const [appIconOpen, setAppIconOpen] = useState(false);
   const name = user.displayName || user.email || 'You';
 
@@ -44,7 +47,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
   // 2. You owe (cards you joined where you owe money)
   // 3. My Loan (self-loans where you pay personal installments)
   const lending = groups.filter((g) => g.ownerId === user.uid && !isLoanGroup(g));
-  const owing = groups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g));
+  const owing = groups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g) && g.members[user.uid]?.status !== 'pending');
   const myLoans = groups.filter((g) => isLoanGroup(g));
   const activeId = route.name === 'group' ? route.id : null;
 
@@ -73,6 +76,14 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
             </SideLink>
             <SideLink onClick={() => setPanel('create_loan')} icon={<Plus className="size-[18px]" />}>
               Add a loan
+            </SideLink>
+            <SideLink onClick={() => setPanel('friends')} icon={<Users className="size-[18px]" />}>
+              <span className="flex-1">Friends</span>
+              {friendRequestsCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
+                  {friendRequestsCount}
+                </span>
+              )}
             </SideLink>
             <SideLink onClick={() => setPanel('join')} icon={<KeyRound className="size-[18px]" />}>
               Join a card
@@ -112,6 +123,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
       <CreateGroupSheet open={panel === 'create'} onClose={() => setPanel(null)} />
       <CreateLoanSheet open={panel === 'create_loan'} onClose={() => setPanel(null)} />
       <JoinCodeSheet open={panel === 'join'} onClose={() => setPanel(null)} />
+      <FriendsSheet open={panel === 'friends'} onClose={() => setPanel(null)} onOpenJoinCode={() => setPanel('join')} />
       <AppIconSheet open={appIconOpen} onClose={() => setAppIconOpen(false)} />
     </div>
   );

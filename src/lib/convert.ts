@@ -17,6 +17,8 @@ function toMember(raw: unknown): Member {
     email: str(m.email),
     photo: str(m.photo),
     joinedAt: num(m.joinedAt),
+    status: m.status === 'pending' ? 'pending' : 'accepted',
+    invitedBy: typeof m.invitedBy === 'string' ? m.invitedBy : undefined,
   };
 }
 

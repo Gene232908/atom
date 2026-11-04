@@ -44,8 +44,11 @@ import { LoanWalletCard } from '../components/loan/LoanWalletCard';
 import { LoanDetailSheet } from '../components/loan/LoanDetailSheet';
 import { computeLoanStats } from '../lib/loanUtils';
 import type { Group } from '../lib/types';
+import { FriendsSheet } from '../components/home/FriendsSheet';
+import { useFriends } from '../hooks/useFriends';
+import { acceptGroupInvite, declineGroupInvite } from '../services/groups';
 
-type Panel = 'create' | 'join' | 'create_loan' | null;
+type Panel = 'create' | 'join' | 'create_loan' | 'friends' | null;
 
 
 export function HomePage() {
@@ -54,6 +57,7 @@ export function HomePage() {
   const write = useSafeWrite();
   const { groups, loading: groupsLoading, error, retry } = useGroups();
   const { items, loading: itemsLoading } = useAllItems(groups);
+  const { requestsCount: friendRequestsCount } = useFriends();
 
   const [panel, setPanel] = useState<Panel>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -104,7 +108,16 @@ export function HomePage() {
   );
 
   const owingItems = useMemo(
-    () => items.filter((it) => it.group.ownerId !== user.uid && !it.isPersonalLoan && it.group.groupType !== 'loan' && it.shares && it.shares[user.uid]),
+    () =>
+      items.filter(
+        (it) =>
+          it.group.ownerId !== user.uid &&
+          !it.isPersonalLoan &&
+          it.group.groupType !== 'loan' &&
+          it.shares &&
+          it.shares[user.uid] &&
+          it.group.members[user.uid]?.status !== 'pending',
+      ),
     [items, user.uid],
   );
 
@@ -123,12 +136,18 @@ export function HomePage() {
     [items],
   );
 
+  // Pending card invitations sent to you by friends that you haven't accepted yet
+  const pendingCardInvites = useMemo(
+    () => liveGroups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g) && g.members[user.uid]?.status === 'pending'),
+    [liveGroups, user.uid, isLoanGroup],
+  );
+
   const lendingGroups = useMemo(
     () => liveGroups.filter((g) => g.ownerId === user.uid && !isLoanGroup(g)),
     [liveGroups, user.uid, isLoanGroup],
   );
   const owingGroups = useMemo(
-    () => liveGroups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g)),
+    () => liveGroups.filter((g) => g.ownerId !== user.uid && !isLoanGroup(g) && g.members[user.uid]?.status !== 'pending'),
     [liveGroups, user.uid, isLoanGroup],
   );
   const loanGroups = useMemo(
@@ -374,9 +393,16 @@ export function HomePage() {
         title="Wallet"
         right={
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <IconButton label="Join a list" onClick={() => setPanel('join')}>
-              <UserPlus className="size-[18px]" strokeWidth={2.2} />
-            </IconButton>
+            <div className="relative">
+              <IconButton label="Friends & Contacts" onClick={() => setPanel('friends')}>
+                <UserPlus className="size-[18px]" strokeWidth={2.2} />
+              </IconButton>
+              {friendRequestsCount > 0 && (
+                <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold text-white shadow-xs">
+                  {friendRequestsCount}
+                </span>
+              )}
+            </div>
             <IconButton
               label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
               dark
@@ -533,30 +559,102 @@ export function HomePage() {
                     }
                   />
                 )
-              ) : (tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
-                <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} items={items} />
-              ) : tab === 'lend' ? (
-                <EmptyState
-                  icon={<WalletCards className="size-7" />}
-                  title="No cards yet"
-                  text="Add a card for each credit card or pay-later app you lend from, like BDO, Atome or SPayLater."
-                  action={
-                    <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
-                      Add a card
-                    </Button>
-                  }
-                />
               ) : (
-                <EmptyState
-                  icon={<WalletCards className="size-7" />}
-                  title="You don't owe anything right now"
-                  text="When a friend adds you to their card, it shows here. Tap Join to enter their code."
-                  action={
-                    <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('join')}>
-                      Join a card
-                    </Button>
-                  }
-                />
+                <>
+                  {/* Pending Card Invitations sent by friends */}
+                  {tab === 'owe' && pendingCardInvites.length > 0 && (
+                    <div className="space-y-3 mb-4 animate-fade-in">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[11.5px] font-semibold text-muted uppercase tracking-wider">
+                          Card Invitations ({pendingCardInvites.length})
+                        </span>
+                        <span className="text-[11px] text-muted">Accept to activate pre-split debts</span>
+                      </div>
+
+                      {pendingCardInvites.map((card) => {
+                        const lenderName = card.members[card.ownerId]?.name || 'A friend';
+                        const cardItems = items.filter((it) => it.group.id === card.id && it.shares?.[user.uid]);
+                        const pendingTotalCents = cardItems.reduce((sum, it) => {
+                          const share = it.shares[user.uid];
+                          return sum + (share?.paidCents ? Math.max(0, it.splitCents - share.paidCents) : it.splitCents);
+                        }, 0);
+
+                        return (
+                          <div key={card.id} className="rounded-[20px] bg-white p-4 ring-1 ring-hairline shadow-xs">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <span className="inline-block rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent uppercase tracking-wider">
+                                  Card Invitation
+                                </span>
+                                <h4 className="mt-1 truncate text-[16px] font-bold text-ink">{card.name}</h4>
+                                <p className="text-[12px] text-muted mt-0.5">
+                                  {lenderName} invited you to this card.
+                                </p>
+                                {pendingTotalCents > 0 ? (
+                                  <p className="text-[13px] font-semibold text-bad mt-1">
+                                    {formatMoney(pendingTotalCents)} pre-split bill waiting
+                                  </p>
+                                ) : (
+                                  <p className="text-[11.5px] text-muted italic mt-1">
+                                    No items added yet
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row gap-1.5 shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => {
+                                    write(acceptGroupInvite(card.id, user.uid), `Joined "${card.name}"! Debts are now active.`);
+                                  }}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-muted hover:text-bad"
+                                  onClick={() => {
+                                    write(declineGroupInvite(card.id, user.uid), `Declined invite to "${card.name}".`);
+                                  }}
+                                >
+                                  Decline
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {(tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
+                    <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} items={items} />
+                  ) : tab === 'lend' ? (
+                    <EmptyState
+                      icon={<WalletCards className="size-7" />}
+                      title="No cards yet"
+                      text="Add a card for each credit card or pay-later app you lend from, like BDO, Atome or SPayLater."
+                      action={
+                        <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create')}>
+                          Add a card
+                        </Button>
+                      }
+                    />
+                  ) : pendingCardInvites.length === 0 ? (
+                    <EmptyState
+                      icon={<WalletCards className="size-7" />}
+                      title="You don't owe anything right now"
+                      text="When a friend adds you to their card, it shows here."
+                      action={
+                        <Button size="sm" variant="white" icon={<UserPlus className="size-4" />} onClick={() => setPanel('friends')}>
+                          Add friends
+                        </Button>
+                      }
+                    />
+                  ) : null}
+                </>
               )}
 
               {groups.length > 0 && (
@@ -647,6 +745,7 @@ export function HomePage() {
       <CreateGroupSheet open={panel === 'create'} onClose={closePanel} />
       <CreateLoanSheet open={panel === 'create_loan'} onClose={closePanel} />
       <JoinCodeSheet open={panel === 'join'} onClose={closePanel} />
+      <FriendsSheet open={panel === 'friends'} onClose={closePanel} onOpenJoinCode={() => setPanel('join')} />
       {activeLoanItem && (
         <LoanDetailSheet
           open={Boolean(activeLoanItem)}

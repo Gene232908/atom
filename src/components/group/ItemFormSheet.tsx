@@ -39,6 +39,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
         name: group.members[uid].name,
         photo: group.members[uid].photo,
         isMe: uid === ownerId,
+        isPending: group.members[uid]?.status === 'pending',
       }));
 
     // If an item was previously saved with someone who later left, keep them so data isn't lost

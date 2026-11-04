@@ -6,6 +6,7 @@ export interface PickPerson {
   name: string;
   photo: string;
   isMe: boolean;
+  isPending?: boolean;
 }
 
 interface Props {
@@ -42,7 +43,14 @@ export function PeoplePicker({ people, selected, onToggle, onSelectAll, onClear,
                 className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition active:bg-fill"
               >
                 <Avatar name={p.name} photo={p.photo} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{p.isMe ? 'Me' : p.name}</span>
+                <div className="min-w-0 flex-1 flex items-center gap-1.5 truncate">
+                  <span className="truncate text-[15px] font-medium text-ink">{p.isMe ? 'Me' : p.name}</span>
+                  {p.isPending && (
+                    <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
+                      Pending
+                    </span>
+                  )}
+                </div>
                 <span
                   className={`grid size-6 shrink-0 place-items-center rounded-full transition ${
                     on ? 'bg-accent text-white' : 'ring-[1.5px] ring-fill-strong ring-inset'

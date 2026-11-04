@@ -55,31 +55,20 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
         title={item.description}
         description={`Personal Loan · ${provider}`}
         footer={
-          <div className="flex gap-2">
+          !stats.isFullyPaid ? (
             <Button
-              variant="secondary"
-              className="text-bad"
-              aria-label="Delete loan"
-              icon={<Trash2 className="size-4" />}
-              onClick={() => setConfirmDelete(true)}
+              size="lg"
+              full
+              icon={<Plus className="size-4" strokeWidth={2.2} />}
+              onClick={() => setPayOpen(true)}
             >
-              Delete
+              Pay
             </Button>
-            {!stats.isFullyPaid ? (
-              <Button
-                size="md"
-                full
-                icon={<Plus className="size-4" strokeWidth={2.5} />}
-                onClick={() => setPayOpen(true)}
-              >
-                Pay Month #{stats.nextTermNumber} ({formatMoney(stats.monthlyCents)})
-              </Button>
-            ) : (
-              <Button size="md" full variant="secondary" disabled>
-                Loan Completed ✓
-              </Button>
-            )}
-          </div>
+          ) : (
+            <Button size="lg" full variant="secondary" disabled>
+              Loan Completed ✓
+            </Button>
+          )
         }
       >
         <div className="space-y-4 pt-1">
@@ -131,29 +120,29 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
           {/* Key Loan Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10.5px] font-medium text-muted uppercase">Total Loan</p>
-              <p className="mt-1 text-[15px] font-bold text-ink tabular-nums">
+              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Total Loan</p>
+              <p className="mt-1 text-[15px] font-semibold text-ink tabular-nums">
                 {formatMoney(stats.totalPriceCents)}
               </p>
             </div>
 
             <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10.5px] font-medium text-muted uppercase">Paid so far</p>
-              <p className="mt-1 text-[15px] font-bold text-ok tabular-nums">
+              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Paid so far</p>
+              <p className="mt-1 text-[15px] font-semibold text-ok tabular-nums">
                 {formatMoney(stats.totalPaidCents)}
               </p>
             </div>
 
             <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10.5px] font-medium text-muted uppercase">Monthly Bill</p>
-              <p className="mt-1 text-[15px] font-bold text-ink tabular-nums">
+              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Monthly Bill</p>
+              <p className="mt-1 text-[15px] font-semibold text-ink tabular-nums">
                 {formatMoney(stats.monthlyCents)}
               </p>
             </div>
 
             <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10.5px] font-medium text-muted uppercase">Next Bill Due</p>
-              <p className="mt-1 text-[13px] font-bold text-accent truncate">
+              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Next Bill Due</p>
+              <p className="mt-1 text-[13px] font-semibold text-accent truncate">
                 {stats.isFullyPaid ? 'Done ✓' : formatDueDateReadable(stats.nextDueDate || item.dueDate)}
               </p>
             </div>
@@ -161,14 +150,14 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
 
           {/* Terms Logic Box: e.g. 18 - 4 = 14 months left */}
           <div className="rounded-[16px] bg-accent/5 p-3.5 ring-1 ring-accent/20">
-            <div className="flex items-center justify-between text-[12px] font-semibold text-accent">
-              <span>INSTALLMENT PROGRESS</span>
+            <div className="flex items-center justify-between text-[11.5px] font-medium text-accent">
+              <span className="tracking-wide">INSTALLMENT PROGRESS</span>
               <span>{stats.progressPercent}% complete</span>
             </div>
-            <p className="mt-1.5 text-[13px] font-medium text-ink">
-              <span className="font-bold">{stats.totalTerms} total months</span> -{' '}
-              <span className="font-bold">{stats.currentPaidTerms} months paid</span> ={' '}
-              <span className="font-bold text-accent">{stats.termsLeft} months left</span>.
+            <p className="mt-1.5 text-[13px] font-normal text-ink">
+              <span className="font-semibold">{stats.totalTerms} total months</span> -{' '}
+              <span className="font-semibold">{stats.currentPaidTerms} months paid</span> ={' '}
+              <span className="font-semibold text-accent">{stats.termsLeft} months left</span>.
             </p>
             {stats.initialPaidTerms > 0 && (
               <p className="mt-1 text-[11px] text-muted">
@@ -180,7 +169,7 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
           {/* Payment & Transaction History */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-bold text-ink uppercase tracking-wider">
+              <h3 className="text-[11.5px] font-semibold text-muted uppercase tracking-wider">
                 Payment History ({payments.length})
               </h3>
               {!stats.isFullyPaid && (
@@ -240,6 +229,18 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
                 })}
               </div>
             )}
+          </div>
+
+          {/* Danger Action: Delete Loan */}
+          <div className="pt-4 pb-1 text-center">
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-bad/70 hover:text-bad transition active:scale-95"
+            >
+              <Trash2 className="size-3.5" />
+              <span>Delete this loan</span>
+            </button>
           </div>
         </div>
       </Sheet>

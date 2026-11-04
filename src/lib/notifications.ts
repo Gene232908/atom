@@ -245,6 +245,7 @@ export function evaluateDueReminders(
 
     // C. Cards you joined where you owe money
     if (group.ownerId !== currentUserId && item.dueDate) {
+      if (group.members[currentUserId]?.status === 'pending') continue;
       const myShare = item.shares?.[currentUserId];
       if (!myShare || myShare.status === 'paid') continue; // Auto-stop: you paid!
 

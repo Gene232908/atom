@@ -6,6 +6,9 @@ export interface Member {
   email: string;
   photo: string;
   joinedAt: number;
+  /** 'pending' when lender directly invited a friend; 'accepted' when friend joins or accepts */
+  status?: 'pending' | 'accepted';
+  invitedBy?: string;
 }
 
 export interface Group {
@@ -102,4 +105,22 @@ export interface PersonSummary {
   owes: number;
   waiting: number;
   paid: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  photo: string;
+  updatedAt: number;
+}
+
+export interface Friendship {
+  id: string;
+  users: string[];
+  userProfiles: Record<string, { name: string; email: string; photo: string }>;
+  status: 'pending' | 'accepted';
+  senderUid: string;
+  createdAt: number;
+  updatedAt: number;
 }

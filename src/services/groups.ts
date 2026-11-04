@@ -95,16 +95,57 @@ export async function fetchInvite(code: string): Promise<Invite | null> {
 export async function joinGroup(user: User, groupId: string, code: string): Promise<void> {
   await updateDoc(doc(db, 'groups', groupId), {
     memberIds: arrayUnion(user.uid),
-    [`members.${user.uid}`]: { ...memberFromUser(user), code },
+    [`members.${user.uid}`]: { ...memberFromUser(user), code, status: 'accepted' },
   });
 }
 
-export function removeMember(groupId: string, uid: string): Promise<void> {
-  return updateDoc(doc(db, 'groups', groupId), {
+/**
+ * Lender directly adds a friend as a member to the group card.
+ * Member starts with status: 'pending' so lender can immediately assign items and splits.
+ */
+export async function inviteFriendToGroup(
+  groupId: string,
+  friend: { uid: string; name: string; email: string; photo: string },
+  currentUid: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'groups', groupId), {
+    memberIds: arrayUnion(friend.uid),
+    [`members.${friend.uid}`]: {
+      name: friend.name,
+      email: friend.email,
+      photo: friend.photo,
+      joinedAt: Date.now(),
+      status: 'pending',
+      invitedBy: currentUid,
+    },
+    updatedAt: Date.now(),
+  });
+}
+
+/**
+ * Payee / friend accepts the card invitation.
+ * Their status becomes 'accepted', activating the card in their "You Owe".
+ */
+export async function acceptGroupInvite(groupId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, 'groups', groupId), {
+    [`members.${uid}.status`]: 'accepted',
+    updatedAt: Date.now(),
+  });
+}
+
+/**
+ * Payee declines or lender removes a member from the group card.
+ */
+export async function declineGroupInvite(groupId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, 'groups', groupId), {
     memberIds: arrayRemove(uid),
     [`members.${uid}`]: deleteField(),
     updatedAt: Date.now(),
   });
+}
+
+export function removeMember(groupId: string, uid: string): Promise<void> {
+  return declineGroupInvite(groupId, uid);
 }
 
 export function saveTotals(groupId: string, totals: Record<string, number>): Promise<void> {
