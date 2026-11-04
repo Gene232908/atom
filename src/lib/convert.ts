@@ -32,6 +32,7 @@ function toPaymentRecord(raw: unknown): PaymentRecord {
     paidAt: num(p.paidAt, Date.now()),
     note: typeof p.note === 'string' ? p.note : undefined,
     status,
+    termNumber: typeof p.termNumber === 'number' ? Math.round(p.termNumber) : undefined,
   };
 }
 
@@ -72,6 +73,7 @@ export function toGroup(id: string, d: DocumentData): Group {
     hasQr: d.hasQr === true,
     color: isCardColor(str(d.color)) ? str(d.color) : '',
     totals,
+    groupType: d.groupType === 'loan' ? 'loan' : 'shared',
     createdAt: num(d.createdAt),
     updatedAt: num(d.updatedAt),
   };
@@ -98,6 +100,11 @@ export function toItem(id: string, d: DocumentData): Item {
     payments,
     store: str(d.store).slice(0, 40),
     color: isCardColor(str(d.color)) ? str(d.color) : '',
+    isPersonalLoan: d.isPersonalLoan === true ? true : undefined,
+    totalTerms: typeof d.totalTerms === 'number' ? Math.round(d.totalTerms) : undefined,
+    initialPaidTerms: typeof d.initialPaidTerms === 'number' ? Math.round(d.initialPaidTerms) : undefined,
+    initialPaidCents: typeof d.initialPaidCents === 'number' ? Math.round(d.initialPaidCents) : undefined,
+    firstDueDate: typeof d.firstDueDate === 'string' && d.firstDueDate ? d.firstDueDate : undefined,
     createdAt: num(d.createdAt),
     updatedAt: num(d.updatedAt),
   };

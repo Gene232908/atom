@@ -52,8 +52,13 @@ export function subscribeGroups(
   );
 }
 
-/** Creates a list. Returns the new id right away; `saved` finishes when the server confirms. */
-export function createGroup(user: User, name: string, color = ''): { id: string; saved: Promise<void> } {
+/** Creates a list or personal loan. Returns the new id right away; `saved` finishes when the server confirms. */
+export function createGroup(
+  user: User,
+  name: string,
+  color = '',
+  groupType: 'shared' | 'loan' = 'shared',
+): { id: string; saved: Promise<void> } {
   const ref = doc(collection(db, 'groups'));
   const code = makeInviteCode();
   const now = Date.now();
@@ -68,14 +73,17 @@ export function createGroup(user: User, name: string, color = ''): { id: string;
     hasQr: false,
     color,
     totals: {},
+    groupType,
     createdAt: now,
     updatedAt: now,
   });
-  batch.set(doc(db, 'invites', code), {
-    groupId: ref.id,
-    groupName: name,
-    ownerName: user.displayName || 'Someone',
-  });
+  if (groupType === 'shared') {
+    batch.set(doc(db, 'invites', code), {
+      groupId: ref.id,
+      groupName: name,
+      ownerName: user.displayName || 'Someone',
+    });
+  }
   return { id: ref.id, saved: batch.commit() };
 }
 

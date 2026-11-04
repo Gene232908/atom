@@ -27,7 +27,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { HomeSkeleton } from '../components/ui/Skeleton';
 import { SummaryTile } from '../components/home/SummaryTile';
-import { LendOweToggle } from '../components/home/LendOweToggle';
+import { LendOweToggle, type Tab } from '../components/home/LendOweToggle';
 import { MotionPrompt } from '../components/ui/MotionPrompt';
 import { HomeDashboard } from '../components/desktop/HomeDashboard';
 import { useIsDesktop } from '../hooks/useIsDesktop';
@@ -36,8 +36,13 @@ import { buildTransactions } from '../lib/transactions';
 import { RecentTransactions } from '../components/transactions/RecentTransactions';
 import { TransactionsScreen } from '../components/transactions/TransactionsScreen';
 import { TransactionDetail } from '../components/transactions/TransactionDetail';
+import { CreateLoanSheet } from '../components/loan/CreateLoanSheet';
+import { LoanWalletCard } from '../components/loan/LoanWalletCard';
+import { LoanDetailSheet } from '../components/loan/LoanDetailSheet';
+import { computeLoanStats } from '../lib/loanUtils';
+import type { Group } from '../lib/types';
 
-type Panel = 'create' | 'join' | null;
+type Panel = 'create' | 'join' | 'create_loan' | null;
 
 
 export function HomePage() {
@@ -56,7 +61,7 @@ export function HomePage() {
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
-  const [tab, setTab] = useState<'lend' | 'owe'>('lend');
+  const [tab, setTab] = useState<Tab>('lend');
   const [hasResolvedDefault, setHasResolvedDefault] = useState(false);
 
   // Modal sheet states
@@ -64,6 +69,7 @@ export function HomePage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [payingItemId, setPayingItemId] = useState<string | null>(null);
   const [inviteGroupId, setInviteGroupId] = useState<string | null>(null);
+  const [viewingLoan, setViewingLoan] = useState<{ group: Group; item: Item } | null>(null);
 
   const onSelectLayoutMode = (mode: CardLayoutMode) => {
     setCardLayout(mode);
@@ -82,14 +88,19 @@ export function HomePage() {
   const closePanel = () => setPanel(null);
   const name = user.displayName || 'there';
 
-  // Lending vs Owing items
+  // Loan items vs Lending vs Owing items
+  const loanItems = useMemo(
+    () => items.filter((it) => it.isPersonalLoan || it.group.groupType === 'loan'),
+    [items],
+  );
+
   const lendingItems = useMemo(
-    () => items.filter((it) => it.group.ownerId === user.uid),
+    () => items.filter((it) => it.group.ownerId === user.uid && !it.isPersonalLoan && it.group.groupType !== 'loan'),
     [items, user.uid],
   );
 
   const owingItems = useMemo(
-    () => items.filter((it) => it.group.ownerId !== user.uid && it.shares && it.shares[user.uid]),
+    () => items.filter((it) => it.group.ownerId !== user.uid && !it.isPersonalLoan && it.group.groupType !== 'loan' && it.shares && it.shares[user.uid]),
     [items, user.uid],
   );
 
@@ -99,8 +110,39 @@ export function HomePage() {
     for (const it of items) byGroup.set(it.group.id, [...(byGroup.get(it.group.id) ?? []), it]);
     return groups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
   }, [groups, items]);
-  const lendingGroups = useMemo(() => liveGroups.filter((g) => g.ownerId === user.uid), [liveGroups, user.uid]);
-  const owingGroups = useMemo(() => liveGroups.filter((g) => g.ownerId !== user.uid), [liveGroups, user.uid]);
+
+  const lendingGroups = useMemo(
+    () => liveGroups.filter((g) => g.ownerId === user.uid && g.groupType !== 'loan'),
+    [liveGroups, user.uid],
+  );
+  const owingGroups = useMemo(
+    () => liveGroups.filter((g) => g.ownerId !== user.uid && g.groupType !== 'loan'),
+    [liveGroups, user.uid],
+  );
+  const loanGroups = useMemo(
+    () => liveGroups.filter((g) => g.groupType === 'loan' && g.ownerId === user.uid),
+    [liveGroups, user.uid],
+  );
+
+  // Total remaining balance and paid amount across all personal loans
+  const { loanRemainingTotal, loanPaidTotal } = useMemo(() => {
+    let remaining = 0;
+    let paid = 0;
+    for (const it of loanItems) {
+      const stats = computeLoanStats(it);
+      remaining += stats.remainingCents;
+      paid += stats.totalPaidCents;
+    }
+    return { loanRemainingTotal: remaining, loanPaidTotal: paid };
+  }, [loanItems]);
+
+  const activeLoanItem = useMemo(() => {
+    if (!viewingLoan) return null;
+    const freshItem = items.find((it) => it.id === viewingLoan.item.id);
+    const freshGroup = groups.find((g) => g.id === viewingLoan.group.id);
+    if (!freshItem || !freshGroup) return null;
+    return { group: freshGroup, item: freshItem };
+  }, [viewingLoan, items, groups]);
 
   // Live remaining balances, counting partial and confirmed payments
   const { youOwe, owedToYou } = useMemo(() => computeBalances(items, groups, user.uid), [items, groups, user.uid]);
@@ -159,6 +201,17 @@ export function HomePage() {
     () => (viewingItemId ? items.find((i) => i.id === viewingItemId) ?? null : null),
     [viewingItemId, items],
   );
+
+  // If an item opened via transaction is a personal loan, forward it to LoanDetailSheet
+  useEffect(() => {
+    if (viewingItemId) {
+      const it = items.find((i) => i.id === viewingItemId);
+      if (it && (it.isPersonalLoan || it.group.groupType === 'loan')) {
+        setViewingLoan({ group: it.group, item: it });
+        setViewingItemId(null);
+      }
+    }
+  }, [viewingItemId, items]);
 
   const editingItem = useMemo(
     () => (editingItemId ? items.find((i) => i.id === editingItemId) ?? null : null),
@@ -238,14 +291,29 @@ export function HomePage() {
           onTab={setTab}
           lendingItems={lendingItems}
           owingItems={owingItems}
+          loanItems={loanItems}
           youOwe={youOwe}
           owedToYou={owedToYou}
+          loanRemainingTotal={loanRemainingTotal}
+          loanPaidTotal={loanPaidTotal}
           loading={loading}
           error={error}
           onRetry={retry}
-          onOpen={(it) => setViewingItemId(it.id)}
-          onPay={(it) => setPayingItemId(it.id)}
-          onNewItem={() => setPanel('create')}
+          onOpen={(it) => {
+            if (it.isPersonalLoan || it.group.groupType === 'loan') {
+              setViewingLoan({ group: it.group, item: it });
+            } else {
+              setViewingItemId(it.id);
+            }
+          }}
+          onPay={(it) => {
+            if (it.isPersonalLoan || it.group.groupType === 'loan') {
+              setViewingLoan({ group: it.group, item: it });
+            } else {
+              setPayingItemId(it.id);
+            }
+          }}
+          onNewItem={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
           onJoin={() => setPanel('join')}
           transactions={transactions}
           onOpenTx={(tx) => setTxKey(tx.key)}
@@ -260,7 +328,11 @@ export function HomePage() {
             <IconButton label="Join a list" onClick={() => setPanel('join')}>
               <UserPlus className="size-[18px]" strokeWidth={2.2} />
             </IconButton>
-            <IconButton label="Add a card" dark onClick={() => setPanel('create')}>
+            <IconButton
+              label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
+              dark
+              onClick={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
+            >
               <Plus className="size-5" strokeWidth={2.5} />
             </IconButton>
             <button
@@ -285,8 +357,17 @@ export function HomePage() {
             {/* Left Column on Desktop / Top Section on Mobile */}
             <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
               <div className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 sm:gap-3.5">
-                <SummaryTile label="You owe" amount={youOwe} tone="bad" sublabel="remaining" />
-                <SummaryTile label="To collect" amount={owedToYou} tone="ok" sublabel="remaining" />
+                {tab === 'loans' ? (
+                  <>
+                    <SummaryTile label="Remaining loan" amount={loanRemainingTotal} tone="bad" sublabel="balance" />
+                    <SummaryTile label="Paid so far" amount={loanPaidTotal} tone="ok" sublabel="progress" />
+                  </>
+                ) : (
+                  <>
+                    <SummaryTile label="You owe" amount={youOwe} tone="bad" sublabel="remaining" />
+                    <SummaryTile label="To collect" amount={owedToYou} tone="ok" sublabel="remaining" />
+                  </>
+                )}
               </div>
             </div>
 
@@ -299,6 +380,7 @@ export function HomePage() {
                   onChange={setTab}
                   lendCount={lendingGroups.length}
                   oweCount={owingGroups.length}
+                  loansCount={loanGroups.length}
                 />
 
                 <button
@@ -317,7 +399,35 @@ export function HomePage() {
               {error && <ErrorBanner message={error} onRetry={retry} />}
 
               {/* My cards: each list is one card */}
-              {(tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
+              {tab === 'loans' ? (
+                loanItems.length > 0 ? (
+                  <div className="space-y-3.5">
+                    {loanItems.map((loanIt, idx) => {
+                      const parentGroup = groups.find((g) => g.id === loanIt.group.id) || loanIt.group;
+                      return (
+                        <LoanWalletCard
+                          key={loanIt.id}
+                          group={parentGroup}
+                          item={loanIt}
+                          index={idx}
+                          onOpen={(g, it) => setViewingLoan({ group: g, item: it })}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={<WalletCards className="size-7" />}
+                    title="No personal loans yet"
+                    text="Add a loan for your motorcycle (e.g. PCX 160 under Sumisho), phone, or gadgets to track monthly progress, cut-off dates, and payments."
+                    action={
+                      <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create_loan')}>
+                        Add a personal loan
+                      </Button>
+                    }
+                  />
+                )
+              ) : (tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
                 <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} items={items} />
               ) : tab === 'lend' ? (
                 <EmptyState
@@ -429,7 +539,16 @@ export function HomePage() {
 
       <CardActionsSheet group={groups.find((g) => g.id === heldId) ?? null} uid={user.uid} onClose={() => setHeldId(null)} />
       <CreateGroupSheet open={panel === 'create'} onClose={closePanel} />
+      <CreateLoanSheet open={panel === 'create_loan'} onClose={closePanel} />
       <JoinCodeSheet open={panel === 'join'} onClose={closePanel} />
+      {activeLoanItem && (
+        <LoanDetailSheet
+          open={Boolean(activeLoanItem)}
+          onClose={() => setViewingLoan(null)}
+          group={activeLoanItem.group}
+          item={activeLoanItem.item}
+        />
+      )}
       <DefaultViewSheet
         open={defaultViewOpen}
         onClose={() => setDefaultViewOpen(false)}

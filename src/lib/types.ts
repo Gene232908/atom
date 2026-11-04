@@ -21,6 +21,8 @@ export interface Group {
   color: string;
   /** Unpaid amount (in centavos) per person. Kept up to date by the lender's app. */
   totals: Record<string, number>;
+  /** 'shared' for normal borrower/lender group cards, 'loan' for self-loans */
+  groupType?: 'shared' | 'loan';
   createdAt: number;
   updatedAt: number;
 }
@@ -50,6 +52,8 @@ export interface PaymentRecord {
   note?: string;
   /** 'pending' = waiting for lender confirmation, 'confirmed' = lender verified */
   status: 'pending' | 'confirmed';
+  /** Installment / term sequence number (e.g. 1, 2, 3...) */
+  termNumber?: number;
 }
 
 export interface Item {
@@ -72,6 +76,12 @@ export interface Item {
   store: string;
   /** Card color picked by the lender. Empty means automatic. */
   color: string;
+  /** Personal / self-loan specific metadata */
+  isPersonalLoan?: boolean;
+  totalTerms?: number;
+  initialPaidTerms?: number;
+  initialPaidCents?: number;
+  firstDueDate?: string;
   createdAt: number;
   updatedAt: number;
 }

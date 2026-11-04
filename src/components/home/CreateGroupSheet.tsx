@@ -57,6 +57,14 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
           <p className="mt-auto text-[12px] font-medium tracking-[0.16em] text-white/75 uppercase">You lend</p>
         </WalletCard>
 
+        <ColorPicker
+          label="Card color"
+          value={color}
+          onChange={setColor}
+          autoBackground={listGradient('new-card', '', name)}
+          hint="Auto matches the card name. Every item in this card uses this color."
+        />
+
         <div>
           <TextField
             id="group-name"
@@ -91,14 +99,6 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
             })}
           </div>
         </div>
-
-        <ColorPicker
-          label="Card color"
-          value={color}
-          onChange={setColor}
-          autoBackground={listGradient('new-card', '', name)}
-          hint="Auto matches the card name. Every item in this card uses this color."
-        />
 
         <Button type="submit" size="lg" full loading={submitting}>
           Add card

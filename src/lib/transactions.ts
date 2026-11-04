@@ -45,6 +45,24 @@ export function buildTransactions(items: GroupItem[], uid: string): Transaction[
   const list: Transaction[] = [];
   for (const item of items) {
     const { group } = item;
+    const isLoan = item.isPersonalLoan || group.groupType === 'loan';
+    if (isLoan) {
+      const loanPayments = (item.payments ?? []).filter((p) => p && p.status === 'confirmed');
+      for (const payment of loanPayments) {
+        list.push({
+          key: `${group.id}:${item.id}:${payment.id}`,
+          item,
+          payment,
+          direction: 'out',
+          otherUid: group.id,
+          otherName: group.name || item.store || 'Personal Loan',
+          otherPhoto: '',
+          at: payment.paidAt || 0,
+        });
+      }
+      continue;
+    }
+
     const isOwner = group.ownerId === uid;
     for (const payment of confirmedHistory(item, group)) {
       const mine = payment.uid === uid;

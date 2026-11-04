@@ -15,7 +15,8 @@ import { Skeleton } from '../ui/Skeleton';
 import { ItemTable, type TableRow } from './ItemTable';
 import { Panel, Segmented, StatStrip, UnderlineTabs } from './Panel';
 
-type Tab = 'lend' | 'owe';
+import type { Tab } from '../home/LendOweToggle';
+
 type Status = 'all' | 'open' | 'done';
 
 interface Props {
@@ -25,8 +26,11 @@ interface Props {
   onTab: (tab: Tab) => void;
   lendingItems: GroupItem[];
   owingItems: GroupItem[];
+  loanItems: GroupItem[];
   youOwe: number;
   owedToYou: number;
+  loanRemainingTotal: number;
+  loanPaidTotal: number;
   loading: boolean;
   error: string;
   onRetry: () => void;
@@ -48,18 +52,15 @@ function greeting(): string {
 
 const toRow = (it: GroupItem): TableRow => ({ item: it, group: it.group });
 
-/** Personal dashboard for laptops and PCs. */
+import { computeLoanStats } from '../../lib/loanUtils';
+
+// ...
 export function HomeDashboard(props: Props) {
-  const { uid, tab, onTab, lendingItems, owingItems, youOwe, owedToYou, loading, error } = props;
+  const { uid, tab, onTab, lendingItems, owingItems, loanItems, youOwe, owedToYou, loading, error } = props;
   const [status, setStatus] = useState<Status>('all');
   const [query, setQuery] = useState('');
 
-  const all = useMemo(() => [...lendingItems, ...owingItems], [lendingItems, owingItems]);
-
-  const waiting = useMemo(
-    () => lendingItems.reduce((n, it) => n + Object.values(it.shares || {}).filter((s) => s.status === 'claimed').length, 0),
-    [lendingItems],
-  );
+  const all = useMemo(() => [...lendingItems, ...owingItems, ...loanItems], [lendingItems, owingItems, loanItems]);
 
   const myLeft = (it: GroupItem) => (it.group.ownerId === uid ? rowStatus(it, it.group.ownerId, uid).amount : remainingFor(it, uid));
 
@@ -76,14 +77,15 @@ export function HomeDashboard(props: Props) {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (tab === 'lend' ? lendingItems : owingItems).filter((it) => {
+    const source = tab === 'loans' ? loanItems : tab === 'lend' ? lendingItems : owingItems;
+    return source.filter((it) => {
       const st = rowStatus(it, it.group.ownerId, uid);
       if (status === 'open' && st.done) return false;
       if (status === 'done' && !st.done) return false;
       if (!q) return true;
       return [it.description, it.store, it.group.name].some((v) => (v || '').toLowerCase().includes(q));
     });
-  }, [tab, lendingItems, owingItems, status, query, uid]);
+  }, [tab, lendingItems, owingItems, loanItems, status, query, uid]);
 
   return (
     <main className="mx-auto w-full max-w-[1360px] px-8 py-8 2xl:px-12">
@@ -101,7 +103,7 @@ export function HomeDashboard(props: Props) {
             Join a card
           </Button>
           <Button icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={props.onNewItem}>
-            Add a card
+            {tab === 'loans' ? 'Add a loan' : 'Add a card'}
           </Button>
         </div>
       </div>
@@ -111,7 +113,7 @@ export function HomeDashboard(props: Props) {
           items={[
             { label: 'You owe', value: formatMoney(youOwe), hint: `${owingItems.length} ${owingItems.length === 1 ? 'item' : 'items'} to pay`, tone: youOwe > 0 ? 'bad' : 'muted', onClick: () => onTab('owe') },
             { label: 'To collect', value: formatMoney(owedToYou), hint: `${lendingItems.length} ${lendingItems.length === 1 ? 'item' : 'items'} you lent`, tone: owedToYou > 0 ? 'ok' : 'muted', onClick: () => onTab('lend') },
-            { label: 'To confirm', value: String(waiting), hint: waiting ? 'Payments to check' : 'Nothing to check', tone: waiting ? 'warn' : 'muted' },
+            { label: 'My Loans', value: formatMoney(props.loanRemainingTotal), hint: `${loanItems.length} ${loanItems.length === 1 ? 'loan' : 'loans'} active`, tone: props.loanRemainingTotal > 0 ? 'warn' : 'muted', onClick: () => onTab('loans') },
             { label: 'Due in 7 days', value: formatMoney(dueWeekAmount), hint: `${dueWeek.length} ${dueWeek.length === 1 ? 'item' : 'items'}`, tone: dueWeek.length ? 'accent' : 'muted' },
           ]}
         />
@@ -122,8 +124,14 @@ export function HomeDashboard(props: Props) {
       <div className="mt-6 grid items-start gap-6 2xl:grid-cols-12">
         <Panel
           className="2xl:col-span-8"
-          title="Transactions"
-          subtitle={tab === 'lend' ? 'Items where people owe you' : 'Items you need to pay'}
+          title={tab === 'loans' ? 'My Loans' : 'Transactions'}
+          subtitle={
+            tab === 'loans'
+              ? 'Personal installment loans and payment progress'
+              : tab === 'lend'
+                ? 'Items where people owe you'
+                : 'Items you need to pay'
+          }
           actions={
             <label className="flex h-9 w-60 items-center gap-2 rounded-lg bg-canvas px-3 ring-1 ring-black/[0.06] focus-within:ring-2 focus-within:ring-accent">
               <Search className="size-4 shrink-0 text-muted" />
@@ -144,6 +152,7 @@ export function HomeDashboard(props: Props) {
               options={[
                 { key: 'lend', label: 'You lend', count: lendingItems.length },
                 { key: 'owe', label: 'You owe', count: owingItems.length },
+                { key: 'loans', label: 'My Loan', count: loanItems.length },
               ]}
             />
             <div className="pb-2">
@@ -167,19 +176,29 @@ export function HomeDashboard(props: Props) {
               rows={rows.map(toRow)}
               uid={uid}
               showList
-              amountLabel={tab === 'lend' ? 'Still owed' : 'Your balance'}
+              amountLabel={tab === 'loans' ? 'Remaining' : tab === 'lend' ? 'Still owed' : 'Your balance'}
               onOpen={(r) => props.onOpen(r.item as GroupItem)}
               onPay={(r) => props.onPay(r.item as GroupItem)}
               empty={
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
-                  title={query || status !== 'all' ? 'No matching items' : tab === 'lend' ? 'No items yet' : "You don't owe anything"}
+                  title={
+                    query || status !== 'all'
+                      ? 'No matching items'
+                      : tab === 'loans'
+                        ? 'No personal loans yet'
+                        : tab === 'lend'
+                          ? 'No items yet'
+                          : "You don't owe anything"
+                  }
                   text={
                     query || status !== 'all'
                       ? 'Try another search or filter.'
-                      : tab === 'lend'
-                        ? 'Add a card or store installment and split it with people.'
-                        : 'When a friend adds you to their list, your items show here.'
+                      : tab === 'loans'
+                        ? 'Add a personal loan for your motorcycle or gadgets to track monthly progress.'
+                        : tab === 'lend'
+                          ? 'Add a card or store installment and split it with people.'
+                          : 'When a friend adds you to their list, your items show here.'
                   }
                 />
               }
@@ -241,15 +260,60 @@ export function HomeDashboard(props: Props) {
             )}
           </Panel>
 
-          <PeoplePanel tab={tab} uid={uid} lendingItems={lendingItems} owingItems={owingItems} />
+          <PeoplePanel tab={tab} uid={uid} lendingItems={lendingItems} owingItems={owingItems} loanItems={loanItems} />
         </div>
       </div>
     </main>
   );
 }
 
-/** Lend tab: who owes you. Owe tab: who you owe. */
-function PeoplePanel({ tab, uid, lendingItems, owingItems }: { tab: Tab; uid: string; lendingItems: GroupItem[]; owingItems: GroupItem[] }) {
+/** Lend tab: who owes you. Owe tab: who you owe. Loans tab: loan breakdown. */
+function PeoplePanel({
+  tab,
+  uid,
+  lendingItems,
+  owingItems,
+  loanItems,
+}: {
+  tab: Tab;
+  uid: string;
+  lendingItems: GroupItem[];
+  owingItems: GroupItem[];
+  loanItems: GroupItem[];
+}) {
+  if (tab === 'loans') {
+    return (
+      <Panel title="Personal Loans" subtitle="Installment breakdown" delay={140}>
+        {loanItems.length === 0 ? (
+          <p className="border-t border-hairline px-6 py-8 text-center text-[13px] text-muted">No personal loans added yet.</p>
+        ) : (
+          <ul className="divide-y divide-hairline border-t border-hairline">
+            {loanItems.map((it) => {
+              const stats = computeLoanStats(it);
+              const provider = it.store || it.group.name || 'Personal Loan';
+              return (
+                <li key={it.id} className="px-6 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[13px] font-semibold text-ink">{it.description}</span>
+                    <span className="shrink-0 text-[13px] font-bold text-ink tabular-nums">{formatMoney(stats.remainingCents)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted">
+                    <span>
+                      {provider} · {stats.termsLeft} mos left
+                    </span>
+                    <span>{stats.progressPercent}% paid</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fill">
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${stats.progressPercent}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+    );
+  }
   const people = useMemo(() => {
     const map = new Map<string, { uid: string; name: string; photo: string; amount: number; groupId: string }>();
     const add = (pid: string, name: string, photo: string, amount: number, it: GroupItem) => {

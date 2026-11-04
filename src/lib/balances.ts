@@ -18,6 +18,7 @@ export function computeBalances(items: GroupItem[], groups: Group[], uid: string
   // Items not loaded yet: fall back to the totals saved on each list.
   if (items.length === 0 && groups.length > 0) {
     for (const g of groups) {
+      if (g.groupType === 'loan') continue;
       if (g.ownerId === uid) owed += sumOwed(g.totals);
       else owe += g.totals[uid] ?? 0;
     }
@@ -25,6 +26,8 @@ export function computeBalances(items: GroupItem[], groups: Group[], uid: string
   }
 
   for (const item of items) {
+    if (item.isPersonalLoan || item.group.groupType === 'loan') continue;
+
     if (item.group.ownerId === uid) {
       for (const [pid, share] of Object.entries(item.shares || {})) {
         if (pid === uid || !share || share.status === 'paid') continue;

@@ -14,7 +14,9 @@ import {
 import { db } from '../lib/firebase';
 import { toItem } from '../lib/convert';
 import { cleanRef, confirmedPaid, pendingClaim, withAmountTag } from '../lib/items';
+import { computeLoanStats } from '../lib/loanUtils';
 import type { Item, PaymentRecord, Share, ShareStatus } from '../lib/types';
+import type { User } from 'firebase/auth';
 
 /** Safety cap so a single list can never use up the daily free reads. */
 const MAX_ITEMS = 300;
@@ -30,6 +32,11 @@ export interface ItemInput {
   monthlyCents?: number;
   store: string;
   color: string;
+  isPersonalLoan?: boolean;
+  totalTerms?: number;
+  initialPaidTerms?: number;
+  initialPaidCents?: number;
+  firstDueDate?: string;
 }
 
 const itemsRef = (groupId: string) => collection(db, 'groups', groupId, 'items');
@@ -53,7 +60,7 @@ export function subscribeItems(
   );
 }
 
-export async function addItem(groupId: string, input: ItemInput): Promise<void> {
+export async function addItem(groupId: string, input: ItemInput): Promise<string> {
   const now = Date.now();
   const data: Record<string, unknown> = {
     description: input.description.trim().slice(0, 200),
@@ -77,8 +84,16 @@ export async function addItem(groupId: string, input: ItemInput): Promise<void> 
   if (input.monthlyCents && input.monthlyCents > 0) {
     data.monthlyCents = Math.round(input.monthlyCents);
   }
+  if (input.isPersonalLoan) {
+    data.isPersonalLoan = true;
+    if (input.totalTerms && input.totalTerms > 0) data.totalTerms = Math.round(input.totalTerms);
+    if (typeof input.initialPaidTerms === 'number') data.initialPaidTerms = Math.round(input.initialPaidTerms);
+    if (typeof input.initialPaidCents === 'number') data.initialPaidCents = Math.round(input.initialPaidCents);
+    if (input.firstDueDate) data.firstDueDate = input.firstDueDate;
+  }
 
-  await addDoc(itemsRef(groupId), data);
+  const docRef = await addDoc(itemsRef(groupId), data);
+  return docRef.id;
 }
 
 export function updateItem(groupId: string, itemId: string, input: ItemInput): Promise<void> {
@@ -111,7 +126,63 @@ export function updateItem(groupId: string, itemId: string, input: ItemInput): P
     data.monthlyCents = deleteField();
   }
 
+  if (input.isPersonalLoan) {
+    data.isPersonalLoan = true;
+    if (input.totalTerms && input.totalTerms > 0) data.totalTerms = Math.round(input.totalTerms);
+    if (typeof input.initialPaidTerms === 'number') data.initialPaidTerms = Math.round(input.initialPaidTerms);
+    if (typeof input.initialPaidCents === 'number') data.initialPaidCents = Math.round(input.initialPaidCents);
+    if (input.firstDueDate) data.firstDueDate = input.firstDueDate;
+  }
+
   return updateDoc(doc(db, 'groups', groupId, 'items', itemId), data);
+}
+
+/** Record a self-loan payment directly with instant confirmation and advance to next due date */
+export async function recordLoanPayment(
+  groupId: string,
+  item: Item,
+  user: User,
+  payment: {
+    amountCents: number;
+    refNumber: string;
+    paidAt?: number;
+    note?: string;
+  },
+): Promise<void> {
+  const now = Date.now();
+  const paidAt = payment.paidAt || now;
+  const stats = computeLoanStats(item);
+
+  const newTermNumber = stats.nextTermNumber || stats.currentPaidTerms + 1;
+  const newPayment: PaymentRecord = {
+    id: `loan-pay-${now}`,
+    uid: user.uid,
+    payerName: user.displayName || 'Me',
+    amountCents: Math.round(payment.amountCents),
+    refNumber: payment.refNumber.trim() || 'Manual payment',
+    paidAt,
+    note: payment.note?.trim() || `Payment #${newTermNumber} of ${stats.totalTerms}`,
+    status: 'confirmed',
+    termNumber: newTermNumber,
+  };
+
+  const existingPayments = Array.isArray(item.payments) ? [...item.payments] : [];
+  const updatedPayments = [newPayment, ...existingPayments];
+
+  const updatedStats = computeLoanStats({ ...item, payments: updatedPayments });
+  const nextDueDate = updatedStats.isFullyPaid ? null : updatedStats.nextDueDate;
+
+  const updates: Record<string, unknown> = {
+    payments: updatedPayments,
+    dueDate: nextDueDate,
+    [`shares.${user.uid}.paidCents`]: updatedStats.totalPaidCents,
+    [`shares.${user.uid}.status`]: updatedStats.isFullyPaid ? 'paid' : 'unpaid',
+    [`shares.${user.uid}.refNumber`]: payment.refNumber.trim() || undefined,
+    [`shares.${user.uid}.updatedAt`]: now,
+    updatedAt: now,
+  };
+
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), updates);
 }
 
 export function deleteItem(groupId: string, itemId: string): Promise<void> {
