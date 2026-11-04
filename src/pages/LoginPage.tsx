@@ -94,7 +94,6 @@ export function LoginPage({ joining }: { joining: boolean }) {
             <EmailForm onBack={() => setUseEmail(false)} />
           ) : (
             <div className="space-y-3">
-              <h2 className="mb-1 hidden text-[20px] font-semibold lg:block">Welcome</h2>
               <button
                 type="button"
                 onClick={signIn}
