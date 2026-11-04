@@ -12,9 +12,7 @@ export function AvatarStack({ people, max = 4 }: { people: Person[]; max?: numbe
   return (
     <div className="flex items-center -space-x-2">
       {shown.map((p, i) => (
-        <span key={`${p.name}-${i}`} className="rounded-full ring-2 ring-white/35">
-          <Avatar name={p.name} photo={p.photo} size="xs" />
-        </span>
+        <Avatar key={`${p.name}-${i}`} name={p.name} photo={p.photo} size="xs" ring="card" />
       ))}
       {extra > 0 && (
         <span className="grid size-6 place-items-center rounded-full bg-white/25 text-[10px] font-semibold text-white ring-2 ring-white/35 backdrop-blur">

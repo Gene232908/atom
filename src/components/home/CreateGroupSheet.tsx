@@ -70,7 +70,7 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
               setError('');
             }}
           />
-          <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+          <div className="no-scrollbar -mx-4 mt-1 flex gap-1.5 overflow-x-auto px-4 py-1.5 sm:-mx-5 sm:px-5">
             {STORE_SUGGESTIONS.map((s) => {
               const on = name.trim().toLowerCase() === s.toLowerCase();
               return (

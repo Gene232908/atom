@@ -21,12 +21,15 @@ const CLOSE_DISTANCE = 110;
  */
 export function Sheet({ open, onClose, title, description, children, footer, zIndex = 'z-50' }: Props) {
   const closeRef = useRef(onClose);
+  // Ignore background taps right after opening (the finger that opened it may still be lifting).
+  const openedAt = useRef(0);
   closeRef.current = onClose;
   const [drag, setDrag] = useState(0);
   const start = useRef<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    openedAt.current = Date.now();
     openSheets += 1;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
@@ -78,7 +81,9 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
       <div
         className="absolute inset-0 animate-fade-in bg-black/40 transition-opacity"
         style={{ opacity: Math.max(0.2, 1 - drag / 400) }}
-        onClick={() => closeRef.current()}
+        onClick={() => {
+          if (Date.now() - openedAt.current > 400) closeRef.current();
+        }}
       />
       <div
         className="relative flex max-h-[94dvh] w-full animate-sheet-up flex-col rounded-t-[28px] bg-canvas text-ink shadow-2xl md:max-w-lg md:animate-pop md:rounded-[28px]"

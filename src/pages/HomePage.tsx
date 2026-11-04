@@ -12,6 +12,7 @@ import { confirmPayment, recordPayment, undoPayment } from '../services/items';
 import { NavBar, PageBody } from '../components/layout/AppHeader';
 import { WalletCardsView } from '../components/home/GroupWalletCard';
 import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
+import { CardActionsSheet } from '../components/home/CardActionsSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { ProfileMenu } from '../components/home/ProfileMenu';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
@@ -44,6 +45,8 @@ export function HomePage() {
 
   const [panel, setPanel] = useState<Panel>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Card the person pressed and held (shows Edit / Remove)
+  const [heldId, setHeldId] = useState<string | null>(null);
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
@@ -251,9 +254,9 @@ export function HomePage() {
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="Your account"
-              className="size-9 shrink-0 rounded-full ring-2 ring-hairline shadow-sm overflow-hidden transition active:scale-90 ml-0.5"
+              className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full transition active:scale-90"
             >
-              <Avatar name={name} photo={user.photoURL ?? ''} size="sm" />
+              <Avatar name={name} photo={user.photoURL ?? ''} size="nav" ring="subtle" />
             </button>
           </div>
         }
@@ -302,7 +305,7 @@ export function HomePage() {
 
               {/* My cards: each list is one card */}
               {(tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
-                <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} />
+                <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} />
               ) : tab === 'lend' ? (
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
@@ -390,6 +393,7 @@ export function HomePage() {
         />
       )}
 
+      <CardActionsSheet group={groups.find((g) => g.id === heldId) ?? null} uid={user.uid} onClose={() => setHeldId(null)} />
       <CreateGroupSheet open={panel === 'create'} onClose={closePanel} />
       <JoinCodeSheet open={panel === 'join'} onClose={closePanel} />
       <DefaultViewSheet

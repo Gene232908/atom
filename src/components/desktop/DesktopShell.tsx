@@ -61,7 +61,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
         </div>
 
         <div className="flex items-center gap-3 border-t border-hairline px-4 py-4">
-          <Avatar name={name} photo={user.photoURL ?? ''} size="sm" />
+          <Avatar name={name} photo={user.photoURL ?? ''} size="sm" ring="subtle" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold">{user.displayName || 'You'}</p>
             <p className="truncate text-[11px] text-muted">{user.email}</p>

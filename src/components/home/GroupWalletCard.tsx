@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { groupGradient } from '../../lib/cardTheme';
 import { navigate } from '../../hooks/useRoute';
+import { useLongPress } from '../../hooks/useLongPress';
 import { formatMoney } from '../../lib/money';
 import { firstName, sumOwed } from '../../lib/items';
 import type { Group } from '../../lib/types';
@@ -70,13 +71,28 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
   );
 }
 
+type OnHold = ((group: Group) => void) | undefined;
+
+/** Hold a card (or right-click) to open its options. Taps and swipes still work normally. */
+function HoldArea({ group, onHold, children }: { group: Group; onHold: OnHold; children: React.ReactNode }) {
+  const handlers = useLongPress(() => onHold?.(group));
+  if (!onHold) return <>{children}</>;
+  return (
+    <div className="contents" {...handlers}>
+      {children}
+    </div>
+  );
+}
+
 /** Stacked like Apple Wallet on phones, a neat grid on tablets and laptops */
-export function WalletStack({ groups, uid }: { groups: Group[]; uid: string }) {
+export function WalletStack({ groups, uid, onHold }: { groups: Group[]; uid: string; onHold?: OnHold }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {groups.map((g, i) => (
         <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[138px]' : ''}`} style={{ zIndex: i }}>
-          <GroupWalletCard group={g} uid={uid} index={i} />
+          <HoldArea group={g} onHold={onHold}>
+            <GroupWalletCard group={g} uid={uid} index={i} />
+          </HoldArea>
         </div>
       ))}
     </div>
@@ -147,7 +163,7 @@ function DeckCardItem({
 }
 
 /** 3D stacked card deck: cards behind peek out; swipe left/right flips & cycles seamlessly */
-export function SingleCardCarousel({ groups, uid }: { groups: Group[]; uid: string }) {
+export function SingleCardCarousel({ groups, uid, onHold }: { groups: Group[]; uid: string; onHold?: OnHold }) {
   const [current, setCurrent] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -381,7 +397,9 @@ export function SingleCardCarousel({ groups, uid }: { groups: Group[]; uid: stri
                   : 'transform 280ms cubic-bezier(0.25, 1, 0.5, 1), opacity 260ms ease, filter 260ms ease',
               }}
             >
-              <DeckCardItem group={group} uid={uid} isFront={rel === 0} />
+              <HoldArea group={group} onHold={rel === 0 ? onHold : undefined}>
+                <DeckCardItem group={group} uid={uid} isFront={rel === 0} />
+              </HoldArea>
             </div>
           );
         })}
@@ -395,13 +413,15 @@ export function WalletCardsView({
   groups,
   uid,
   mode = 'stack',
+  onHold,
 }: {
   groups: Group[];
   uid: string;
   mode?: 'stack' | 'single';
+  onHold?: OnHold;
 }) {
   if (mode === 'single') {
-    return <SingleCardCarousel groups={groups} uid={uid} />;
+    return <SingleCardCarousel groups={groups} uid={uid} onHold={onHold} />;
   }
-  return <WalletStack groups={groups} uid={uid} />;
+  return <WalletStack groups={groups} uid={uid} onHold={onHold} />;
 }

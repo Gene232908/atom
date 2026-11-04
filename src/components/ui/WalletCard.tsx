@@ -20,38 +20,19 @@ const TILT = 'perspective(900px) rotateX(calc(var(--ty, 0) * -6deg)) rotateY(cal
 const SHADOW =
   'calc(var(--tx, 0) * -10px) calc(16px + var(--ty, 0) * -6px) 34px -12px rgba(0,0,0,0.45), 0 4px 10px -4px rgba(0,0,0,0.18)';
 
-const GLARE: CSSProperties = {
+// One wide, soft sheen that glides across the card as the phone tilts. No lines, no spots.
+const SHEEN: CSSProperties = {
   background:
-    'radial-gradient(circle at calc(50% + var(--tx, 0) * 60%) calc(30% + var(--ty, 0) * 60%), rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.08) 26%, transparent 55%)',
-  mixBlendMode: 'overlay',
-};
-
-const FOIL: CSSProperties = {
-  background:
-    'linear-gradient(calc(115deg + var(--tx, 0) * 40deg), transparent 18%, rgba(255,105,180,0.55) 32%, rgba(110,220,255,0.55) 44%, rgba(255,236,140,0.55) 56%, rgba(170,120,255,0.5) 66%, transparent 80%)',
-  backgroundSize: '260% 260%',
-  backgroundPosition: 'calc(50% + var(--tx, 0) * 45%) calc(50% + var(--ty, 0) * 45%)',
+    'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.10) 38%, rgba(255,255,255,0.20) 48%, rgba(255,255,255,0.10) 58%, transparent 76%)',
+  backgroundSize: '250% 100%',
+  backgroundPosition: 'calc(50% - var(--tx, 0) * 45%) 0',
   backgroundRepeat: 'no-repeat',
-  mixBlendMode: 'color-dodge',
-  opacity: 0.2,
 };
 
-const BAND: CSSProperties = {
-  background: 'linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.30) 49%, rgba(255,255,255,0.06) 54%, transparent 60%)',
-  backgroundSize: '320% 100%',
-  backgroundPosition: 'calc(50% - var(--tx, 0) * 48%) 0',
-  backgroundRepeat: 'no-repeat',
-  mixBlendMode: 'overlay',
-};
-
-const TEXTURE: CSSProperties = {
-  background:
-    'repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 5px)',
-};
-
+// Soft light from the top-left and a gentle shade at the bottom, for depth.
 const DEPTH: CSSProperties = {
   background:
-    'radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.12), transparent 55%), linear-gradient(to top, rgba(0,0,0,0.16), transparent 50%)',
+    'linear-gradient(160deg, rgba(255,255,255,0.14) 0%, transparent 45%), linear-gradient(to top, rgba(0,0,0,0.14), transparent 45%)',
 };
 
 /** Glossy, Apple Wallet style card. The shine moves when you tilt your phone. */
@@ -71,10 +52,7 @@ export function WalletCard({ seed, background, className = '', style, children, 
         style={{ backgroundImage: background ?? cardGradient(seed), boxShadow: SHADOW }}
       >
         <div aria-hidden className="pointer-events-none absolute inset-0" style={DEPTH} />
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={TEXTURE} />
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={FOIL} />
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={BAND} />
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={GLARE} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={SHEEN} />
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] ring-1 ring-white/12 ring-inset"

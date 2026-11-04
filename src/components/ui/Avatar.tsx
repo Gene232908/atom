@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const COLORS = [
   'bg-[#e5e5ea] text-[#3a3a3c]',
@@ -26,35 +26,54 @@ function initials(name: string): string {
 
 const SIZES = {
   xs: 'size-6 text-[10px]',
-  sm: 'size-8 text-xs',
-  md: 'size-10 text-sm',
-  lg: 'size-14 text-lg',
+  sm: 'size-8 text-[12px]',
+  nav: 'size-9 text-[13px]',
+  md: 'size-10 text-[14px]',
+  lg: 'size-14 text-[18px]',
+};
+
+const RINGS = {
+  none: '',
+  /** Thin grey outline for light backgrounds */
+  subtle: 'ring-1 ring-black/10',
+  /** White outline for faces stacked on a colored card */
+  card: 'ring-2 ring-white/70',
 };
 
 interface Props {
   name: string;
   photo?: string;
   size?: keyof typeof SIZES;
+  ring?: keyof typeof RINGS;
 }
 
-export function Avatar({ name, photo, size = 'md' }: Props) {
+/** Round profile picture. The photo always fills the circle exactly; falls back to initials. */
+export function Avatar({ name, photo, size = 'md', ring = 'none' }: Props) {
   const [broken, setBroken] = useState(false);
-  const cls = `${SIZES[size]} shrink-0 rounded-full`;
+  useEffect(() => setBroken(false), [photo]);
 
-  if (photo && !broken) {
-    return (
-      <img
-        src={photo}
-        alt=""
-        referrerPolicy="no-referrer"
-        onError={() => setBroken(true)}
-        className={`${cls} bg-fill object-cover`}
-      />
-    );
-  }
+  const showPhoto = Boolean(photo) && !broken;
   return (
-    <span className={`${cls} grid place-items-center font-semibold ${colorFor(name)}`} aria-hidden>
-      {initials(name)}
+    <span
+      className={`relative inline-grid shrink-0 place-items-center overflow-hidden rounded-full align-middle font-semibold select-none ${
+        SIZES[size]
+      } ${RINGS[ring]} ${showPhoto ? 'bg-fill' : colorFor(name)}`}
+      aria-hidden
+    >
+      {showPhoto ? (
+        <img
+          src={photo}
+          alt=""
+          referrerPolicy="no-referrer"
+          draggable={false}
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+          className="absolute inset-0 size-full object-cover"
+        />
+      ) : (
+        <span className="leading-none">{initials(name)}</span>
+      )}
     </span>
   );
 }

@@ -236,9 +236,9 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="Your account"
-              className="size-9 shrink-0 rounded-full ring-2 ring-hairline shadow-sm overflow-hidden transition active:scale-90 ml-0.5"
+              className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full transition active:scale-90"
             >
-              <Avatar name={user.displayName || user.email || 'You'} photo={user.photoURL ?? ''} size="sm" />
+              <Avatar name={user.displayName || user.email || 'You'} photo={user.photoURL ?? ''} size="nav" ring="subtle" />
             </button>
           </div>
         }

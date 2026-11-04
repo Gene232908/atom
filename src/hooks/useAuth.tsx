@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  createUserWithEmailAndPassword,
   getRedirectResult,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  updateProfile,
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
@@ -25,6 +30,15 @@ interface AuthValue {
   error: string;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** True when signed in with email and password but the email is not verified yet. */
+  needsVerification: boolean;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<boolean>;
+  signInWithEmail: (email: string, password: string) => Promise<boolean>;
+  resendVerification: () => Promise<boolean>;
+  /** Re-checks with Firebase after the person clicked the link in their email. */
+  checkVerified: () => Promise<boolean>;
+  resetPassword: (email: string) => Promise<boolean>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -37,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState('');
+  // Bumped after re-checking verification, so the screen updates even though the user object is the same.
+  const [, setVerifyTick] = useState(0);
 
   useEffect(() => {
     getRedirectResult(auth).catch((err) => setError(friendlyError(err)));
@@ -72,9 +88,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
   }, []);
 
+  const run = useCallback(async (work: () => Promise<unknown>): Promise<boolean> => {
+    setError('');
+    setSigningIn(true);
+    try {
+      await work();
+      return true;
+    } catch (err) {
+      setError(friendlyError(err));
+      return false;
+    } finally {
+      setSigningIn(false);
+    }
+  }, []);
+
+  const signUpWithEmail = useCallback(
+    (name: string, email: string, password: string) =>
+      run(async () => {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        if (name.trim()) await updateProfile(cred.user, { displayName: name.trim() });
+        // The account is created even if this email fails. The verify screen has a "send again" button.
+        await sendEmailVerification(cred.user).catch(() => undefined);
+        setUser(cred.user);
+      }),
+    [run],
+  );
+
+  const signInWithEmail = useCallback(
+    (email: string, password: string) =>
+      run(async () => {
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        if (!cred.user.emailVerified) await sendEmailVerification(cred.user).catch(() => undefined);
+      }),
+    [run],
+  );
+
+  const resendVerification = useCallback(
+    () => run(async () => auth.currentUser && sendEmailVerification(auth.currentUser)),
+    [run],
+  );
+
+  const checkVerified = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) return false;
+    try {
+      await current.reload();
+      // Fresh token so the database rules see email_verified = true.
+      await current.getIdToken(true);
+      setVerifyTick((n) => n + 1);
+      return current.emailVerified === true;
+    } catch (err) {
+      setError(friendlyError(err));
+      return false;
+    }
+  }, []);
+
+  const resetPassword = useCallback(
+    (email: string) => run(() => sendPasswordResetEmail(auth, email.trim())),
+    [run],
+  );
+
+  const clearError = useCallback(() => setError(''), []);
+
+  const needsVerification = Boolean(
+    user &&
+      !user.emailVerified &&
+      user.providerData.length > 0 &&
+      user.providerData.every((p) => p.providerId === 'password'),
+  );
+
   const value = useMemo(
-    () => ({ user, loading, signingIn, error, signIn, signOut }),
-    [user, loading, signingIn, error, signIn, signOut],
+    () => ({
+      user, loading, signingIn, error, signIn, signOut, needsVerification,
+      signUpWithEmail, signInWithEmail, resendVerification, checkVerified, resetPassword, clearError,
+    }),
+    [user, loading, signingIn, error, signIn, signOut, needsVerification, signUpWithEmail, signInWithEmail, resendVerification, checkVerified, resetPassword, clearError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

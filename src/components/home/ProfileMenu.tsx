@@ -57,9 +57,7 @@ export function ProfileMenu({ open, onClose }: Props) {
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="size-11 shrink-0 rounded-full ring-2 ring-hairline overflow-hidden">
-              <Avatar name={name} photo={user.photoURL ?? ''} size="md" />
-            </div>
+            <Avatar name={name} photo={user.photoURL ?? ''} size="md" ring="subtle" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-bold text-ink">{name}</p>
               <p className="truncate text-[12px] text-muted">{user.email || 'Signed in'}</p>

@@ -23,12 +23,27 @@ export function friendlyError(err: unknown): string {
     case 'auth/unauthorized-domain':
       return 'This website is not allowed to sign in yet. The app owner needs to add it in Firebase settings.';
     case 'auth/operation-not-allowed':
-      return 'Google sign in is not turned on yet. The app owner needs to turn it on in Firebase.';
+      return 'This sign in method is not turned on yet. The app owner needs to turn it on in Firebase.';
     case 'auth/too-many-requests':
       return 'Too many tries. Please wait a few minutes and try again.';
     case 'auth/web-storage-unsupported':
     case 'auth/operation-not-supported-in-this-environment':
       return 'This browser cannot sign in. Please open the link in Chrome or Safari.';
+    case 'auth/email-already-in-use':
+      return 'This email already has an account. Try signing in instead.';
+    case 'auth/invalid-email':
+      return 'That email does not look right. Please check it.';
+    case 'auth/weak-password':
+      return 'Please use a password with at least 6 characters.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+    case 'auth/invalid-login-credentials':
+      return 'Wrong email or password. Please try again.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled.';
+    case 'auth/missing-password':
+      return 'Please type your password.';
     case 'permission-denied':
       return 'You are not allowed to do this. You may have been removed from this list.';
     case 'resource-exhausted':
