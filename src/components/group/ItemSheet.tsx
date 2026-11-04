@@ -8,9 +8,9 @@ import {
   ReceiptText,
   ShoppingBag,
 } from 'lucide-react';
-import { storeGradient } from '../../lib/cardTheme';
+import { itemGradient } from '../../lib/cardTheme';
 import { formatMoney, toCents, centsToInput } from '../../lib/money';
-import { dueInfo, isItemDone, itemProgress } from '../../lib/items';
+import { amountProgress, dueInfo, isItemDone, itemProgress } from '../../lib/items';
 import { recordPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
 import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
@@ -26,7 +26,7 @@ interface Props {
   onClose: () => void;
   onEdit: (item: Item) => void;
   onPay: (item: Item) => void;
-  onSetStatus: (item: Item, personUid: string, status: ShareStatus) => void;
+  onSetStatus: (item: Item, personUid: string, status: ShareStatus, amountCents?: number) => void;
 }
 
 /** Everything about one item, plus transaction payment history & installment breakdowns. */
@@ -67,9 +67,9 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
       if (share.status === 'claimed' && !existingUidsWithPending.has(pid)) {
         const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
         const amt =
-          share.paidCents && share.paidCents > 0
-            ? share.paidCents
-            : item.monthlyCents || installmentMonthly || item.splitCents || 0;
+          share.claimCents && share.claimCents > 0
+            ? share.claimCents
+            : Math.max(0, item.splitCents - (share.paidCents ?? 0));
         list.unshift({
           id: `claim-${pid}`,
           uid: pid,
@@ -102,7 +102,8 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   const isOwner = group.ownerId === uid;
   const done = isItemDone(item, group.ownerId);
   const due = dueInfo(item.dueDate, done);
-  const { paid, total } = itemProgress(item, group.ownerId);
+  const { total } = itemProgress(item, group.ownerId);
+  const moneyProgress = amountProgress(item, group.ownerId);
   const mine = item.shares ? item.shares[uid] : undefined;
 
   const myPaid = mine?.paidCents ?? (mine?.status === 'paid' ? item.splitCents : 0);
@@ -150,7 +151,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
         ) : undefined
       }
     >
-      <WalletCard seed={item.id} background={storeGradient(item.store || '', item.id, item.color)} className="p-5">
+      <WalletCard seed={item.id} background={itemGradient(item, group)} className="p-5">
         {/* Top Header: Store on left, Cycle on top right, Due Date directly below it */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -232,12 +233,12 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
           <div className="mt-4">
             <div className="flex justify-between text-[11px] font-medium text-white/80">
               <span>
-                {paid} of {total} paid in full
+                {formatMoney(moneyProgress.paid)} of {formatMoney(moneyProgress.total)} collected
               </span>
-              <span>{Math.round((paid / total) * 100)}%</span>
+              <span>{moneyProgress.percent}%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/25">
-              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${(paid / total) * 100}%` }} />
+              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${moneyProgress.percent}%` }} />
             </div>
           </div>
         )}
@@ -266,7 +267,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                   item={item}
                   group={group}
                   viewerUid={uid}
-                  onSetStatus={(personUid, status) => onSetStatus(item, personUid, status)}
+                  onSetStatus={(personUid, status, amountCents) => onSetStatus(item, personUid, status, amountCents)}
                 />
               ))}
             </div>
@@ -409,12 +410,12 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                       <div className="flex items-center gap-2">
                         <span className="truncate text-[14px] font-bold text-ink">{p.payerName}</span>
                         {isConfirmed ? (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-bold text-ok-ink">
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-bold text-ok-ink">
                             <CheckCircle2 className="size-3 text-ok" />
                             Confirmed
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold text-warn-ink">
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-bold text-warn-ink">
                             <Clock className="size-3 text-warn" />
                             Pending
                           </span>

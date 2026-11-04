@@ -8,8 +8,7 @@ import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { TextField } from '../ui/Field';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
-import { STORE_SUGGESTIONS, autoStoreGradient, storeGradient } from '../../lib/cardTheme';
-import { ColorPicker } from '../ui/ColorPicker';
+import { itemGradient } from '../../lib/cardTheme';
 import { PeoplePicker, type PickPerson } from './PeoplePicker';
 
 interface Props {
@@ -67,8 +66,9 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
   const [monthlyInput, setMonthlyInput] = useState(
     item?.monthlyCents ? centsToInput(item.monthlyCents) : '',
   );
-  const [store, setStore] = useState(item?.store ?? '');
-  const [color, setColor] = useState(item?.color ?? '');
+  // Card name and color come from the list now. Older items keep what they had.
+  const store = item?.store ?? '';
+  const color = item?.color ?? '';
   const [errors, setErrors] = useState<Errors>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -192,43 +192,6 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             }}
           />
 
-          <div>
-            <TextField
-              id="item-store"
-              label="Card or store used (optional)"
-              placeholder="e.g. Atome, BDO, Shopee"
-              value={store}
-              maxLength={40}
-              onChange={(e) => setStore(e.target.value)}
-            />
-            <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
-              {STORE_SUGGESTIONS.map((name) => {
-                const on = store.trim().toLowerCase() === name.toLowerCase();
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => setStore(on ? '' : name)}
-                    className={`h-7 shrink-0 rounded-full px-3 text-[12px] font-medium transition active:scale-95 ${
-                      on ? 'text-white font-semibold' : 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-hairline'
-                    }`}
-                    style={on ? { backgroundImage: storeGradient(name, name) } : undefined}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <ColorPicker
-            label="Card color"
-            value={color}
-            onChange={setColor}
-            autoBackground={autoStoreGradient(store, 'split-cost')}
-            hint="Auto uses the color of the card or store above."
-          />
-
           <TextField
             id="item-price"
             label="Price (total)"
@@ -281,10 +244,10 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
           {/* Compact Split Summary Card */}
           <div
             className="rounded-[18px] p-4 text-white shadow-sm ring-1 ring-white/20 select-none"
-            style={{ backgroundImage: storeGradient(store, 'split-cost', color) }}
+            style={{ backgroundImage: itemGradient({ id: 'split-cost', store, color }, group) }}
           >
             <p className="mb-2 truncate text-[11px] font-bold tracking-[0.14em] uppercase text-white/80">
-              {store.trim() || 'Item Split'}
+              {store.trim() || group.name || 'Item Split'}
             </p>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[12px] font-medium text-white/85">Each person pays</p>

@@ -35,6 +35,7 @@ service cloud.firestore {
 
     // A person (not the lender) saying "I paid" or undoing it.
     // Only on their own share, and never after the lender confirmed it.
+    // They can say how much they sent (claimCents) but never change the confirmed paid amount.
     function isClaimingOwnShare() {
       let uid = request.auth.uid;
       let before = resource.data;
@@ -42,9 +43,21 @@ service cloud.firestore {
       return uid in before.shares
         && after.diff(before).affectedKeys().hasOnly(['shares', 'updatedAt', 'payments'])
         && after.shares.diff(before.shares).affectedKeys().hasOnly([uid])
-        && after.shares[uid].diff(before.shares[uid]).affectedKeys().hasOnly(['status', 'updatedAt', 'refNumber', 'paidCents'])
+        && after.shares[uid].diff(before.shares[uid]).affectedKeys().hasOnly(['status', 'updatedAt', 'refNumber', 'claimCents'])
         && before.shares[uid].status != 'paid'
-        && after.shares[uid].status in ['unpaid', 'claimed'];
+        && after.shares[uid].status in ['unpaid', 'claimed']
+        && addsOnlyOwnPendingPayment(uid, before, after);
+    }
+
+    // Payment history: a borrower may only add ONE new pending record of their own at the top.
+    // Everyone else's history stays exactly as it was.
+    function addsOnlyOwnPendingPayment(uid, before, after) {
+      let oldList = 'payments' in before ? before.payments : [];
+      return !('payments' in after.diff(before).affectedKeys())
+        || (after.payments.size() == oldList.size() + 1
+          && after.payments[0].uid == uid
+          && after.payments[0].status == 'pending'
+          && after.payments.hasAll(oldList));
     }
 
     function validItem() {

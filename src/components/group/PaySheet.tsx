@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Copy, Download, QrCode, ReceiptText, ShoppingBag } from 'lucide-react';
 import { loadQr } from '../../services/groups';
 import { copyText } from '../../lib/clipboard';
-import { listGradient, storeGradient } from '../../lib/cardTheme';
+import { groupGradient, itemGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
 import { formatMoney, toCents, centsToInput } from '../../lib/money';
 import { firstName } from '../../lib/items';
@@ -117,7 +117,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
     >
       <WalletCard
         seed={item?.id ?? group.id}
-        background={item ? storeGradient(item.store, item.id, item.color) : listGradient(group.id, group.color)}
+        background={item ? itemGradient(item, group) : groupGradient(group)}
         className="p-5"
       >
         <div className="flex items-center gap-2">

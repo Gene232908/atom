@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import type { Item, ShareStatus } from '../../lib/types';
+import type { Group, Item, ShareStatus } from '../../lib/types';
 import { SectionLabel } from '../ui/Group';
 import { Carousel } from './Carousel';
 import { DebtCard } from './DebtCard';
 
 interface Props {
   items: Item[];
+  group: Group;
   uid: string;
   onPay: (item: Item) => void;
   onOpen: (item: Item) => void;
@@ -14,7 +15,7 @@ interface Props {
 const ORDER: Record<ShareStatus, number> = { unpaid: 0, claimed: 1, paid: 2 };
 
 /** Your debts as swipeable ATM cards on phones, a grid on tablets and laptops. */
-export function MyCards({ items, uid, onPay, onOpen }: Props) {
+export function MyCards({ items, group, uid, onPay, onOpen }: Props) {
   const mine = useMemo(
     () =>
       items
@@ -46,7 +47,7 @@ export function MyCards({ items, uid, onPay, onOpen }: Props) {
       </SectionLabel>
       {mine.length === 1 ? (
         <div className="w-full">
-          <DebtCard item={mine[0]} personUid={uid} onPay={onPay} onOpen={onOpen} />
+          <DebtCard item={mine[0]} group={group} personUid={uid} onPay={onPay} onOpen={onOpen} />
         </div>
       ) : (
         <Carousel
@@ -55,7 +56,7 @@ export function MyCards({ items, uid, onPay, onOpen }: Props) {
           wideClass="md:mx-0 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-4 md:overflow-visible md:px-0"
         >
           {mine.map((item) => (
-            <DebtCard key={item.id} item={item} personUid={uid} onPay={onPay} onOpen={onOpen} />
+            <DebtCard key={item.id} item={item} group={group} personUid={uid} onPay={onPay} onOpen={onOpen} />
           ))}
         </Carousel>
       )}

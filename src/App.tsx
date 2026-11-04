@@ -9,24 +9,30 @@ import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { GroupPage } from './pages/GroupPage';
 import { JoinPage } from './pages/JoinPage';
+import { DesktopShell } from './components/desktop/DesktopShell';
+import { useIsDesktop } from './hooks/useIsDesktop';
 
 function Screens() {
   const { user, loading } = useAuth();
   const route = useRoute();
+  const isDesktop = useIsDesktop();
 
   if (loading) return <FullScreenLoader />;
   if (!user) return <LoginPage joining={route.name === 'join'} />;
 
+  const page =
+    route.name === 'group' ? (
+      <GroupPage key={route.id} id={route.id} />
+    ) : route.name === 'join' ? (
+      <JoinPage key={route.code} code={route.code} />
+    ) : (
+      <HomePage />
+    );
+
   return (
     <GroupsProvider uid={user.uid}>
       <OfflineBanner />
-      {route.name === 'group' ? (
-        <GroupPage key={route.id} id={route.id} />
-      ) : route.name === 'join' ? (
-        <JoinPage key={route.code} code={route.code} />
-      ) : (
-        <HomePage />
-      )}
+      {isDesktop ? <DesktopShell route={route}>{page}</DesktopShell> : page}
     </GroupsProvider>
   );
 }

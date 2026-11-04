@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { listGradient } from '../../lib/cardTheme';
+import { groupGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
 import { firstName, otherShares } from '../../lib/items';
 import type { Group, Item, Share } from '../../lib/types';
@@ -69,7 +69,7 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
   return (
     <WalletCard
       seed={group.id}
-      background={listGradient(group.id, group.color)}
+      background={groupGradient(group)}
       interactive={true}
       className="flex min-h-[208px] animate-rise flex-col p-5 sm:min-h-[224px] sm:p-6"
     >
@@ -91,7 +91,7 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
 
       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-white/60 uppercase">
             {isOwner ? 'You lend' : 'You borrow'}
           </p>
           <p className="mt-0.5 font-mono text-[14px] tracking-[0.18em] text-white/90">

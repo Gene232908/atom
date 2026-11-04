@@ -108,7 +108,7 @@ function SettingsForm({ onClose, group }: Props) {
           />
 
           <div className="space-y-3">
-            <WalletCard seed={group.id} background={listGradient(group.id, color)} className="flex h-24 flex-col p-4">
+            <WalletCard seed={group.id} background={listGradient(group.id, color, name)} className="flex h-24 flex-col p-4">
               <p className="truncate text-[16px] font-semibold">{name.trim() || 'Your list'}</p>
               <p className="mt-auto font-mono text-[13px] tracking-[0.18em] text-white/85">
                 •••• {group.inviteCode.slice(-4)}
@@ -118,7 +118,7 @@ function SettingsForm({ onClose, group }: Props) {
               label="List card color"
               value={color}
               onChange={setColor}
-              autoBackground={listGradient(group.id)}
+              autoBackground={listGradient(group.id, '', name)}
               hint="Everyone in the list sees this color on their home screen."
             />
           </div>

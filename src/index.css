@@ -144,3 +144,15 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Phones and tablets: text boxes must be at least 16px.
+ * Smaller text makes iPhone (and some Android browsers) zoom in when you tap to type.
+ */
+@media (max-width: 1023px), (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

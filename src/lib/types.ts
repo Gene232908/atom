@@ -33,6 +33,8 @@ export interface Share {
   paidCents?: number;
   /** Latest payment reference number (e.g. GCash / Maya reference string) */
   refNumber?: string;
+  /** Amount the person says they sent, waiting for the lender to confirm. Not counted as paid yet. */
+  claimCents?: number;
 }
 
 export interface PaymentRecord {

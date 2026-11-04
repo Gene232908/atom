@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Check, Clock, Copy } from 'lucide-react';
-import { formatMoney } from '../../lib/money';
+import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
 import { copyText } from '../../lib/clipboard';
+import { confirmedPaid } from '../../lib/items';
 import type { Group, Item, Share, ShareStatus } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -12,59 +13,50 @@ interface Props {
   item: Item;
   group: Group;
   viewerUid: string;
-  onSetStatus: (personUid: string, status: ShareStatus) => void;
+  /** amountCents is only used when the lender marks a payment as received. */
+  onSetStatus: (personUid: string, status: ShareStatus, amountCents?: number) => void;
 }
 
-interface Action {
-  label: string;
-  next: ShareStatus;
-  style: string;
-}
-
-function actionFor(ownerViewing: boolean, personUid: string, ownerId: string, status: ShareStatus): Action | null {
-  if (personUid === ownerId) return null;
-  if (ownerViewing) {
-    if (status === 'claimed') {
-      return { label: 'Confirm payment', next: 'paid', style: 'bg-ok text-white font-bold shadow-sm hover:bg-ok/90' };
-    }
-    if (status === 'paid') {
-      return { label: 'Undo', next: 'unpaid', style: 'bg-fill text-ink hover:bg-black/10' };
-    }
-    return { label: 'Mark paid', next: 'paid', style: 'bg-ok text-white font-medium hover:bg-ok/90' };
-  }
-  // Borrowers use the "Pay now" card flow to pay, so no redundant button inside information
-  return null;
+/** Amount the person says they sent but the lender has not confirmed yet. */
+function pendingAmount(item: Item, uid: string, share?: Share): number {
+  if (share?.status !== 'claimed') return 0;
+  if (share.claimCents && share.claimCents > 0) return share.claimCents;
+  return (item.payments ?? [])
+    .filter((p) => p.uid === uid && p.status === 'pending')
+    .reduce((sum, p) => sum + (p.amountCents || 0), 0);
 }
 
 export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus }: Props) {
   const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [amount, setAmount] = useState('');
+
   const ownerViewing = group.ownerId === viewerUid;
   const member = group.members[personUid];
   const name = member?.name ?? share?.name ?? 'Member';
   const isLender = personUid === group.ownerId;
   const status: ShareStatus = share?.status ?? 'unpaid';
-  const action = actionFor(ownerViewing, personUid, group.ownerId, status);
 
-  const expectedCutoff =
-    item.monthlyCents ||
-    (item.installmentsCount && item.installmentsCount > 1
-      ? Math.round(item.splitCents / item.installmentsCount)
-      : item.splitCents);
-  const claimAmount = share?.paidCents && share.paidCents > 0 ? share.paidCents : expectedCutoff;
+  const paid = confirmedPaid(item, personUid);
+  const left = Math.max(0, item.splitCents - paid);
+  const sent = pendingAmount(item, personUid, share);
+  const canManage = ownerViewing && !isLender;
+
+  const openConfirm = () => {
+    setAmount(centsToInput(Math.min(left, sent || left)));
+    setConfirming(true);
+  };
+  const typed = toCents(amount) ?? 0;
+  const tooMuch = typed > left;
 
   let note = '';
-  if (isLender) note = 'Lender’s own share';
-  else if (status === 'claimed' && ownerViewing) note = 'Submitted for verification';
+  if (isLender) note = 'Lender’s share';
   else if (!member) note = 'Removed';
-
-  if (share?.paidCents && share.paidCents > 0 && status !== 'paid') {
-    const paidText = `Paid ${formatMoney(share.paidCents)}`;
-    note = note ? `${note} · ${paidText}` : paidText;
-  }
+  else if (status !== 'paid' && paid > 0) note = `Paid ${formatMoney(paid)} of ${formatMoney(item.splitCents)}`;
 
   return (
     <div className="px-4 py-3">
-      <div className="flex min-h-[48px] items-center gap-3">
+      <div className="flex min-h-[44px] items-center gap-3">
         <Avatar name={name} photo={member?.photo} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-medium text-ink">{personUid === viewerUid ? 'You' : name}</p>
@@ -73,59 +65,107 @@ export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus
             {note && <span className="truncate text-[12px] text-muted">{note}</span>}
           </div>
         </div>
-        {action && (
-          <button
-            type="button"
-            onClick={() => onSetStatus(personUid, action.next)}
-            className={`h-8 shrink-0 rounded-full px-3.5 text-[13px] transition active:scale-95 ${action.style}`}
-          >
-            {action.label}
-          </button>
+        {canManage && !confirming && (
+          status === 'paid' ? (
+            <button
+              type="button"
+              onClick={() => onSetStatus(personUid, 'unpaid')}
+              className="h-9 shrink-0 rounded-full bg-fill px-4 text-[13px] font-semibold text-ink transition active:scale-95"
+            >
+              Undo
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openConfirm}
+              className="h-9 shrink-0 rounded-full bg-ok px-4 text-[13px] font-semibold text-white transition active:scale-95"
+            >
+              {status === 'claimed' ? 'Confirm' : 'Mark paid'}
+            </button>
+          )
         )}
       </div>
 
-      {/* Lender verification box: clearly displays payee reference number & amount to cross-check */}
-      {status === 'claimed' && ownerViewing && (
-        <div className="mt-2.5 rounded-xl bg-warn/10 border border-warn/25 p-2.5 text-[12px]">
+      {/* What the person says they sent */}
+      {status === 'claimed' && (ownerViewing || personUid === viewerUid) && !confirming && (
+        <div className="mt-2.5 rounded-2xl bg-warn/10 px-3.5 py-3 text-[13px]">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-warn-ink flex items-center gap-1.5">
-              <Clock className="size-3.5 text-warn" />
-              Payee submitted payment for verification
+            <span className="flex items-center gap-1.5 font-semibold text-warn-ink">
+              <Clock className="size-4" />
+              {ownerViewing ? 'Says they sent' : 'You sent'}
             </span>
-            <span className="font-bold text-ink">{formatMoney(claimAmount)}</span>
+            <span className="font-bold text-ink tabular-nums">{sent > 0 ? formatMoney(sent) : 'Amount not given'}</span>
           </div>
-          {share?.refNumber ? (
-            <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-white/80 px-2.5 py-1.5 ring-1 ring-hairline">
-              <span className="font-mono text-[12px] font-bold text-accent truncate">
-                Ref: {share.refNumber}
-              </span>
+          {share?.refNumber && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2">
+              <span className="truncate font-mono text-[13px] font-semibold text-ink">Ref: {share.refNumber}</span>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   copyText(share.refNumber!);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline shrink-0"
+                className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-accent"
               >
-                {copied ? <Check className="size-3 text-ok" /> : <Copy className="size-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-          ) : (
-            <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1 text-muted">
-              <span className="text-[11px] italic">Ref: Pending verification</span>
-              <span className="text-[11px] font-medium">Cut-off payment ({formatMoney(claimAmount)})</span>
-            </div>
           )}
+          <p className="mt-2 text-[12px] text-muted">
+            {ownerViewing ? 'Check your GCash or bank first, then tap Confirm.' : 'Waiting for the lender to confirm.'}
+          </p>
+        </div>
+      )}
+
+      {/* Lender types the amount actually received */}
+      {confirming && (
+        <div className="mt-2.5 rounded-2xl bg-canvas p-3.5">
+          <label htmlFor={`amt-${item.id}-${personUid}`} className="text-[13px] font-semibold text-ink">
+            How much did you receive?
+          </label>
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3.5 ring-1 ring-hairline focus-within:ring-2 focus-within:ring-accent">
+            <span className="font-semibold text-muted">₱</span>
+            <input
+              id={`amt-${item.id}-${personUid}`}
+              inputMode="decimal"
+              autoComplete="off"
+              value={amount}
+              onChange={(e) => setAmount(cleanMoneyInput(e.target.value))}
+              className="h-11 w-full min-w-0 bg-transparent text-[16px] font-semibold text-ink outline-none"
+            />
+          </div>
+          <p className={`mt-1.5 text-[12px] ${tooMuch ? 'font-semibold text-bad' : 'text-muted'}`}>
+            {tooMuch
+              ? `That is more than what is left (${formatMoney(left)}).`
+              : `Still owes ${formatMoney(left)}. Type less for a partial payment.`}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="h-10 flex-1 rounded-full bg-white text-[14px] font-semibold text-ink ring-1 ring-hairline active:scale-95"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={typed <= 0 || tooMuch}
+              onClick={() => {
+                onSetStatus(personUid, 'paid', typed);
+                setConfirming(false);
+              }}
+              className="h-10 flex-1 rounded-full bg-ok text-[14px] font-semibold text-white active:scale-95 disabled:opacity-40"
+            >
+              {typed > 0 && typed < left ? `Confirm ${formatMoney(typed)}` : 'Confirm full'}
+            </button>
+          </div>
         </div>
       )}
 
       {status === 'paid' && share?.refNumber && (
-        <p className="mt-1 pl-11 text-[11px] text-muted font-mono">
-          Ref: {share.refNumber}
-        </p>
+        <p className="mt-1 pl-11 font-mono text-[12px] text-muted">Ref: {share.refNumber}</p>
       )}
     </div>
   );

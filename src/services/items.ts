@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toItem } from '../lib/convert';
+import { confirmedPaid } from '../lib/items';
 import type { Item, PaymentRecord, Share, ShareStatus } from '../lib/types';
 
 /** Safety cap so a single list can never use up the daily free reads. */
@@ -146,54 +147,64 @@ export async function setShareStatus(
   }
 }
 
-/** Record a partial or installment payment with a reference number and note. */
+/**
+ * Record a payment.
+ * - From the borrower (status 'pending'): saved as "sent, waiting". The balance does NOT go down yet.
+ * - From the lender (status 'confirmed'): counted as paid right away.
+ */
 export async function recordPayment(
   groupId: string,
   item: Item,
   payment: Omit<PaymentRecord, 'id' | 'paidAt'>,
 ): Promise<void> {
   const now = Date.now();
-  const id = Math.random().toString(36).slice(2, 10);
-  const newRecord: PaymentRecord = {
-    ...payment,
-    id,
-    paidAt: now,
-  };
-
-  const existingPayments = item.payments ?? [];
-  const updatedPayments = [newRecord, ...existingPayments];
-
+  const record: PaymentRecord = { ...payment, id: Math.random().toString(36).slice(2, 10), paidAt: now };
+  const payments = [record, ...(item.payments ?? [])];
   const share = item.shares[payment.uid];
-  const prevPaid = share?.paidCents ?? (share?.status === 'paid' ? item.splitCents : 0);
-  const newPaid = prevPaid + payment.amountCents;
-  const isFullyPaid = newPaid >= item.splitCents;
+  const ref = { groupId, itemId: item.id };
 
-  const nextStatus: ShareStatus = isFullyPaid
-    ? (payment.status === 'confirmed' ? 'paid' : 'claimed')
-    : (payment.status === 'confirmed' ? 'unpaid' : 'claimed');
-
-  try {
-    await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
-      payments: updatedPayments,
+  if (payment.status === 'confirmed') {
+    const newPaid = Math.min(item.splitCents, confirmedPaid(item, payment.uid) + payment.amountCents);
+    const done = newPaid >= item.splitCents;
+    await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), {
+      payments,
       [`shares.${payment.uid}.paidCents`]: newPaid,
+      [`shares.${payment.uid}.status`]: done ? 'paid' : share?.status === 'claimed' ? 'claimed' : 'unpaid',
       [`shares.${payment.uid}.refNumber`]: payment.refNumber,
-      [`shares.${payment.uid}.status`]: nextStatus,
       [`shares.${payment.uid}.updatedAt`]: now,
       updatedAt: now,
     });
-  } catch (err) {
-    // Fallback: If deployed Firestore rules only allow status update for non-owners,
-    // safely update status and refNumber so payment claim is recorded and succeeds without permission error!
-    await setShareStatus(groupId, item.id, payment.uid, nextStatus, payment.refNumber);
+    return;
+  }
+
+  // Pending: add to what they already sent but the lender has not confirmed yet.
+  const claim = (share?.status === 'claimed' ? share.claimCents ?? 0 : 0) + payment.amountCents;
+  try {
+    await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), {
+      payments,
+      [`shares.${payment.uid}.status`]: 'claimed',
+      [`shares.${payment.uid}.claimCents`]: claim,
+      [`shares.${payment.uid}.refNumber`]: payment.refNumber,
+      [`shares.${payment.uid}.updatedAt`]: now,
+      updatedAt: now,
+    });
+  } catch {
+    // Older Firebase rules only allow the status. The lender will type the amount when confirming.
+    await setShareStatus(groupId, item.id, payment.uid, 'claimed', payment.refNumber);
   }
 }
 
-/** Lender confirms a pending payment record or marks a member as paid. */
+/**
+ * Lender confirms money they received from one person.
+ * `amountCents` is what the lender typed. If empty, we use what the person said they sent.
+ * Only the confirmed amount is counted, so a half payment stays a half payment.
+ */
 export async function confirmPayment(
   groupId: string,
   item: Item,
   paymentId: string,
   targetUid?: string,
+  amountCents?: number,
 ): Promise<void> {
   const now = Date.now();
   let payments = item.payments ? [...item.payments] : [];
@@ -201,77 +212,48 @@ export async function confirmPayment(
   if (!uid) return;
 
   const share = item.shares[uid];
-  const borrowerName = share?.name ?? 'Borrower';
-  const expectedCutoff =
-    item.monthlyCents ||
-    (item.installmentsCount && item.installmentsCount > 1
-      ? Math.round(item.splitCents / item.installmentsCount)
-      : item.splitCents);
+  const alreadyPaid = confirmedPaid(item, uid);
+  const left = Math.max(0, item.splitCents - alreadyPaid);
+  const pendingId = payments.find((p) => p.uid === uid && p.status === 'pending')?.id ?? null;
+  const pendingTotal = payments.filter((p) => p.uid === uid && p.status === 'pending').reduce((s, p) => s + (p.amountCents || 0), 0);
+  const suggested = (share?.status === 'claimed' ? share.claimCents : 0) || pendingTotal || left;
+  const amount = Math.min(left, Math.max(0, amountCents ?? suggested));
+  if (amount <= 0) return;
 
-  // Check if there is an existing pending record or claim
-  const foundIndex = payments.findIndex(
-    (p) => p.id === paymentId || (p.uid === uid && p.status === 'pending'),
-  );
+  const refNum = share?.refNumber || 'Confirmed by lender';
+  // All pending records of this person become one confirmed record with the real amount.
+  payments = payments.filter((p) => !(p.uid === uid && p.status === 'pending'));
+  payments.unshift({
+    id: pendingId ?? `pay-${uid}-${now}`,
+    uid,
+    payerName: share?.name ?? 'Borrower',
+    amountCents: amount,
+    refNumber: refNum,
+    note: amount < left ? 'Partial payment' : 'Payment confirmed',
+    status: 'confirmed',
+    paidAt: now,
+  });
 
-  let thisPaymentAmount = expectedCutoff;
-  let refNum = share?.refNumber || 'Verified by lender';
-
-  if (foundIndex >= 0) {
-    thisPaymentAmount = payments[foundIndex].amountCents || expectedCutoff;
-    refNum = payments[foundIndex].refNumber || refNum;
-    payments[foundIndex] = {
-      ...payments[foundIndex],
-      status: 'confirmed',
-      amountCents: thisPaymentAmount,
-      refNumber: refNum,
-      paidAt: payments[foundIndex].paidAt || now,
-    };
-  } else {
-    payments = [
-      {
-        id: `pay-${uid}-${now}`,
-        uid,
-        payerName: borrowerName,
-        amountCents: thisPaymentAmount,
-        refNumber: refNum,
-        note: share?.refNumber ? `Ref: ${share.refNumber}` : 'Cut-off payment confirmed',
-        status: 'confirmed',
-        paidAt: now,
-      },
-      ...payments,
-    ];
-  }
-
-  // Calculate cumulative paid amount from all confirmed payments for this user
-  const totalPaidCents = payments
-    .filter((p) => p.uid === uid && p.status === 'confirmed')
-    .reduce((sum, p) => sum + p.amountCents, 0);
-
-  const isFullyPaid = totalPaidCents >= item.splitCents;
-  const nextStatus: ShareStatus = isFullyPaid ? 'paid' : 'unpaid';
-
-  const updates: Record<string, unknown> = {
+  const newPaid = alreadyPaid + amount;
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
     payments,
-    [`shares.${uid}.status`]: nextStatus,
-    [`shares.${uid}.paidCents`]: totalPaidCents,
+    [`shares.${uid}.status`]: newPaid >= item.splitCents ? 'paid' : 'unpaid',
+    [`shares.${uid}.paidCents`]: newPaid,
+    [`shares.${uid}.claimCents`]: 0,
     [`shares.${uid}.refNumber`]: refNum,
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
-  };
-
-  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), updates);
+  });
 }
 
-/** Lender undoes payment for a member, reverting status to unpaid and updating history. */
+/** Lender undoes payments for a member, reverting status to unpaid and clearing their history. */
 export async function undoPayment(groupId: string, item: Item, uid: string): Promise<void> {
   const now = Date.now();
-  const existingPayments = item.payments ? [...item.payments] : [];
-  const updatedPayments = existingPayments.filter((p) => p.uid !== uid);
-
   await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
-    payments: updatedPayments,
+    payments: (item.payments ?? []).filter((p) => p.uid !== uid),
     [`shares.${uid}.status`]: 'unpaid',
     [`shares.${uid}.paidCents`]: 0,
+    [`shares.${uid}.claimCents`]: 0,
     [`shares.${uid}.refNumber`]: '',
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,

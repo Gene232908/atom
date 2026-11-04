@@ -1,4 +1,4 @@
-import { listGradient } from '../../lib/cardTheme';
+import { groupGradient } from '../../lib/cardTheme';
 import { useState } from 'react';
 import { Check, Copy, Share2 } from 'lucide-react';
 import { inviteLink } from '../../hooks/useRoute';
@@ -41,7 +41,7 @@ export function InviteSheet({ open, onClose, group }: { open: boolean; onClose: 
 
   return (
     <Sheet open={open} onClose={onClose} title="Invite people" description="Send this to the people who owe you.">
-      <WalletCard seed={group.id} background={listGradient(group.id, group.color)} className="flex h-[188px] flex-col p-5">
+      <WalletCard seed={group.id} background={groupGradient(group)} className="flex h-[188px] flex-col p-5">
         <p className="truncate text-[17px] font-semibold">{group.name}</p>
         <p className="text-[12px] text-white/70">Invite code</p>
         <p className="mt-auto font-mono text-[26px] font-semibold tracking-[0.2em] tabular-nums">

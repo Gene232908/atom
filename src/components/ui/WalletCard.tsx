@@ -10,85 +10,76 @@ interface Props {
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
-  /** Enable dynamic 3D tilt and specular reflection when moving phone / mouse */
+  /** Tilt the card in 3D with the phone (or mouse). Light effects always follow the phone. */
   interactive?: boolean;
 }
 
-/**
- * Clean, glossy Apple Wallet style loan card:
- * - Dynamic 3D tilt from gyroscope (tilting phone) or cursor drag
- * - Holographic foil sheen and specular light reflection
- * - Multi-layer soft card shadow
- * - Strict user-select: none to prevent iPhone select-all loupe
- */
-export function WalletCard({
-  seed,
-  background,
-  className = '',
-  style,
-  children,
-  interactive = true,
-}: Props) {
+// Every value below reads --tx / --ty (-1..1) written by lib/motion.ts, so it moves with the phone.
+const TILT = 'perspective(900px) rotateX(calc(var(--ty, 0) * -6deg)) rotateY(calc(var(--tx, 0) * 8deg))';
+
+const SHADOW =
+  'calc(var(--tx, 0) * -10px) calc(16px + var(--ty, 0) * -6px) 34px -12px rgba(0,0,0,0.45), 0 4px 10px -4px rgba(0,0,0,0.18)';
+
+const GLARE: CSSProperties = {
+  background:
+    'radial-gradient(circle at calc(50% + var(--tx, 0) * 60%) calc(30% + var(--ty, 0) * 60%), rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.08) 26%, transparent 55%)',
+  mixBlendMode: 'overlay',
+};
+
+const FOIL: CSSProperties = {
+  background:
+    'linear-gradient(calc(115deg + var(--tx, 0) * 40deg), transparent 18%, rgba(255,105,180,0.55) 32%, rgba(110,220,255,0.55) 44%, rgba(255,236,140,0.55) 56%, rgba(170,120,255,0.5) 66%, transparent 80%)',
+  backgroundSize: '260% 260%',
+  backgroundPosition: 'calc(50% + var(--tx, 0) * 45%) calc(50% + var(--ty, 0) * 45%)',
+  backgroundRepeat: 'no-repeat',
+  mixBlendMode: 'color-dodge',
+  opacity: 0.2,
+};
+
+const BAND: CSSProperties = {
+  background: 'linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.30) 49%, rgba(255,255,255,0.06) 54%, transparent 60%)',
+  backgroundSize: '320% 100%',
+  backgroundPosition: 'calc(50% - var(--tx, 0) * 48%) 0',
+  backgroundRepeat: 'no-repeat',
+  mixBlendMode: 'overlay',
+};
+
+const TEXTURE: CSSProperties = {
+  background:
+    'repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 5px)',
+};
+
+const DEPTH: CSSProperties = {
+  background:
+    'radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.12), transparent 55%), linear-gradient(to top, rgba(0,0,0,0.16), transparent 50%)',
+};
+
+/** Glossy, Apple Wallet style card. The shine moves when you tilt your phone. */
+export function WalletCard({ seed, background, className = '', style, children, interactive = true }: Props) {
   const tilt = useTiltReflection(interactive);
 
   return (
     <div
       ref={tilt.ref}
-      onPointerDown={tilt.onPointerDown}
       onPointerMove={tilt.onPointerMove}
       onPointerLeave={tilt.onPointerLeave}
-      className="relative select-none touch-manipulation perspective-[1000px] [-webkit-touch-callout:none] [-webkit-user-select:none] rounded-[22px]"
-      style={{
-        ...style,
-        ...(interactive ? tilt.style : {}),
-      }}
+      className="relative rounded-[22px] select-none [-webkit-touch-callout:none]"
+      style={{ ...style, transform: interactive ? TILT : undefined, willChange: interactive ? 'transform' : undefined }}
     >
       <div
-        className={`relative isolate flex flex-col overflow-hidden rounded-[22px] text-white apple-card-shadow transition-[filter,transform] duration-200 select-none ${className}`}
-        style={{
-          backgroundImage: background ?? cardGradient(seed),
-        }}
+        className={`relative isolate flex flex-col overflow-hidden rounded-[22px] text-white select-none ${className}`}
+        style={{ backgroundImage: background ?? cardGradient(seed), boxShadow: SHADOW }}
       >
-        {/* Diagonal metallic brushed shimmer */}
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={DEPTH} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={TEXTURE} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={FOIL} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={BAND} />
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={GLARE} />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,transparent_20%,rgba(255,255,255,0.08)_45%,transparent_65%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] ring-1 ring-white/12 ring-inset"
         />
-
-        {/* DYNAMIC HOLOGRAPHIC FOIL LAYER (Reacts to tilting phone and touch drag) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-200"
-          style={{
-            opacity: interactive ? 'var(--glare-opacity, 0.45)' : 0.25,
-            background:
-              'linear-gradient(var(--shine-angle, 125deg), rgba(255,0,128,0.28) 0%, rgba(0,240,255,0.3) 30%, rgba(255,220,0,0.3) 65%, rgba(160,32,240,0.28) 100%)',
-            mixBlendMode: 'color-dodge',
-          }}
-        />
-
-        {/* DYNAMIC SPECULAR GLARE REFLECTION (Moves with touch drag or phone tilt) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-150"
-          style={{
-            opacity: interactive ? 'var(--glare-opacity, 0.65)' : 0.35,
-            background:
-              'radial-gradient(circle 260px at var(--shine-x, 50%) var(--shine-y, 45%), rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.2) 30%, transparent 65%)',
-            mixBlendMode: 'overlay',
-          }}
-        />
-
-        {/* Subtle glassmorphism border without harsh white corner glare */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-white/10 ring-inset"
-        />
-
-        {/* Card content */}
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col select-none">
-          {children}
-        </div>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col select-none">{children}</div>
       </div>
     </div>
   );

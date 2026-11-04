@@ -1,65 +1,57 @@
-/** Card colors people can pick. The key is what gets saved. */
-export const CARD_COLORS: { key: string; name: string; colors: [string, string, string?] }[] = [
-  { key: 'blue', name: 'Pacific Blue', colors: ['#0080ff', '#0059e6', '#0038a8'] },
-  { key: 'sunset', name: 'Coral Sunset', colors: ['#ff5e36', '#ff2a6d', '#8b008b'] },
-  { key: 'aurora', name: 'Aurora Mesh', colors: ['#ff758c', '#ff7eb3', '#7928ca'] },
-  { key: 'cyberpunk', name: 'Cyberpunk Neon', colors: ['#ec4899', '#8b5cf6', '#3b82f6'] },
-  { key: 'unionbank', name: 'UnionBank Sunset', colors: ['#ffaa00', '#ff6200', '#d62400'] },
-  { key: 'shopee', name: 'Shopee Ember', colors: ['#ff6f3c', '#ee4d2d', '#c92a2a'] },
-  { key: 'atome', name: 'Atome Lime', colors: ['#c6ff00', '#88e000', '#257000'] },
-  { key: 'apple', name: 'Apple Cash', colors: ['#1c1c1e', '#2c2c2e', '#101012'] },
-  { key: 'navy', name: 'Electric Sapphire', colors: ['#2563eb', '#1d4ed8', '#1e3a8a'] },
-  { key: 'glacier', name: 'Glacier Cyan', colors: ['#38bdf8', '#0284c7', '#0f172a'] },
-  { key: 'sky', name: 'Cyan Sky', colors: ['#06b6d4', '#0284c7', '#0369a1'] },
-  { key: 'tropical', name: 'Tropical Lagoon', colors: ['#06b6d4', '#10b981', '#064e3b'] },
-  { key: 'teal', name: 'Emerald Teal', colors: ['#14b8a6', '#0d9488', '#115e59'] },
-  { key: 'emerald', name: 'Midnight Emerald', colors: ['#10b981', '#059669', '#064e3b'] },
-  { key: 'green', name: 'Mint Green', colors: ['#22c55e', '#16a34a', '#14532d'] },
-  { key: 'sage', name: 'Matcha Sage', colors: ['#84cc16', '#65a30d', '#3f6212'] },
-  { key: 'gold', name: 'Solar Amber', colors: ['#fbbf24', '#f59e0b', '#d97706'] },
-  { key: 'golden_hour', name: 'Golden Horizon', colors: ['#f59e0b', '#d97706', '#78350f'] },
-  { key: 'copper', name: 'Metallic Copper', colors: ['#ea580c', '#c2410c', '#7c2d12'] },
-  { key: 'orange', name: 'Solar Orange', colors: ['#fb923c', '#ea580c', '#c2410c'] },
-  { key: 'plasma', name: 'Plasma Fire', colors: ['#f97316', '#ef4444', '#7f1d1d'] },
-  { key: 'red', name: 'Crimson Glow', colors: ['#f43f5e', '#e11d48', '#be123c'] },
-  { key: 'crimson_velvet', name: 'Crimson Velvet', colors: ['#e11d48', '#9f1239', '#4c0519'] },
-  { key: 'ruby', name: 'Imperial Ruby', colors: ['#fb7185', '#e11d48', '#881337'] },
-  { key: 'pink', name: 'Neon Pink', colors: ['#f472b6', '#ec4899', '#db2777'] },
-  { key: 'candy', name: 'Cotton Candy', colors: ['#f472b6', '#c084fc', '#818cf8'] },
-  { key: 'purple', name: 'Ultraviolet', colors: ['#a855f7', '#7c3aed', '#6d28d9'] },
-  { key: 'amethyst', name: 'Deep Amethyst', colors: ['#9333ea', '#6b21a8', '#3b0764'] },
-  { key: 'plum', name: 'Velvet Plum', colors: ['#c026d3', '#86198f', '#4a044e'] },
-  { key: 'rose', name: 'Rose Gold', colors: ['#fda4af', '#f43f5e', '#9f1239'] },
-  { key: 'space', name: 'Cosmic Void', colors: ['#312e81', '#1e1b4b', '#0f172a'] },
-  { key: 'titanium', name: 'Titanium Carbon', colors: ['#64748b', '#334155', '#0f172a'] },
-  { key: 'silver', name: 'Iridescent Silver', colors: ['#94a3b8', '#64748b', '#334155'] },
-  { key: 'black', name: 'Obsidian Black', colors: ['#27272a', '#18181b', '#09090b'] },
+import type { Group, Item } from './types';
+
+/**
+ * Bright, rich card colors (like Apple Wallet). Each card is one color going from
+ * light to deep, so it looks colorful and clean, not a messy rainbow. The key is what gets saved.
+ */
+export const CARD_COLORS: { key: string; name: string; colors: [string, string] }[] = [
+  { key: 'black', name: 'Black', colors: ['#3a3a3c', '#0b0b0c'] },
+  { key: 'graphite', name: 'Graphite', colors: ['#6b6b70', '#2c2c2e'] },
+  { key: 'navy', name: 'Navy', colors: ['#2547c9', '#0b1f66'] },
+  { key: 'blue', name: 'Blue', colors: ['#1e90ff', '#0040c1'] },
+  { key: 'sky', name: 'Sky', colors: ['#38bdf8', '#0369a1'] },
+  { key: 'teal', name: 'Teal', colors: ['#14c8b4', '#0b6f66'] },
+  { key: 'green', name: 'Green', colors: ['#34d36b', '#00804a'] },
+  { key: 'olive', name: 'Lime', colors: ['#9ad61b', '#3f7a0c'] },
+  { key: 'gold', name: 'Gold', colors: ['#fbbf24', '#c2620a'] },
+  { key: 'terracotta', name: 'Orange', colors: ['#ff9f0a', '#e0430f'] },
+  { key: 'red', name: 'Red', colors: ['#ff5a4f', '#b3121b'] },
+  { key: 'rose', name: 'Pink', colors: ['#ff6b9a', '#c2185b'] },
+  { key: 'plum', name: 'Purple', colors: ['#b45cf6', '#5b21b6'] },
+  { key: 'silver', name: 'Silver', colors: ['#b4b4bc', '#5c5c66'] },
 ];
 
-const AUTO_THEMES: [string, string, string?][] = CARD_COLORS.map((c) => c.colors);
+/** Older color names saved before still work. */
+const ALIASES: Record<string, string> = {
+  apple: 'black', space: 'navy', titanium: 'graphite', glacier: 'sky', tropical: 'teal', emerald: 'teal',
+  sage: 'green', golden_hour: 'gold', copper: 'terracotta', orange: 'terracotta', plasma: 'terracotta',
+  unionbank: 'terracotta', shopee: 'terracotta', sunset: 'terracotta', atome: 'olive', crimson_velvet: 'red',
+  ruby: 'red', pink: 'rose', candy: 'rose', aurora: 'rose', purple: 'plum', amethyst: 'plum',
+  cyberpunk: 'plum', lavender: 'plum',
+};
 
-/** Recognized bank & fintech brands for automatic branding, patterns & gradients */
-const KNOWN: { match: RegExp; colors: [string, string, string?]; brand: string; network?: string }[] = [
-  { match: /union\s?bank|ub/i, colors: ['#ffaa00', '#ff6200', '#d62400'], brand: 'UnionBank', network: 'VISA' },
-  { match: /spaylater|shopee\s?pay|shopee/i, colors: ['#ff6f3c', '#ee4d2d', '#c92a2a'], brand: 'Shopee', network: 'PAYLATER' },
-  { match: /atome/i, colors: ['#c6ff00', '#88e000', '#257000'], brand: 'Atome', network: 'PAYLATER' },
-  { match: /apple\s?cash|apple/i, colors: ['#2c2c2e', '#1c1c1e', '#09090b'], brand: 'Apple Cash', network: 'CASH' },
-  { match: /lazada|lazpaylater/i, colors: ['#4f46e5', '#a855f7', '#ec4899'], brand: 'Lazada', network: 'PAYLATER' },
-  { match: /tiktok/i, colors: ['#1e293b', '#0f172a', '#020617'], brand: 'TikTok', network: 'PAYLATER' },
-  { match: /ggives|gcredit|g\s?cash|gloan/i, colors: ['#3b82f6', '#1d4ed8', '#1e40af'], brand: 'GCash', network: 'VISA' },
-  { match: /maya/i, colors: ['#10b981', '#059669', '#047857'], brand: 'Maya', network: 'MASTERCARD' },
-  { match: /billease/i, colors: ['#06b6d4', '#0891b2', '#0e7490'], brand: 'BillEase', network: 'CREDIT' },
-  { match: /home\s?credit/i, colors: ['#ef4444', '#dc2626', '#b91c1c'], brand: 'Home Credit', network: 'LOAN' },
-  { match: /\bbdo\b/i, colors: ['#2563eb', '#1d4ed8', '#172554'], brand: 'BDO', network: 'MASTERCARD' },
-  { match: /\bbpi\b/i, colors: ['#e11d48', '#be123c', '#881337'], brand: 'BPI', network: 'VISA' },
-  { match: /metrobank|metro\s?bank/i, colors: ['#0284c7', '#0369a1', '#075985'], brand: 'Metrobank', network: 'VISA' },
-  { match: /security\s?bank/i, colors: ['#0ea5e9', '#0284c7', '#0369a1'], brand: 'Security Bank', network: 'MASTERCARD' },
-  { match: /\brcbc\b/i, colors: ['#3b82f6', '#1d4ed8', '#1e3a8a'], brand: 'RCBC', network: 'VISA' },
-  { match: /east\s?west/i, colors: ['#9333ea', '#7e22ce', '#581c87'], brand: 'EastWest', network: 'VISA' },
-  { match: /landbank|land\s?bank/i, colors: ['#16a34a', '#15803d', '#14532d'], brand: 'Landbank', network: 'VISA' },
-  { match: /\bpnb\b/i, colors: ['#2563eb', '#1e40af', '#1e3a8a'], brand: 'PNB', network: 'MASTERCARD' },
-  { match: /grab/i, colors: ['#16a34a', '#15803d', '#166534'], brand: 'GrabPay', network: 'PAYLATER' },
-  { match: /amazon|temu|shein/i, colors: ['#f59e0b', '#d97706', '#b45309'], brand: 'Store', network: 'DEBIT' },
+/** Bright colors for common cards and pay-later apps, so a card is easy to recognize. */
+const KNOWN: { match: RegExp; colors: [string, string]; brand: string; network?: string }[] = [
+  { match: /union\s?bank|\bub\b/i, colors: ['#ffa21a', '#e04e0c'], brand: 'UnionBank', network: 'VISA' },
+  { match: /spaylater|shopee\s?pay|shopee/i, colors: ['#ff7043', '#e0301e'], brand: 'Shopee', network: 'PAYLATER' },
+  { match: /atome/i, colors: ['#9ad61b', '#3f7a0c'], brand: 'Atome', network: 'PAYLATER' },
+  { match: /apple\s?cash|apple/i, colors: ['#3a3a3c', '#0b0b0c'], brand: 'Apple Cash', network: 'CASH' },
+  { match: /lazada|lazpaylater/i, colors: ['#6a5cff', '#3a1fb8'], brand: 'Lazada', network: 'PAYLATER' },
+  { match: /tiktok/i, colors: ['#33333a', '#0b0b0c'], brand: 'TikTok', network: 'PAYLATER' },
+  { match: /ggives|gcredit|g\s?cash|gloan/i, colors: ['#2f8cff', '#0049b7'], brand: 'GCash', network: 'VISA' },
+  { match: /maya/i, colors: ['#22c48a', '#0b6b4d'], brand: 'Maya', network: 'MASTERCARD' },
+  { match: /billease/i, colors: ['#14c3b0', '#0b6b62'], brand: 'BillEase', network: 'CREDIT' },
+  { match: /home\s?credit/i, colors: ['#f2554f', '#a51818'], brand: 'Home Credit', network: 'LOAN' },
+  { match: /\bbdo\b/i, colors: ['#2a5bea', '#0a1f6b'], brand: 'BDO', network: 'MASTERCARD' },
+  { match: /\bbpi\b/i, colors: ['#e8344f', '#8a1030'], brand: 'BPI', network: 'VISA' },
+  { match: /metrobank|metro\s?bank/i, colors: ['#1f80e8', '#0b3b80'], brand: 'Metrobank', network: 'VISA' },
+  { match: /security\s?bank/i, colors: ['#36b7e8', '#0b5f95'], brand: 'Security Bank', network: 'MASTERCARD' },
+  { match: /\brcbc\b/i, colors: ['#3366d6', '#0c2558'], brand: 'RCBC', network: 'VISA' },
+  { match: /east\s?west/i, colors: ['#a24fd4', '#4c1d6e'], brand: 'EastWest', network: 'VISA' },
+  { match: /landbank|land\s?bank/i, colors: ['#26b062', '#0b5a2c'], brand: 'Landbank', network: 'VISA' },
+  { match: /\bpnb\b/i, colors: ['#2547c9', '#0b1a4d'], brand: 'PNB', network: 'MASTERCARD' },
+  { match: /grab/i, colors: ['#00c159', '#006b30'], brand: 'GrabPay', network: 'PAYLATER' },
+  { match: /amazon|temu|shein/i, colors: ['#f7a21b', '#b45309'], brand: 'Store', network: 'DEBIT' },
 ];
 
 export const STORE_SUGGESTIONS = [
@@ -85,20 +77,27 @@ function hash(text: string): number {
   return Math.abs(h);
 }
 
-function gradient([from, via, to]: [string, string, string?]): string {
-  if (to) {
-    return `linear-gradient(135deg, ${from} 0%, ${via} 52%, ${to} 100%)`;
-  }
-  return `linear-gradient(135deg, ${from} 0%, ${via} 100%)`;
+/** One rich color, bright at the top-left and deep at the bottom-right. */
+function gradient([from, to]: [string, string]): string {
+  return `linear-gradient(150deg, ${from} 0%, ${to} 100%)`;
+}
+
+function resolveKey(key: string): string {
+  return ALIASES[key] ?? key;
 }
 
 export function isCardColor(key: string): boolean {
-  return CARD_COLORS.some((c) => c.key === key);
+  const k = resolveKey(key);
+  return CARD_COLORS.some((c) => c.key === k);
 }
 
 function picked(key: string): string | null {
-  const found = CARD_COLORS.find((c) => c.key === key);
+  const found = CARD_COLORS.find((c) => c.key === resolveKey(key));
   return found ? gradient(found.colors) : null;
+}
+
+export function swatch(key: string): string {
+  return picked(key) ?? gradient(CARD_COLORS[0].colors);
 }
 
 /** Returns recognized brand information for logos, watermarks, and network badge */
@@ -109,24 +108,19 @@ export function getCardBrandInfo(name: string): { brand: string; network: string
     return {
       brand: known.brand,
       network: known.network ?? 'DEBIT',
-      isUnionBank: /union\s?bank|ub/i.test(clean),
+      isUnionBank: /union\s?bank|\bub\b/i.test(clean),
       isAppleCash: /apple\s?cash|apple/i.test(clean),
     };
   }
-  return {
-    brand: clean || 'UTANG',
-    network: 'DEBIT',
-    isUnionBank: false,
-    isAppleCash: false,
-  };
+  return { brand: clean || 'UTANG', network: 'DEBIT', isUnionBank: false, isAppleCash: false };
 }
 
-/** Steady gradient generated from any text */
+/** Steady color generated from any text */
 export function cardGradient(seed: string): string {
-  return gradient(AUTO_THEMES[hash(seed) % AUTO_THEMES.length]);
+  return gradient(CARD_COLORS[hash(seed) % CARD_COLORS.length].colors);
 }
 
-/** Card color for a store or card name when no color was picked */
+/** Card color from a card / store name when no color was picked */
 export function autoStoreGradient(store: string, seed: string): string {
   const known = KNOWN.find((t) => t.match.test(store));
   if (known) return gradient(known.colors);
@@ -138,7 +132,16 @@ export function storeGradient(store: string, seed: string, color = ''): string {
   return picked(color) ?? autoStoreGradient(store, seed);
 }
 
-/** Color of a list's card */
-export function listGradient(groupId: string, color = ''): string {
-  return picked(color) ?? cardGradient(groupId);
+/** Color of a list's card: picked color, else the card name (e.g. "BDO"), else a steady color. */
+export function listGradient(groupId: string, color = '', name = ''): string {
+  return picked(color) ?? (name.trim() ? autoStoreGradient(name, groupId) : cardGradient(groupId));
+}
+
+export function groupGradient(group: Pick<Group, 'id' | 'color' | 'name'>): string {
+  return listGradient(group.id, group.color, group.name);
+}
+
+/** Items use their own color if one was saved, otherwise their list's color. */
+export function itemGradient(item: Pick<Item, 'id' | 'color' | 'store'>, group: Pick<Group, 'id' | 'color' | 'name'>): string {
+  return picked(item.color) ?? (item.store?.trim() ? autoStoreGradient(item.store, item.id) : groupGradient(group));
 }

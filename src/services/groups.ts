@@ -53,7 +53,7 @@ export function subscribeGroups(
 }
 
 /** Creates a list. Returns the new id right away; `saved` finishes when the server confirms. */
-export function createGroup(user: User, name: string): { id: string; saved: Promise<void> } {
+export function createGroup(user: User, name: string, color = ''): { id: string; saved: Promise<void> } {
   const ref = doc(collection(db, 'groups'));
   const code = makeInviteCode();
   const now = Date.now();
@@ -66,7 +66,7 @@ export function createGroup(user: User, name: string): { id: string; saved: Prom
     inviteCode: code,
     paymentNote: '',
     hasQr: false,
-    color: '',
+    color,
     totals: {},
     createdAt: now,
     updatedAt: now,

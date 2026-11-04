@@ -148,3 +148,19 @@ export function dueInfo(due: string | null, done: boolean): DueInfo | null {
 export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
+
+/** Money a person has paid on an item that the lender already confirmed. */
+export function confirmedPaid(item: Item, uid: string): number {
+  const share = item.shares?.[uid];
+  if (!share) return 0;
+  if (share.status === 'paid') return item.splitCents;
+  return Math.min(item.splitCents, Math.max(0, share.paidCents ?? 0));
+}
+
+/** Progress by money (not by number of people), so half payments show as half. */
+export function amountProgress(item: Item, ownerId: string): { paid: number; total: number; percent: number } {
+  const others = otherShares(item, ownerId);
+  const total = others.length * item.splitCents;
+  const paid = others.reduce((sum, [uid]) => sum + confirmedPaid(item, uid), 0);
+  return { paid, total, percent: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0 };
+}

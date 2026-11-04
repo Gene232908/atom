@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { listGradient } from '../../lib/cardTheme';
+import { groupGradient } from '../../lib/cardTheme';
 import { navigate } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
 import { firstName, sumOwed } from '../../lib/items';
@@ -29,7 +29,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
     >
       <WalletCard
         seed={group.id}
-        background={listGradient(group.id, group.color)}
+        background={groupGradient(group)}
         interactive={true}
         className="flex h-[196px] flex-col p-5"
       >
@@ -56,7 +56,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
 
         <div className="mt-auto flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-white/60 uppercase">
               {isOwner ? 'You lend' : 'You borrow'}
             </p>
             <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">
@@ -106,7 +106,7 @@ function DeckCardItem({
   return (
     <WalletCard
       seed={group.id}
-      background={listGradient(group.id, group.color)}
+      background={groupGradient(group)}
       interactive={isFront}
       className="flex h-[196px] flex-col p-5 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18)]"
     >
@@ -133,7 +133,7 @@ function DeckCardItem({
 
         <div className="mt-auto flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-white/60 uppercase">
               {isOwner ? 'You lend' : 'You borrow'}
             </p>
             <p className="mt-0.5 font-mono text-[15px] tracking-[0.18em] text-white/90">

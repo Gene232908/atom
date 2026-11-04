@@ -1,19 +1,20 @@
 import { CalendarClock, Check, Clock, ShoppingBag } from 'lucide-react';
-import { storeGradient } from '../../lib/cardTheme';
+import { itemGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
 import { dueInfo } from '../../lib/items';
-import type { Item } from '../../lib/types';
+import type { Group, Item } from '../../lib/types';
 import { WalletCard } from '../ui/WalletCard';
 
 interface Props {
   item: Item;
+  group: Group;
   personUid: string;
   onPay: (item: Item) => void;
   onOpen: (item: Item) => void;
 }
 
 /** Clean loan card with dynamic tilt reflection */
-export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
+export function DebtCard({ item, group, personUid, onPay, onOpen }: Props) {
   const share = item.shares[personUid];
   if (!share) return null;
   const status = share.status;
@@ -38,7 +39,7 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
     >
       <WalletCard
         seed={item.id}
-        background={storeGradient(store, item.id, item.color)}
+        background={itemGradient(item, group)}
         interactive={true}
         className={`flex w-full min-h-[208px] sm:min-h-[224px] flex-col p-5 sm:p-6 ${status === 'paid' ? 'opacity-75 saturate-50' : ''}`}
       >
@@ -48,7 +49,7 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
               <ShoppingBag className="size-3.5 text-white" />
             </span>
             <p className="min-w-0 truncate text-[14px] font-bold tracking-[0.08em] text-white uppercase drop-shadow-sm">
-              {store || 'Card'}
+              {store || group.name || 'Card'}
             </p>
           </div>
 
@@ -88,7 +89,7 @@ export function DebtCard({ item, personUid, onPay, onOpen }: Props) {
             </span>
           )}
           {item.billingCycle && (
-            <span className="inline-flex w-fit items-center rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur">
+            <span className="inline-flex w-fit items-center rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
               {item.billingCycle}
             </span>
           )}

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  CheckCircle2,
   ChevronRight,
   Clock,
   LogOut,
@@ -17,10 +16,10 @@ import { useSafeWrite, useToast } from '../../hooks/useToast';
 import { useTotalsSync } from '../../hooks/useTotalsSync';
 import { navigate } from '../../hooks/useRoute';
 import { removeMember } from '../../services/groups';
-import { claimAll, confirmPayment, recordPayment, setShareStatus, undoPayment } from '../../services/items';
+import { claimAll, confirmPayment, recordPayment, undoPayment } from '../../services/items';
 import { friendlyError } from '../../lib/errors';
 import { formatMoney } from '../../lib/money';
-import { firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
+import { confirmedPaid, firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
 import type { Group, Item, ShareStatus } from '../../lib/types';
 import { NavBar, PageBody } from '../layout/AppHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -43,6 +42,9 @@ import { InviteSheet } from './InviteSheet';
 import { SettingsSheet } from './SettingsSheet';
 import { PaySheet } from './PaySheet';
 import { PersonSheet } from './PersonSheet';
+import { OwnerBanners } from './OwnerBanners';
+import { GroupDashboard } from '../desktop/GroupDashboard';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 type Panel =
   | { kind: 'add' }
@@ -68,6 +70,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const close = useCallback(() => setPanel(null), []);
+  const isDesktop = useIsDesktop();
 
   useTotalsSync(group, items, isOwner && fromServer && !error);
 
@@ -92,7 +95,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
     () => (isOwner ? [] : items.filter((it) => it.shares[uid]?.status === 'unpaid')),
     [items, uid, isOwner],
   );
-  const myUnpaidTotal = myUnpaid.reduce((sum, it) => sum + it.splitCents, 0);
+  const myUnpaidTotal = myUnpaid.reduce((sum, it) => sum + Math.max(0, it.splitCents - confirmedPaid(it, uid)), 0);
   const waitingCount = useMemo(
     () => items.reduce((n, it) => n + Object.values(it.shares).filter((s) => s.status === 'claimed').length, 0),
     [items],
@@ -101,22 +104,20 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'The lender');
 
   const onSetStatus = useCallback(
-    (item: Item, personUid: string, status: ShareStatus) => {
+    (item: Item, personUid: string, status: ShareStatus, amountCents?: number) => {
       const who = firstName(group.members[personUid]?.name ?? item.shares[personUid]?.name ?? 'They');
       if (status === 'paid') {
         const pendingPayment = item.payments?.find((p) => p.uid === personUid && p.status === 'pending');
         const paymentId = pendingPayment?.id || `claim-${personUid}`;
         write(
-          confirmPayment(group.id, item, paymentId, personUid),
-          `Payment for ${who} confirmed and recorded!`,
+          confirmPayment(group.id, item, paymentId, personUid, amountCents),
+          amountCents ? `Confirmed ${formatMoney(amountCents)} from ${who}` : `Payment for ${who} confirmed`,
         );
       } else if (status === 'unpaid') {
         write(
           undoPayment(group.id, item, personUid),
           `Reverted ${who} to unpaid`,
         );
-      } else {
-        write(setShareStatus(group.id, item.id, personUid, status), `Status updated for ${who}`);
       }
     },
     [group.id, group.members, write],
@@ -124,22 +125,22 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
 
   const onPaid = (item: Item | null, amountCents?: number, refNumber?: string, note?: string) => {
     if (item) {
-      if (refNumber || (amountCents && amountCents !== item.splitCents)) {
-        const payAmount = amountCents ?? item.splitCents;
+      {
+        // Always save how much was sent, so the lender confirms the right amount.
+        const left = Math.max(0, item.splitCents - confirmedPaid(item, uid));
+        const payAmount = amountCents && amountCents > 0 ? Math.min(amountCents, left) : left;
         const payerName = group.members[uid]?.name ?? item.shares[uid]?.name ?? 'You';
         write(
           recordPayment(group.id, item, {
             uid,
             payerName,
             amountCents: payAmount,
-            refNumber: refNumber || 'Manual',
-            note: note || 'Cut-off payment',
+            refNumber: refNumber || '',
+            note: note || (payAmount < left ? 'Partial payment' : 'Full payment'),
             status: 'pending',
           }),
           `Payment of ${formatMoney(payAmount)} sent! ${ownerName} will confirm it.`,
         );
-      } else {
-        write(setShareStatus(group.id, item.id, uid, 'claimed', refNumber), `Sent! ${ownerName} will confirm it.`);
       }
     } else {
       write(claimAll(group.id, items, uid), `Sent! ${ownerName} will confirm your payments.`);
@@ -179,6 +180,39 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
 
   return (
     <>
+      {isDesktop ? (
+        <GroupDashboard
+          group={group}
+          uid={uid}
+          items={items}
+          visible={visible}
+          loading={loading}
+          error={error && !(isOwner && Date.now() - group.createdAt < 15000) ? error : ''}
+          onRetry={retry}
+          people={people}
+          filter={safeFilter}
+          counts={counts}
+          onFilter={setFilter}
+          focusUid={focusUid}
+          focusName={focusName}
+          onClearFocus={() => setFocusUid(null)}
+          waitingCount={waitingCount}
+          myUnpaidTotal={myUnpaidTotal}
+          onOpenItem={openItem}
+          onPayItem={payItem}
+          onPayAll={() => setPanel({ kind: 'pay', id: null })}
+          onAdd={() => setPanel({ kind: 'add' })}
+          onInvite={() => setPanel({ kind: 'invite' })}
+          onSettings={() => setPanel({ kind: 'settings' })}
+          onLeave={() => setConfirmLeave(true)}
+          onOpenPerson={(personUid) => setPanel({ kind: 'person', uid: personUid })}
+          onShowWaiting={() => {
+            setFocusUid(null);
+            setFilter('waiting');
+          }}
+        />
+      ) : (
+        <>
       <NavBar
         title={group.name}
         backLabel="Wallet"
@@ -214,49 +248,15 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           <div className="space-y-4 sm:space-y-6 lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
             <HeroCard group={group} items={items} uid={uid} onPay={() => setPanel({ kind: 'pay', id: null })} />
 
-            {/* When no other members have joined yet */}
-            {isOwner && otherMembers.length === 0 && (
-              <div className="flex items-center justify-between gap-3 rounded-[20px] bg-accent/10 p-4 ring-1 ring-accent/20">
-                <div className="flex items-center gap-2.5">
-                  <UserPlus className="size-5 shrink-0 text-accent" />
-                  <div>
-                    <p className="text-[14px] font-semibold text-ink">Waiting for members to join</p>
-                    <p className="text-[12px] text-muted">No members yet. Share code {group.inviteCode} so others can join.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPanel({ kind: 'invite' })}
-                  className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:bg-accent/90 active:scale-95"
-                >
-                  Invite
-                </button>
-              </div>
-            )}
-
-            {/* Celebratory badge for owner ONLY when there are actual members who owed and all debts are settled */}
-            {isOwner &&
-              otherMembers.length > 0 &&
-              items.length > 0 &&
-              waitingCount === 0 &&
-              otherMembers.every((p) => p.owes === 0) &&
-              otherMembers.some((p) => p.paid > 0) && (
-              <div className="flex items-center justify-between gap-3 rounded-[20px] bg-ok/10 p-4 ring-1 ring-ok/20">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="size-5 shrink-0 text-ok" />
-                  <div>
-                    <p className="text-[14px] font-semibold text-ink">All debts settled!</p>
-                    <p className="text-[12px] text-muted">You can delete this card in Settings.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPanel({ kind: 'settings' })}
-                  className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-ink shadow-sm ring-1 ring-hairline transition hover:bg-canvas"
-                >
-                  Settings
-                </button>
-              </div>
+            {isOwner && (
+              <OwnerBanners
+                inviteCode={group.inviteCode}
+                otherMembers={otherMembers}
+                itemCount={items.length}
+                waitingCount={waitingCount}
+                onInvite={() => setPanel({ kind: 'invite' })}
+                onSettings={() => setPanel({ kind: 'settings' })}
+              />
             )}
 
             {isOwner && (
@@ -316,7 +316,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               <ErrorBanner message={error} onRetry={retry} />
             )}
 
-            {!isOwner && !loading && <MyCards items={items} uid={uid} onPay={payItem} onOpen={openItem} />}
+            {!isOwner && !loading && <MyCards items={items} group={group} uid={uid} onPay={payItem} onOpen={openItem} />}
 
             <section>
               <SectionLabel
@@ -399,6 +399,8 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
           </div>
         </div>
       </PageBody>
+        </>
+      )}
 
       {/* Sheets & Dialogs */}
       {isOwner && (
