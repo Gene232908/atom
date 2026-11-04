@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { useUser } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { createGroup } from '../../services/groups';
@@ -10,6 +10,7 @@ import { Button } from '../ui/Button';
 import { TextField } from '../ui/Field';
 import { ColorPicker } from '../ui/ColorPicker';
 import { WalletCard } from '../ui/WalletCard';
+import { computeFirstDueDate, formatDueDateReadable } from '../../lib/loanUtils';
 
 const LOAN_SUGGESTIONS = [
   'Sumisho',
@@ -41,10 +42,9 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
   const [totalTermsInput, setTotalTermsInput] = useState('18');
   const [isExisting, setIsExisting] = useState(false);
   const [alreadyPaidMonthsInput, setAlreadyPaidMonthsInput] = useState('0');
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 15);
-    return d.toISOString().slice(0, 10);
+  const [dueDay, setDueDay] = useState(15);
+  const [startMonthOffset, setStartMonthOffset] = useState(() => {
+    return new Date().getDate() <= 15 ? 0 : 1;
   });
   const [color, setColor] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -63,7 +63,42 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
   const remainingCents = Math.max(0, priceCents - initialPaidCents);
   const progressPercent = totalTerms > 0 ? Math.min(100, Math.round((alreadyPaidTerms / totalTerms) * 100)) : 0;
 
-  const nextDueDate = dueDate;
+  const computedNextDueDate = useMemo(() => {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + startMonthOffset, 1);
+    const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const day = dueDay === 31 ? maxDays : Math.min(Math.max(1, dueDay), maxDays);
+    target.setDate(day);
+
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, '0');
+    const d = String(target.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, [dueDay, startMonthOffset]);
+
+  const computedFirstDueDate = useMemo(() => {
+    return computeFirstDueDate(computedNextDueDate, alreadyPaidTerms);
+  }, [computedNextDueDate, alreadyPaidTerms]);
+
+  const currentMonthLabel = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, []);
+
+  const nextMonthLabel = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, []);
+
+  const formatMonthDay = (offset: number, dayNum: number) => {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(dayNum === 31 ? maxDays : Math.min(Math.max(1, dayNum), maxDays));
+    return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const handleAutoDivide = () => {
     if (autoMonthlyCents > 0) {
@@ -84,7 +119,6 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
     if (priceCents <= 0) newErrors.price = 'Please enter total loan price.';
     if (totalTerms <= 0) newErrors.terms = 'Please enter total number of months.';
     if (monthlyCents <= 0) newErrors.monthly = 'Please enter monthly cut-off amount.';
-    if (!dueDate) newErrors.due = 'Please select your billing due date.';
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
@@ -97,6 +131,7 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
 
       // 2. Add personal loan item
       const now = Date.now();
+      const billingCycleLabel = dueDay === 31 ? 'Tuwing katapusan ng buwan' : `Tuwing ika-${dueDay} ng buwan`;
       const itemId = await addItem(groupId, {
         description: cleanDesc,
         priceCents,
@@ -109,9 +144,9 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
             updatedAt: now,
           },
         },
-        dueDate: nextDueDate,
-        firstDueDate: dueDate,
-        billingCycle: `Every ${new Date(dueDate).getDate()}th of the month`,
+        dueDate: computedNextDueDate,
+        firstDueDate: computedFirstDueDate,
+        billingCycle: billingCycleLabel,
         installmentsCount: totalTerms,
         totalTerms,
         initialPaidTerms: alreadyPaidTerms,
@@ -384,21 +419,113 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
           )}
         </div>
 
-        {/* Due Date (Calendar) */}
-        <div>
-          <TextField
-            id="loan-due"
-            label="Payment Due Date (Day of the month)"
-            type="date"
-            value={dueDate}
-            error={errors.due}
-            onChange={(e) => {
-              setDueDate(e.target.value);
-              setErrors((prev) => ({ ...prev, due: '' }));
-            }}
-            hint="Tuwing kailan ang hulog mo? (Consistent calendar day-of-month)"
-            className="appearance-none text-left [&::-webkit-date-and-time-value]:text-left"
-          />
+        {/* Payment Due Day (Tuwing anong araw ng buwan) */}
+        <div className="rounded-[18px] bg-fill p-3.5 sm:p-4 ring-1 ring-hairline">
+          <div className="flex items-center justify-between">
+            <label className="block text-[12.5px] font-bold text-ink">
+              Tuwing kailan ang hulog mo? (Payment Due Day)
+            </label>
+            <span className="text-[12px] font-bold text-accent">
+              {dueDay === 31 ? 'Katapusan ng buwan' : `Tuwing ika-${dueDay}`}
+            </span>
+          </div>
+
+          <p className="mt-0.5 text-[11.5px] text-muted">
+            Piliin kung anong araw ng buwan ang regular mong cut-off bill.
+          </p>
+
+          {/* Quick Day Chips */}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {[5, 10, 15, 20, 25, 30].map((d) => {
+              const on = dueDay === d;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDueDay(d)}
+                  className={`h-8 min-w-[44px] rounded-full px-2.5 text-[12px] font-semibold transition active:scale-95 ${
+                    on
+                      ? 'bg-accent text-white shadow-sm ring-1 ring-accent'
+                      : 'bg-white text-ink shadow-sm ring-1 ring-hairline hover:bg-black/[0.02]'
+                  }`}
+                >
+                  {d}th
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setDueDay(31)}
+              className={`h-8 rounded-full px-3 text-[12px] font-semibold transition active:scale-95 ${
+                dueDay === 31
+                  ? 'bg-accent text-white shadow-sm ring-1 ring-accent'
+                  : 'bg-white text-ink shadow-sm ring-1 ring-hairline hover:bg-black/[0.02]'
+              }`}
+            >
+              Katapusan (31st)
+            </button>
+          </div>
+
+          {/* Custom Day Input */}
+          <div className="mt-2.5 flex items-center gap-2">
+            <span className="text-[12px] font-medium text-muted">O kaya custom day:</span>
+            <input
+              type="number"
+              min="1"
+              max="31"
+              value={dueDay}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) setDueDay(Math.min(31, Math.max(1, val)));
+              }}
+              className="w-16 rounded-[10px] bg-white px-2.5 py-1 text-center text-[13px] font-bold text-ink ring-1 ring-hairline focus:ring-accent outline-none"
+            />
+            <span className="text-[12px] text-muted">ng bawat buwan</span>
+          </div>
+
+          {/* Starting / Next Due Month */}
+          <div className="mt-3.5 pt-3 border-t border-hairline">
+            <label className="block text-[12px] font-semibold text-ink">
+              {isExisting ? 'Kailan ang susunod mong hulog?' : 'Kailan magsisimula ang unang hulog?'}
+            </label>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setStartMonthOffset(0)}
+                className={`rounded-[12px] p-2.5 text-left transition active:scale-95 ${
+                  startMonthOffset === 0
+                    ? 'bg-white shadow-sm ring-1.5 ring-accent text-ink'
+                    : 'bg-white/60 text-muted hover:text-ink ring-1 ring-hairline/80'
+                }`}
+              >
+                <p className="text-[12px] font-bold">Ngayong {currentMonthLabel}</p>
+                <p className="text-[11px] text-muted mt-0.5">{formatMonthDay(0, dueDay)}</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStartMonthOffset(1)}
+                className={`rounded-[12px] p-2.5 text-left transition active:scale-95 ${
+                  startMonthOffset === 1
+                    ? 'bg-white shadow-sm ring-1.5 ring-accent text-ink'
+                    : 'bg-white/60 text-muted hover:text-ink ring-1 ring-hairline/80'
+                }`}
+              >
+                <p className="text-[12px] font-bold">Susunod na {nextMonthLabel}</p>
+                <p className="text-[11px] text-muted mt-0.5">{formatMonthDay(1, dueDay)}</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Schedule Confirmation Banner */}
+          <div className="mt-3 flex items-center justify-between rounded-[12px] bg-accent/10 px-3 py-2 text-[12px] text-accent">
+            <span className="font-semibold">
+              🗓️ {dueDay === 31 ? 'Tuwing katapusan' : `Tuwing ika-${dueDay}`} ng buwan
+            </span>
+            <span className="font-bold">
+              Due: {formatDueDateReadable(computedNextDueDate)}
+            </span>
+          </div>
         </div>
 
         <div className="pt-2">

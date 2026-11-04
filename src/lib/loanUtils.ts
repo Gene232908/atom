@@ -28,6 +28,30 @@ export function computeNextDueDate(firstDueDate: string | null | undefined, term
   return `${nextY}-${nextM}-${nextD}`;
 }
 
+/**
+ * Calculates Month #1's due date from the target upcoming due date and already paid terms count.
+ */
+export function computeFirstDueDate(targetDateStr: string, alreadyPaidTerms: number): string {
+  if (!targetDateStr || alreadyPaidTerms <= 0) return targetDateStr;
+  const parts = targetDateStr.split('-');
+  if (parts.length < 3) return targetDateStr;
+
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return targetDateStr;
+
+  const target = new Date(y, m - alreadyPaidTerms, 1);
+  const maxDays = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, maxDays));
+
+  const resY = target.getFullYear();
+  const resM = String(target.getMonth() + 1).padStart(2, '0');
+  const resD = String(target.getDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
 export interface LoanStats {
   totalPriceCents: number;
   monthlyCents: number;
