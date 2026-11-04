@@ -25,6 +25,7 @@ function toMember(raw: unknown): Member {
 function toPaymentRecord(raw: unknown): PaymentRecord {
   const p = obj(raw);
   const status = p.status === 'confirmed' ? 'confirmed' : 'pending';
+  const paymentType = p.paymentType === 'late' || p.paymentType === 'advance' || p.paymentType === 'regular' ? p.paymentType : undefined;
   return {
     id: str(p.id, Math.random().toString(36).slice(2)),
     uid: str(p.uid),
@@ -35,6 +36,11 @@ function toPaymentRecord(raw: unknown): PaymentRecord {
     note: typeof p.note === 'string' ? p.note : undefined,
     status,
     termNumber: typeof p.termNumber === 'number' ? Math.round(p.termNumber) : undefined,
+    termsCovered: typeof p.termsCovered === 'number' && p.termsCovered > 0 ? Math.round(p.termsCovered) : undefined,
+    principalCents: typeof p.principalCents === 'number' ? Math.round(p.principalCents) : undefined,
+    interestCents: typeof p.interestCents === 'number' ? Math.round(p.interestCents) : undefined,
+    daysOverdue: typeof p.daysOverdue === 'number' ? Math.round(p.daysOverdue) : undefined,
+    paymentType,
   };
 }
 

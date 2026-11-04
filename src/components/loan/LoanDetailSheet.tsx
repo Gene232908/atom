@@ -149,19 +149,24 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
           </div>
 
           {/* Terms Logic Box: e.g. 18 - 4 = 14 months left */}
-          <div className="rounded-[16px] bg-accent/5 p-3.5 ring-1 ring-accent/20">
+          <div className="rounded-[16px] bg-accent/5 p-3.5 ring-1 ring-accent/20 space-y-1">
             <div className="flex items-center justify-between text-[11.5px] font-medium text-accent">
               <span className="tracking-wide">INSTALLMENT PROGRESS</span>
               <span>{stats.progressPercent}% complete</span>
             </div>
-            <p className="mt-1.5 text-[13px] font-normal text-ink">
+            <p className="mt-1 text-[13px] font-normal text-ink">
               <span className="font-semibold">{stats.totalTerms} total months</span> -{' '}
               <span className="font-semibold">{stats.currentPaidTerms} months paid</span> ={' '}
               <span className="font-semibold text-accent">{stats.termsLeft} months left</span>.
             </p>
             {stats.initialPaidTerms > 0 && (
-              <p className="mt-1 text-[11px] text-muted">
+              <p className="text-[11px] text-muted">
                 * Started with {stats.initialPaidTerms} pre-paid months ({formatMoney(stats.totalPriceCents - stats.remainingCents)} credited).
+              </p>
+            )}
+            {stats.totalInterestPaidCents > 0 && (
+              <p className="text-[11px] font-medium text-amber-700">
+                * Total late interest fees paid: {formatMoney(stats.totalInterestPaidCents)} (tracked separately, original loan principal is untouched).
               </p>
             )}
           </div>
@@ -194,7 +199,15 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
             ) : (
               <div className="divide-y divide-hairline rounded-[16px] bg-fill ring-1 ring-hairline overflow-hidden">
                 {payments.map((p, idx) => {
-                  const termLabel = p.termNumber ? `Month #${p.termNumber} of ${stats.totalTerms}` : `Payment #${payments.length - idx}`;
+                  const isAdvance = (p.termsCovered ?? 1) > 1;
+                  const termStart = p.termNumber ?? 1;
+                  const termEnd = termStart + (p.termsCovered ?? 1) - 1;
+                  const termLabel = isAdvance
+                    ? `Months #${termStart}–#${termEnd} (${p.termsCovered} mos)`
+                    : p.termNumber
+                      ? `Month #${p.termNumber} of ${stats.totalTerms}`
+                      : `Payment #${payments.length - idx}`;
+
                   const payDate = new Date(p.paidAt).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -208,9 +221,19 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
                   return (
                     <div key={p.id} className="p-3 sm:p-3.5 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <CheckCircle2 className="size-3.5 text-ok shrink-0" />
-                          <p className="text-[13px] font-bold text-ink truncate">{termLabel}</p>
+                          <p className="text-[13px] font-semibold text-ink truncate">{termLabel}</p>
+                          {isAdvance && (
+                            <span className="rounded-full bg-accent/10 px-1.5 py-0.2 text-[10px] font-semibold text-accent">
+                              Advance
+                            </span>
+                          )}
+                          {p.interestCents && p.interestCents > 0 ? (
+                            <span className="rounded-full bg-amber-500/10 px-1.5 py-0.2 text-[10px] font-semibold text-amber-700">
+                              +{formatMoney(p.interestCents)} late fee
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-[11px] text-muted mt-0.5">
                           {payDate} at {payTime} {p.refNumber ? `· Ref: ${p.refNumber}` : ''}
@@ -219,7 +242,7 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
                       </div>
 
                       <div className="text-right shrink-0">
-                        <p className="text-[14px] font-bold text-ok tabular-nums">
+                        <p className="text-[13.5px] font-semibold text-ok tabular-nums">
                           {formatMoney(p.amountCents)}
                         </p>
                         <span className="text-[10px] font-medium text-ok/80 uppercase">Confirmed</span>

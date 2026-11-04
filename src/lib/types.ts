@@ -57,6 +57,16 @@ export interface PaymentRecord {
   status: 'pending' | 'confirmed';
   /** Installment / term sequence number (e.g. 1, 2, 3...) */
   termNumber?: number;
+  /** Number of terms covered by this payment (e.g. 1 for regular, 2+ for advance payment) */
+  termsCovered?: number;
+  /** Principal amount applied to reduce loan balance */
+  principalCents?: number;
+  /** Late interest or penalty fee paid (not deducted from principal) */
+  interestCents?: number;
+  /** Number of days overdue when payment was made */
+  daysOverdue?: number;
+  /** 'regular' | 'late' | 'advance' */
+  paymentType?: 'regular' | 'late' | 'advance';
 }
 
 export interface Item {

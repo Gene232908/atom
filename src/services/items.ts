@@ -147,13 +147,28 @@ export async function recordLoanPayment(
     refNumber: string;
     paidAt?: number;
     note?: string;
+    termsCovered?: number;
+    principalCents?: number;
+    interestCents?: number;
+    daysOverdue?: number;
+    paymentType?: 'regular' | 'late' | 'advance';
   },
 ): Promise<void> {
   const now = Date.now();
   const paidAt = payment.paidAt || now;
   const stats = computeLoanStats(item);
 
-  const newTermNumber = stats.nextTermNumber || stats.currentPaidTerms + 1;
+  const termsCovered = payment.termsCovered && payment.termsCovered > 0 ? payment.termsCovered : 1;
+  const startTerm = stats.nextTermNumber || stats.currentPaidTerms + 1;
+  const endTerm = startTerm + termsCovered - 1;
+
+  const defaultNote =
+    termsCovered > 1
+      ? `Advance payment for months #${startTerm}–#${endTerm} (${termsCovered} months)`
+      : payment.paymentType === 'late' && (payment.daysOverdue ?? 0) > 0
+        ? `Payment #${startTerm} of ${stats.totalTerms} (${payment.daysOverdue} days late)`
+        : `Payment #${startTerm} of ${stats.totalTerms}`;
+
   const newPayment: PaymentRecord = {
     id: `loan-pay-${now}`,
     uid: user.uid,
@@ -161,9 +176,14 @@ export async function recordLoanPayment(
     amountCents: Math.round(payment.amountCents),
     refNumber: payment.refNumber.trim() || 'Manual payment',
     paidAt,
-    note: payment.note?.trim() || `Payment #${newTermNumber} of ${stats.totalTerms}`,
+    note: payment.note?.trim() || defaultNote,
     status: 'confirmed',
-    termNumber: newTermNumber,
+    termNumber: startTerm,
+    termsCovered,
+    principalCents: payment.principalCents !== undefined ? Math.round(payment.principalCents) : undefined,
+    interestCents: payment.interestCents !== undefined ? Math.round(payment.interestCents) : undefined,
+    daysOverdue: payment.daysOverdue,
+    paymentType: payment.paymentType || (termsCovered > 1 ? 'advance' : 'regular'),
   };
 
   const existingPayments = Array.isArray(item.payments) ? [...item.payments] : [];

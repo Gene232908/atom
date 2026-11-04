@@ -61,6 +61,7 @@ export interface LoanStats {
   termsLeft: number;
   totalPaidCents: number;
   remainingCents: number;
+  totalInterestPaidCents: number;
   isFullyPaid: boolean;
   progressPercent: number;
   nextTermNumber: number | null;
@@ -82,12 +83,38 @@ export function computeLoanStats(item: Item): LoanStats {
   const payments = Array.isArray(item.payments) ? item.payments : [];
   const confirmedPayments = payments.filter((p) => p && p.status === 'confirmed');
 
-  const currentPaidTerms = Math.min(totalTerms, initialPaidTerms + confirmedPayments.length);
+  // Accumulate terms covered, principal applied, and interest fees across payments
+  let paymentsTermsCount = 0;
+  let paymentsPrincipalCents = 0;
+  let totalInterestPaidCents = 0;
+
+  for (const p of confirmedPayments) {
+    const terms = p.termsCovered && p.termsCovered > 0 ? p.termsCovered : 1;
+    paymentsTermsCount += terms;
+
+    // Principal applied directly to the loan
+    const principal = p.principalCents !== undefined
+      ? p.principalCents
+      : monthlyCents > 0
+        ? Math.min(p.amountCents, terms * monthlyCents)
+        : p.amountCents;
+
+    paymentsPrincipalCents += principal;
+
+    // Any late interest or penalty fee is tracked separately and does not reduce loan principal
+    if (typeof p.interestCents === 'number' && p.interestCents > 0) {
+      totalInterestPaidCents += p.interestCents;
+    } else if (p.amountCents > principal) {
+      totalInterestPaidCents += (p.amountCents - principal);
+    }
+  }
+
+  const currentPaidTerms = Math.min(totalTerms, initialPaidTerms + paymentsTermsCount);
   const termsLeft = Math.max(0, totalTerms - currentPaidTerms);
 
   const initialPaidCents = item.initialPaidCents || initialPaidTerms * monthlyCents;
-  const paymentsTotalCents = confirmedPayments.reduce((sum, p) => sum + (p.amountCents || 0), 0);
-  const totalPaidCents = Math.min(totalPriceCents, initialPaidCents + paymentsTotalCents);
+  // Principal reduces the loan balance; interest does NOT reduce principal
+  const totalPaidCents = Math.min(totalPriceCents, initialPaidCents + paymentsPrincipalCents);
   const remainingCents = Math.max(0, totalPriceCents - totalPaidCents);
 
   const isFullyPaid = termsLeft === 0 || remainingCents === 0;
@@ -106,6 +133,7 @@ export function computeLoanStats(item: Item): LoanStats {
     termsLeft,
     totalPaidCents,
     remainingCents,
+    totalInterestPaidCents,
     isFullyPaid,
     progressPercent,
     nextTermNumber,

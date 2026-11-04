@@ -43,6 +43,7 @@ import { PaySheet } from './PaySheet';
 import { PersonSheet } from './PersonSheet';
 import { OwnerBanners } from './OwnerBanners';
 import { GroupDashboard } from '../desktop/GroupDashboard';
+import { LoanDetailSheet } from '../loan/LoanDetailSheet';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 type Panel =
@@ -419,15 +420,25 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
         </>
       )}
       {viewing && (
-        <ItemSheet
-          item={viewing}
-          group={group}
-          uid={uid}
-          onClose={close}
-          onEdit={(item) => setPanel({ kind: 'edit', id: item.id })}
-          onPay={payItem}
-          onSetStatus={onSetStatus}
-        />
+        group.groupType === 'loan' ? (
+          <LoanDetailSheet
+            open={Boolean(viewing)}
+            onClose={close}
+            group={group}
+            item={viewing}
+            onUpdated={close}
+          />
+        ) : (
+          <ItemSheet
+            item={viewing}
+            group={group}
+            uid={uid}
+            onClose={close}
+            onEdit={(item) => setPanel({ kind: 'edit', id: item.id })}
+            onPay={payItem}
+            onSetStatus={onSetStatus}
+          />
+        )
       )}
       <PaySheet
         open={panel?.kind === 'pay'}
