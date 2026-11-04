@@ -74,7 +74,7 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
       className="flex min-h-[208px] animate-rise flex-col p-5 sm:min-h-[224px] sm:p-6"
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 truncate text-[18px] font-bold text-white drop-shadow-sm">
+        <p className="min-w-0 flex-1 truncate text-[16px] font-semibold text-white drop-shadow-sm">
           {group.name}
         </p>
         <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
@@ -85,7 +85,7 @@ export function HeroCard({ group, items, uid, onPay }: Props) {
       <p className="mt-4 text-[13px] font-medium text-white/75">
         {subtitle}
       </p>
-      <p className="text-[36px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[42px]">
+      <p className="text-[28px] leading-tight font-bold tracking-tight text-white drop-shadow tabular-nums sm:text-[32px]">
         {formatMoney(displayAmount)}
       </p>
 

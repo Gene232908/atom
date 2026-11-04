@@ -1,17 +1,9 @@
 import { useMemo, useState } from 'react';
-import {
-  CalendarClock,
-  CheckCircle2,
-  Clock,
-  Pencil,
-  Plus,
-  ReceiptText,
-  ShoppingBag,
-} from 'lucide-react';
+import { CalendarClock, CheckCircle2, Pencil, Plus, ReceiptText } from 'lucide-react';
 import { itemGradient } from '../../lib/cardTheme';
-import { formatMoney, toCents, centsToInput } from '../../lib/money';
-import { amountProgress, dueInfo, isItemDone, itemProgress } from '../../lib/items';
-import { recordPayment } from '../../services/items';
+import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
+import { amountProgress, confirmedPaid, dueInfo, isItemDone, itemProgress } from '../../lib/items';
+import { recordPayment, rejectPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
 import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
@@ -29,109 +21,85 @@ interface Props {
   onSetStatus: (item: Item, personUid: string, status: ShareStatus, amountCents?: number) => void;
 }
 
-/** Everything about one item, plus transaction payment history & installment breakdowns. */
+const label = 'mb-1 block text-[12px] font-medium text-muted';
+const input = 'w-full rounded-xl bg-canvas px-3 py-2.5 text-[14px] text-ink outline-none ring-1 ring-hairline focus:ring-2 focus:ring-accent';
+
+/** One item: summary card, who owes what, and confirmed payment history. */
 export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatus }: Props) {
   const write = useSafeWrite();
   const [recordOpen, setRecordOpen] = useState(false);
-  const [recUid, setRecUid] = useState<string>('');
+  const [recUid, setRecUid] = useState('');
   const [recAmount, setRecAmount] = useState('');
   const [recRef, setRecRef] = useState('');
-  const [recNote, setRecNote] = useState('');
-
-  const installmentMonthly =
-    item?.installmentsCount && item.installmentsCount > 1 && item.splitCents > 0
-      ? Math.round(item.splitCents / item.installmentsCount)
-      : null;
 
   const people = useMemo(() => {
     if (!item?.shares) return [];
     const rank = (pid: string, status?: ShareStatus) =>
-      pid === uid ? 0 : pid === group.ownerId ? 3 : status === 'paid' ? 2 : 1;
+      pid === uid ? 0 : pid === group.ownerId ? 3 : status === 'claimed' ? 1 : status === 'paid' ? 2.5 : 2;
     return Object.entries(item.shares).sort(
-      ([a, sa], [b, sb]) =>
-        rank(a, sa?.status) - rank(b, sb?.status) ||
-        (sa?.name ?? '').localeCompare(sb?.name ?? ''),
+      ([a, sa], [b, sb]) => rank(a, sa?.status) - rank(b, sb?.status) || (sa?.name ?? '').localeCompare(sb?.name ?? ''),
     );
   }, [item, uid, group.ownerId]);
 
-  // Auto-record borrower payments in Transaction History: includes recorded payments AND any borrower claimed payments
-  const payments = useMemo(() => {
+  // Only payments the lender has confirmed. Waiting payments are shown on each person instead.
+  const history = useMemo(() => {
     if (!item) return [];
-    const list: PaymentRecord[] = Array.isArray(item.payments) ? [...item.payments] : [];
-    const existingUidsWithPending = new Set(list.filter((p) => p && p.status === 'pending').map((p) => p.uid));
-    const existingUidsWithConfirmed = new Set(list.filter((p) => p && p.status === 'confirmed').map((p) => p.uid));
-
-    const shares = item.shares ?? {};
-    for (const [pid, share] of Object.entries(shares)) {
-      if (!share || pid === group.ownerId) continue;
-      if (share.status === 'claimed' && !existingUidsWithPending.has(pid)) {
-        const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
-        const amt =
-          share.claimCents && share.claimCents > 0
-            ? share.claimCents
-            : Math.max(0, item.splitCents - (share.paidCents ?? 0));
-        list.unshift({
-          id: `claim-${pid}`,
-          uid: pid,
-          payerName: borrowerName,
-          amountCents: amt,
-          refNumber: share.refNumber || 'Pending verification',
-          note: share.refNumber ? `Ref: ${share.refNumber}` : 'Submitted via Pay now',
-          status: 'pending',
-          paidAt: share.updatedAt && !isNaN(share.updatedAt) && share.updatedAt > 0 ? share.updatedAt : Date.now(),
-        });
-      } else if (share.status === 'paid' && !existingUidsWithConfirmed.has(pid)) {
-        const borrowerName = group.members[pid]?.name ?? share.name ?? 'Borrower';
-        const amt = share.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents;
+    const list: PaymentRecord[] = (item.payments ?? []).filter((p) => p && p.status === 'confirmed');
+    const withRecord = new Set(list.map((p) => p.uid));
+    for (const [pid, share] of Object.entries(item.shares ?? {})) {
+      // Older items marked paid before payment records existed
+      if (share?.status === 'paid' && pid !== group.ownerId && !withRecord.has(pid)) {
         list.push({
-          id: `confirmed-${pid}`,
+          id: `paid-${pid}`,
           uid: pid,
-          payerName: borrowerName,
-          amountCents: amt,
-          refNumber: share.refNumber || 'Paid in full',
-          note: share.refNumber ? `Ref: ${share.refNumber}` : 'Payment confirmed',
+          payerName: group.members[pid]?.name ?? share.name ?? 'Borrower',
+          amountCents: share.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents,
+          refNumber: share.refNumber || '',
           status: 'confirmed',
-          paidAt: share.updatedAt && !isNaN(share.updatedAt) && share.updatedAt > 0 ? share.updatedAt : (item.updatedAt || Date.now()),
+          paidAt: share.updatedAt || item.updatedAt || 0,
         });
       }
     }
-    return list;
-  }, [item, installmentMonthly, group.members, group.ownerId]);
+    return list.sort((a, b) => (b.paidAt || 0) - (a.paidAt || 0));
+  }, [item, group.members, group.ownerId]);
 
   if (!item) return null;
   const isOwner = group.ownerId === uid;
   const done = isItemDone(item, group.ownerId);
   const due = dueInfo(item.dueDate, done);
   const { total } = itemProgress(item, group.ownerId);
-  const moneyProgress = amountProgress(item, group.ownerId);
-  const mine = item.shares ? item.shares[uid] : undefined;
+  const progress = amountProgress(item, group.ownerId);
+  const mine = item.shares?.[uid];
+  const myPaid = confirmedPaid(item, uid);
+  const myLeft = Math.max(0, item.splitCents - myPaid);
+  const myPct = item.splitCents > 0 ? Math.min(100, Math.round((myPaid / item.splitCents) * 100)) : 0;
+  const canPay = !isOwner && !!mine && myLeft > 0 && mine.status !== 'claimed';
+  const monthly =
+    item.monthlyCents ||
+    (item.installmentsCount && item.installmentsCount > 1 ? Math.round(item.splitCents / item.installmentsCount) : 0);
+  const cardName = (item.store || '').trim() || group.name;
 
-  const myPaid = mine?.paidCents ?? (mine?.status === 'paid' ? item.splitCents : 0);
-  const myRemaining = Math.max(0, item.splitCents - myPaid);
-  const canPay = !isOwner && myRemaining > 0;
+  const borrowers = people.filter(([pid]) => pid !== group.ownerId);
+  const recordFor = recUid || borrowers[0]?.[0] || '';
 
-  const handleRecordPaymentSubmit = () => {
-    const targetUid = recUid || (people[0] ? people[0][0] : '');
-    const amountCents = toCents(recAmount) ?? (installmentMonthly || item.splitCents);
-    if (!targetUid || amountCents <= 0) return;
-
-    const borrowerName = group.members[targetUid]?.name ?? item.shares[targetUid]?.name ?? 'Borrower';
+  const saveRecord = () => {
+    const amountCents = toCents(recAmount) ?? 0;
+    if (!recordFor || amountCents <= 0) return;
+    const name = group.members[recordFor]?.name ?? item.shares[recordFor]?.name ?? 'Borrower';
     write(
       recordPayment(group.id, item, {
-        uid: targetUid,
-        payerName: borrowerName,
+        uid: recordFor,
+        payerName: name,
         amountCents,
-        refNumber: recRef.trim() || 'Manual',
-        note: recNote.trim() || 'Cut-off payment',
+        refNumber: recRef.trim(),
+        note: 'Recorded by lender',
         status: 'confirmed',
       }),
-      `Recorded payment of ${formatMoney(amountCents)} for ${borrowerName}`,
+      `Recorded ${formatMoney(amountCents)} from ${name}`,
     );
-
     setRecordOpen(false);
     setRecAmount('');
     setRecRef('');
-    setRecNote('');
   };
 
   return (
@@ -141,317 +109,178 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
       title={item.description}
       footer={
         isOwner ? (
-          <Button size="lg" variant="secondary" full icon={<Pencil className="size-4" />} onClick={() => onEdit(item)}>
+          <Button variant="secondary" full icon={<Pencil className="size-4" />} onClick={() => onEdit(item)}>
             Edit item
           </Button>
         ) : canPay ? (
           <Button size="lg" full onClick={() => onPay(item)}>
-            Pay {formatMoney(myRemaining)} now
+            Pay {formatMoney(myLeft)}
           </Button>
         ) : undefined
       }
     >
-      <WalletCard seed={item.id} background={itemGradient(item, group)} className="p-5">
-        {/* Top Header: Store on left, Cycle on top right, Due Date directly below it */}
+      {/* Summary */}
+      <WalletCard seed={item.id} background={itemGradient(item, group)} className="p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/20 backdrop-blur">
-              <ShoppingBag className="size-3.5 text-white" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[14px] font-bold tracking-[0.08em] text-white uppercase drop-shadow-sm">
-                {(item.store || '').trim() || 'Credit Card'}
-              </p>
-              {item.installmentsCount && item.installmentsCount > 1 && (
-                <p className="text-[11px] text-white/80 font-medium">
-                  {item.installmentsCount} mos installment
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Upper Right Corner: Cycle on top, Due Date below */}
-          <div className="flex flex-col items-end gap-1 shrink-0 text-right">
-            {item.billingCycle && (
-              <span className="inline-flex items-center rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-medium text-white/95 backdrop-blur">
-                {item.billingCycle}
-              </span>
-            )}
-            {due && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                  due.tone === 'slate' ? 'bg-white/15 text-white' : 'bg-white text-bad-ink'
-                }`}
-              >
-                <CalendarClock className="size-3" />
-                {due.text}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Row: Total Charge on left, Monthly Cutoff small & aligned right */}
-        <div className="mt-8 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium text-white/70 uppercase tracking-wider">Total Charge</p>
-            <p className="truncate text-[26px] leading-tight font-bold tracking-tight tabular-nums text-white drop-shadow sm:text-[30px]">
-              {formatMoney(item.priceCents)}
-            </p>
+            <p className="truncate text-[12px] font-semibold tracking-[0.1em] text-white/90 uppercase">{cardName}</p>
+            {item.installmentsCount && item.installmentsCount > 1 ? (
+              <p className="text-[11px] text-white/75">{item.installmentsCount} months installment</p>
+            ) : null}
           </div>
-
-          {(item.monthlyCents || installmentMonthly) && (
-            <div className="shrink-0 text-right">
-              <p className="text-[11px] font-medium text-white/70 uppercase tracking-wider">Monthly cutoff</p>
-              <p className="text-[17px] font-bold text-white tabular-nums">
-                {formatMoney(item.monthlyCents || installmentMonthly!)}
-                <span className="text-[12px] font-normal text-white/80">/mo</span>
-              </p>
-            </div>
+          {due && (
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                due.tone === 'slate' ? 'bg-white/20 text-white' : 'bg-white text-bad-ink'
+              }`}
+            >
+              <CalendarClock className="size-3" />
+              {due.text}
+            </span>
           )}
         </div>
 
-        {!isOwner && (
-          <div className="mt-4 rounded-xl bg-black/20 p-3 backdrop-blur">
-            <div className="flex justify-between text-[12px] font-semibold text-white">
-              <span>Your payment progress</span>
-              <span>{Math.round((myPaid / item.splitCents) * 100)}%</span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/25">
-              <div
-                className="h-full rounded-full bg-white transition-all"
-                style={{ width: `${Math.min(100, (myPaid / item.splitCents) * 100)}%` }}
-              />
-            </div>
-            <div className="mt-2 flex justify-between text-[11px] text-white/80">
-              <span>Paid: {formatMoney(myPaid)}</span>
-              <span>Remaining: {formatMoney(myRemaining)}</span>
-            </div>
+        <div className="mt-5 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-white/75">{isOwner ? 'Total price' : 'Your balance'}</p>
+            <p className="truncate text-[22px] leading-tight font-bold tabular-nums">
+              {formatMoney(isOwner ? item.priceCents : myLeft)}
+            </p>
           </div>
-        )}
+          <div className="shrink-0 text-right">
+            <p className="text-[11px] text-white/75">{monthly ? 'Monthly' : 'Each person'}</p>
+            <p className="text-[14px] font-semibold tabular-nums">{formatMoney(monthly || item.splitCents)}</p>
+          </div>
+        </div>
 
-        {isOwner && total > 0 && (
-          <div className="mt-4">
-            <div className="flex justify-between text-[11px] font-medium text-white/80">
+        {(isOwner ? total > 0 : !!mine) && (
+          <div className="mt-3">
+            <div className="flex justify-between text-[11px] text-white/80">
               <span>
-                {formatMoney(moneyProgress.paid)} of {formatMoney(moneyProgress.total)} collected
+                {isOwner
+                  ? `${formatMoney(progress.paid)} of ${formatMoney(progress.total)} collected`
+                  : `${formatMoney(myPaid)} of ${formatMoney(item.splitCents)} paid`}
               </span>
-              <span>{moneyProgress.percent}%</span>
+              <span>{isOwner ? progress.percent : myPct}%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/25">
-              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${moneyProgress.percent}%` }} />
+              <div className="h-full rounded-full bg-white" style={{ width: `${isOwner ? progress.percent : myPct}%` }} />
             </div>
           </div>
         )}
       </WalletCard>
 
-      {/* Split With People List */}
-      {people.length === 0 ? (
-        <div className="mt-5 rounded-[20px] bg-white p-5 text-center ring-1 ring-hairline shadow-sm">
-          <p className="text-[14px] font-semibold text-ink">Waiting for members</p>
-          <p className="mt-1 text-[12px] text-muted">
-            No members have been assigned to this item yet. Tap <span className="font-semibold text-ink">Edit item</span> below or share invite code <span className="font-mono font-bold text-ink">{group.inviteCode}</span>.
-          </p>
-        </div>
-      ) : (
-        <>
-          <p className="mt-5 mb-2 px-1 text-[13px] font-medium text-muted">
-            Split with {people.length} {people.length === 1 ? 'person' : 'people'}
-          </p>
-          <div className="overflow-hidden rounded-[20px] bg-white ring-1 ring-hairline shadow-sm">
-            <div className="divide-y divide-hairline">
-              {people.map(([pid, share]) => (
-                <ShareRow
-                  key={pid}
-                  personUid={pid}
-                  share={share}
-                  item={item}
-                  group={group}
-                  viewerUid={uid}
-                  onSetStatus={(personUid, status, amountCents) => onSetStatus(item, personUid, status, amountCents)}
-                />
-              ))}
-            </div>
+      {/* People */}
+      <p className="mt-5 mb-1.5 px-1 text-[12px] font-medium text-muted">
+        {people.length ? `Split with ${people.length} ${people.length === 1 ? 'person' : 'people'}` : 'No one added yet'}
+      </p>
+      {people.length > 0 && (
+        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-hairline">
+          <div className="divide-y divide-hairline">
+            {people.map(([pid, share]) => (
+              <ShareRow
+                key={pid}
+                personUid={pid}
+                share={share}
+                item={item}
+                group={group}
+                viewerUid={uid}
+                onSetStatus={(personUid, status, amountCents) => onSetStatus(item, personUid, status, amountCents)}
+                onReject={(personUid) =>
+                  write(
+                    rejectPayment(group.id, item, personUid),
+                    `Marked as not received. ${group.members[personUid]?.name?.split(' ')[0] ?? 'They'} will see it.`,
+                  )
+                }
+              />
+            ))}
           </div>
-        </>
+        </div>
       )}
 
-      {/* TRANSACTION & PAYMENT HISTORY SECTION */}
-      <div className="mt-6 space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            <ReceiptText className="size-4 text-ink" />
-            <span className="text-[14px] font-bold text-ink">Transaction History</span>
-            <span className="grid size-5 place-items-center rounded-full bg-fill text-[11px] font-bold text-muted">
-              {payments.length}
-            </span>
+      {/* Confirmed payments only */}
+      <div className="mt-5 mb-1.5 flex items-center gap-1.5 px-1">
+        <ReceiptText className="size-3.5 text-muted" />
+        <p className="flex-1 text-[12px] font-medium text-muted">Payment history</p>
+        {history.length > 0 && <span className="text-[12px] text-muted">{history.length}</span>}
+      </div>
+      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-hairline">
+        {history.length === 0 ? (
+          <p className="px-4 py-4 text-center text-[13px] text-muted">No confirmed payments yet.</p>
+        ) : (
+          <div className="divide-y divide-hairline">
+            {history.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-ok" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-ink">{p.payerName}</p>
+                  <p className="truncate text-[11px] text-muted">
+                    {p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Earlier'}
+                    {p.refNumber ? ` · ${p.refNumber}` : ''}
+                  </p>
+                </div>
+                <p className="shrink-0 text-[13px] font-semibold text-ok-ink tabular-nums">+{formatMoney(p.amountCents)}</p>
+              </div>
+            ))}
           </div>
+        )}
 
-          {isOwner && (
-            <button
-              type="button"
-              onClick={() => {
-                setRecordOpen((prev) => !prev);
-                if (!recUid && people[0]) setRecUid(people[0][0]);
-                if (installmentMonthly) setRecAmount(centsToInput(installmentMonthly));
-              }}
-              className="inline-flex items-center gap-1 rounded-full bg-fill px-3 py-1 text-[12px] font-semibold text-accent transition hover:bg-black/5 active:scale-95"
-            >
-              <Plus className="size-3.5" />
-              <span>Manual entry (optional)</span>
-            </button>
-          )}
-        </div>
-
-        {/* Lender Record Payment Form */}
-        {recordOpen && isOwner && (
-          <div className="animate-fade-in rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-hairline space-y-3">
-            <p className="text-[13px] font-bold text-ink">Record Cash / Installment Payment</p>
-
+        {/* Lender: record cash or a different amount */}
+        {isOwner && borrowers.length > 0 && !recordOpen && (
+          <button
+            type="button"
+            onClick={() => {
+              setRecordOpen(true);
+              if (monthly) setRecAmount(centsToInput(monthly));
+            }}
+            className="flex w-full items-center gap-2 border-t border-hairline px-4 py-3 text-left text-[13px] font-medium text-accent active:bg-fill"
+          >
+            <Plus className="size-4" />
+            Record a payment
+            <span className="ml-auto text-[11px] font-normal text-muted">optional</span>
+          </button>
+        )}
+        {isOwner && recordOpen && (
+          <div className="space-y-3 border-t border-hairline p-4">
+            <p className="text-[13px] font-semibold text-ink">Record a payment you received</p>
             <div>
-              <label className="block text-[11px] font-semibold text-muted uppercase">Borrower</label>
-              <select
-                value={recUid || (people[0] ? people[0][0] : '')}
-                onChange={(e) => setRecUid(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-fill px-3 py-2 text-[14px] font-medium text-ink outline-none ring-1 ring-hairline"
-              >
-                {people.map(([pid, share]) => (
+              <label className={label} htmlFor="rec-who">From</label>
+              <select id="rec-who" value={recordFor} onChange={(e) => setRecUid(e.target.value)} className={input}>
+                {borrowers.map(([pid, share]) => (
                   <option key={pid} value={pid}>
                     {group.members[pid]?.name ?? share.name}
                   </option>
                 ))}
               </select>
             </div>
-
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase">Amount (₱)</label>
+                <label className={label} htmlFor="rec-amount">Amount (₱)</label>
                 <input
-                  type="text"
+                  id="rec-amount"
                   inputMode="decimal"
                   value={recAmount}
-                  onChange={(e) => setRecAmount(e.target.value)}
-                  placeholder={centsToInput(installmentMonthly || item.splitCents)}
-                  className="mt-1 w-full rounded-xl bg-fill px-3 py-2 text-[14px] font-medium text-ink outline-none ring-1 ring-hairline"
+                  onChange={(e) => setRecAmount(cleanMoneyInput(e.target.value))}
+                  placeholder={centsToInput(Math.max(0, item.splitCents - confirmedPaid(item, recordFor)))}
+                  className={input}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase">Reference #</label>
-                <input
-                  type="text"
-                  value={recRef}
-                  onChange={(e) => setRecRef(e.target.value)}
-                  placeholder="e.g. GCash 100238"
-                  className="mt-1 w-full rounded-xl bg-fill px-3 py-2 text-[14px] font-medium text-ink outline-none ring-1 ring-hairline"
-                />
+                <label className={label} htmlFor="rec-ref">Reference (optional)</label>
+                <input id="rec-ref" value={recRef} onChange={(e) => setRecRef(e.target.value)} placeholder="GCash ref" className={input} />
               </div>
             </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-muted uppercase">Note (optional)</label>
-              <input
-                type="text"
-                value={recNote}
-                onChange={(e) => setRecNote(e.target.value)}
-                placeholder="e.g. Cut-off 1 payment, 1st month"
-                className="mt-1 w-full rounded-xl bg-fill px-3 py-2 text-[13px] text-ink outline-none ring-1 ring-hairline"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setRecordOpen(false)}
-                className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted hover:text-ink"
-              >
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" full onClick={() => setRecordOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleRecordPaymentSubmit}
-                className="rounded-full bg-ink px-4 py-1.5 text-[12px] font-bold text-white shadow-sm transition active:scale-95"
-              >
-                Save payment
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Payments List */}
-        {payments.length === 0 ? (
-          <div className="rounded-[20px] bg-white p-5 text-center shadow-sm ring-1 ring-hairline">
-            <ReceiptText className="mx-auto size-7 text-muted/60" />
-            <p className="mt-2 text-[13px] font-medium text-ink">No payment records yet</p>
-            <p className="mt-0.5 text-[12px] text-muted">
-              When cut-off or installment payments are made with reference numbers, they will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-hairline">
-            <div className="divide-y divide-hairline">
-              {payments.map((p) => {
-                const isConfirmed = p.status === 'confirmed';
-                const validTs = typeof p.paidAt === 'number' && !isNaN(p.paidAt) && p.paidAt > 0 ? p.paidAt : Date.now();
-                let dateStr = 'Recent';
-                try {
-                  dateStr = new Date(validTs).toLocaleDateString('en-PH', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                } catch {
-                  dateStr = 'Recent';
-                }
-
-                return (
-                  <div key={p.id} className="flex items-center justify-between gap-3 p-3.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-[14px] font-bold text-ink">{p.payerName}</span>
-                        {isConfirmed ? (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-bold text-ok-ink">
-                            <CheckCircle2 className="size-3 text-ok" />
-                            Confirmed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-bold text-warn-ink">
-                            <Clock className="size-3 text-warn" />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[12px] text-muted">
-                        <span>{dateStr}</span>
-                        {p.refNumber && (
-                          <span className="font-mono text-[11px] font-semibold text-accent">
-                            Ref: {p.refNumber}
-                          </span>
-                        )}
-                      </div>
-
-                      {p.note && <p className="mt-0.5 text-[12px] text-ink/80 italic">{p.note}</p>}
-                    </div>
-
-                    <div className="shrink-0 text-right">
-                      <p className="text-[15px] font-bold text-ok-ink tabular-nums">
-                        +{formatMoney(p.amountCents)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+              </Button>
+              <Button size="sm" full onClick={saveRecord} disabled={(toCents(recAmount) ?? 0) <= 0}>
+                Save
+              </Button>
             </div>
           </div>
         )}
       </div>
-
-      {!isOwner && mine?.status === 'claimed' && (
-        <p className="mt-3 px-1 text-[13px] text-muted">
-          You sent a payment confirmation. Waiting for {group.members[group.ownerId]?.name ?? 'the lender'} to confirm it.
-        </p>
-      )}
     </Sheet>
   );
 }

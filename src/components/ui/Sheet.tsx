@@ -99,7 +99,7 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
           </div>
           <div className="flex items-start gap-3 px-5 pt-3 pb-3 md:pt-5">
             <div className="min-w-0 flex-1">
-              <h2 className="text-[22px] leading-tight font-bold tracking-tight text-ink wrap-break-word">{title}</h2>
+              <h2 className="text-[18px] leading-tight font-bold tracking-tight text-ink wrap-break-word">{title}</h2>
               {description && <p className="mt-1 text-[14px] leading-snug text-muted">{description}</p>}
             </div>
             <button

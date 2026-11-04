@@ -5,7 +5,7 @@ import { copyText } from '../../lib/clipboard';
 import { groupGradient, itemGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
 import { formatMoney, toCents, centsToInput } from '../../lib/money';
-import { firstName } from '../../lib/items';
+import { confirmedPaid, firstName } from '../../lib/items';
 import type { Group, Item } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
@@ -39,8 +39,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
 
   // Calculate user's remaining balance for this item
-  const myShare = item?.shares[uid];
-  const paidSoFar = myShare?.paidCents ?? (myShare?.status === 'paid' ? item?.splitCents ?? 0 : 0);
+  const paidSoFar = item ? confirmedPaid(item, uid) : 0;
   const remainingCents = item ? Math.max(0, item.splitCents - paidSoFar) : totalCents;
 
   const installmentMonthly =
@@ -101,7 +100,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
       open={open}
       onClose={onClose}
       title="Pay now"
-      description={`Send payment to ${ownerName}, then enter your reference number.`}
+      description={`Send your payment to ${ownerName}, then tap the button below.`}
       footer={
         canMark && amountToPay > 0 ? (
           <Button
@@ -110,7 +109,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
             icon={<Check className="size-5" strokeWidth={2.5} />}
             onClick={handlePaidSubmit}
           >
-            I already paid {formatMoney(amountToPay)}
+            I paid {formatMoney(amountToPay)}
           </Button>
         ) : undefined
       }
@@ -118,35 +117,35 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
       <WalletCard
         seed={item?.id ?? group.id}
         background={item ? itemGradient(item, group) : groupGradient(group)}
-        className="p-5"
+        className="p-4"
       >
         <div className="flex items-center gap-2">
-          <ShoppingBag className="size-4 shrink-0" />
-          <p className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-[0.12em] uppercase">
-            {item ? item.store.trim() || 'Item' : group.name}
+          <ShoppingBag className="size-3.5 shrink-0" />
+          <p className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[0.1em] uppercase">
+            {item ? item.store.trim() || group.name : group.name}
           </p>
         </div>
-        <p className="mt-2 line-clamp-2 text-[14px] text-white/85">
+        <p className="mt-1.5 line-clamp-2 text-[13px] text-white/85">
           {item ? item.description : `All ${unpaidCount} unpaid ${unpaidCount === 1 ? 'item' : 'items'}`}
         </p>
 
         {paidSoFar > 0 && item && (
-          <p className="mt-2 text-[12px] font-medium text-white/80">
+          <p className="mt-1.5 text-[11px] text-white/80">
             Paid so far: {formatMoney(paidSoFar)} · Balance: {formatMoney(remainingCents)}
           </p>
         )}
 
-        <p className="mt-4 text-[11px] font-medium text-white/70">Amount to pay</p>
-        <p className="text-[34px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
+        <p className="mt-3 text-[11px] text-white/75">Amount to pay</p>
+        <p className="text-[24px] leading-tight font-bold tabular-nums wrap-break-word">
           {formatMoney(amountToPay)}
         </p>
-        <p className="mt-1 text-[12px] text-white/75">Pay to {group.members[group.ownerId]?.name ?? ownerName}</p>
+        <p className="mt-0.5 text-[11px] text-white/75">Pay to {group.members[group.ownerId]?.name ?? ownerName}</p>
       </WalletCard>
 
       {/* If this is an installment item, let the user choose cut-off payment */}
       {item && remainingCents > 0 && (
         <div className="mt-4 rounded-[20px] bg-white p-4">
-          <p className="text-[13px] font-semibold text-ink">Payment Type</p>
+          <p className="text-[12px] font-medium text-muted">How much are you paying?</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -157,7 +156,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
                   : 'bg-fill text-muted hover:text-ink'
               }`}
             >
-              Full Balance
+              Full balance
               <span className="block text-[11px] font-normal opacity-80">{formatMoney(remainingCents)}</span>
             </button>
             <button
@@ -174,23 +173,23 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
                   : 'bg-fill text-muted hover:text-ink'
               }`}
             >
-              Cut-off / Installment
+              Part of it
               <span className="block text-[11px] font-normal opacity-80">
-                {installmentMonthly ? `${formatMoney(installmentMonthly)}/mo` : 'Partial'}
+                {installmentMonthly ? `${formatMoney(installmentMonthly)}/mo` : 'Type the amount'}
               </span>
             </button>
           </div>
 
           {payMode === 'custom' && (
             <div className="mt-3">
-              <label className="block text-[12px] font-medium text-muted">Amount you are paying now (₱)</label>
+              <label className="block text-[12px] font-medium text-muted">Amount (₱)</label>
               <input
                 type="text"
                 inputMode="decimal"
                 value={customAmountInput}
                 onChange={(e) => setCustomAmountInput(e.target.value)}
                 placeholder={centsToInput(remainingCents)}
-                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[15px] font-semibold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
+                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[14px] font-semibold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
               />
             </div>
           )}
@@ -199,13 +198,10 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
 
       {/* Reference Number & Payment Method Input */}
       <div className="mt-4 rounded-[20px] bg-white p-4">
-        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
-          <ReceiptText className="size-4 text-accent" />
-          <span>Payment Details for Verification</span>
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-muted">
+          <ReceiptText className="size-3.5" />
+          <span>How did you pay?</span>
         </div>
-        <p className="mt-0.5 text-[12px] text-muted">
-          Select what payment method you used and enter the receipt reference number so {ownerName} can easily verify it.
-        </p>
 
         {/* Quick Payment Method Selector */}
         <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -226,20 +222,18 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
         </div>
 
         <div className="mt-3">
-          <label className="block text-[11px] font-semibold text-muted uppercase">
-            {paymentMethod} Reference Number
-          </label>
+          <label className="block text-[12px] font-medium text-muted">Reference number (optional)</label>
           <input
             type="text"
             value={refNumber}
             onChange={(e) => setRefNumber(e.target.value)}
-            placeholder={`e.g. ${paymentMethod} ref # (e.g. 100238491)`}
+            placeholder={paymentMethod === 'Cash' ? 'Not needed for cash' : 'e.g. 1002384915'}
             className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 font-mono text-[14px] font-medium text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
           />
         </div>
 
         <div className="mt-3">
-          <label className="block text-[11px] font-semibold text-muted uppercase">Note (optional)</label>
+          <label className="block text-[12px] font-medium text-muted">Note (optional)</label>
           <input
             type="text"
             value={note}
@@ -272,7 +266,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <p className="mt-1.5 text-[16px] font-semibold wrap-break-word whitespace-pre-wrap">{group.paymentNote}</p>
+          <p className="mt-1 text-[14px] font-semibold wrap-break-word whitespace-pre-wrap">{group.paymentNote}</p>
         </div>
       )}
 

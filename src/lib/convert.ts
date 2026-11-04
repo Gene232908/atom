@@ -45,6 +45,7 @@ function toShare(raw: unknown): Share {
     paidCents: typeof s.paidCents === 'number' ? Math.round(s.paidCents) : undefined,
     refNumber: typeof s.refNumber === 'string' ? s.refNumber : undefined,
     claimCents: typeof s.claimCents === 'number' && s.claimCents > 0 ? Math.round(s.claimCents) : undefined,
+    rejectedCents: typeof s.rejectedCents === 'number' && s.rejectedCents > 0 ? Math.round(s.rejectedCents) : undefined,
   };
 }
 

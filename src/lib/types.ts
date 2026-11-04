@@ -35,6 +35,8 @@ export interface Share {
   refNumber?: string;
   /** Amount the person says they sent, waiting for the lender to confirm. Not counted as paid yet. */
   claimCents?: number;
+  /** Set when the lender said "No, I did not receive it". Shown to the person until they pay again. */
+  rejectedCents?: number;
 }
 
 export interface PaymentRecord {

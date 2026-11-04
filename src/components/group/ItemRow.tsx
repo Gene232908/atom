@@ -75,7 +75,7 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
       className="group flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3.5 text-left transition select-none active:bg-fill"
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[16px] font-semibold tracking-tight text-ink">
+        <p className="truncate text-[14px] font-semibold text-ink">
           {item.description || storeLabel || 'Transaction'}
         </p>
 
@@ -90,7 +90,7 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
 
       <div className="flex shrink-0 items-center gap-2">
         <span
-          className={`text-[16px] font-semibold tabular-nums text-right ${
+          className={`text-[14px] font-semibold tabular-nums text-right ${
             done ? 'text-muted line-through' : 'text-ink'
           }`}
         >

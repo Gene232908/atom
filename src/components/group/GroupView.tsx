@@ -33,7 +33,6 @@ import { ProfileMenu } from '../home/ProfileMenu';
 import { HeroCard } from './HeroCard';
 import { QuickActions } from './QuickActions';
 import { PeopleCarousel } from './PeopleCarousel';
-import { MyCards } from './MyCards';
 import { FilterBar } from './FilterBar';
 import { ItemRow } from './ItemRow';
 import { ItemSheet } from './ItemSheet';
@@ -316,7 +315,6 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               <ErrorBanner message={error} onRetry={retry} />
             )}
 
-            {!isOwner && !loading && <MyCards items={items} group={group} uid={uid} onPay={payItem} onOpen={openItem} />}
 
             <section>
               <SectionLabel
@@ -326,7 +324,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                   </span>
                 }
               >
-                {isOwner ? 'Items' : 'All items'}
+                Items
               </SectionLabel>
 
               {loading ? (
@@ -395,7 +393,6 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
               )}
             </section>
 
-            {!isOwner && <div className="lg:hidden">{peopleSection}</div>}
           </div>
         </div>
       </PageBody>

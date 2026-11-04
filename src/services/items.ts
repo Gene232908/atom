@@ -240,7 +240,28 @@ export async function confirmPayment(
     [`shares.${uid}.status`]: newPaid >= item.splitCents ? 'paid' : 'unpaid',
     [`shares.${uid}.paidCents`]: newPaid,
     [`shares.${uid}.claimCents`]: 0,
+    [`shares.${uid}.rejectedCents`]: 0,
     [`shares.${uid}.refNumber`]: refNum,
+    [`shares.${uid}.updatedAt`]: now,
+    updatedAt: now,
+  });
+}
+
+/**
+ * Lender says "No, I did not receive it".
+ * The pending payment is removed, the person goes back to unpaid and sees a notice.
+ */
+export async function rejectPayment(groupId: string, item: Item, uid: string): Promise<void> {
+  const now = Date.now();
+  const share = item.shares[uid];
+  const pending = (item.payments ?? []).filter((p) => p.uid === uid && p.status === 'pending');
+  const claimed = share?.claimCents || pending.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+  await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
+    payments: (item.payments ?? []).filter((p) => !(p.uid === uid && p.status === 'pending')),
+    [`shares.${uid}.status`]: 'unpaid',
+    [`shares.${uid}.claimCents`]: 0,
+    [`shares.${uid}.rejectedCents`]: claimed || Math.max(0, item.splitCents - confirmedPaid(item, uid)),
+    [`shares.${uid}.refNumber`]: '',
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   });
@@ -254,6 +275,7 @@ export async function undoPayment(groupId: string, item: Item, uid: string): Pro
     [`shares.${uid}.status`]: 'unpaid',
     [`shares.${uid}.paidCents`]: 0,
     [`shares.${uid}.claimCents`]: 0,
+    [`shares.${uid}.rejectedCents`]: 0,
     [`shares.${uid}.refNumber`]: '',
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
