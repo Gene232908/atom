@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyRound, Plus, Search, WalletCards } from 'lucide-react';
+import { Bell, KeyRound, Plus, Search, WalletCards } from 'lucide-react';
 import type { GroupItem } from '../../hooks/useAllItems';
 import { navigate } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
@@ -41,6 +41,8 @@ interface Props {
   transactions: Transaction[];
   onOpenTx: (tx: Transaction) => void;
   onViewAllTx: () => void;
+  onOpenReminders?: () => void;
+  remindersCount?: number;
 }
 
 function greeting(): string {
@@ -99,6 +101,21 @@ export function HomeDashboard(props: Props) {
           </h1>
         </div>
         <div className="flex gap-2">
+          {props.onOpenReminders && (
+            <Button
+              variant="white"
+              className="relative ring-1 ring-black/[0.08]"
+              icon={<Bell className="size-4 text-accent" />}
+              onClick={props.onOpenReminders}
+            >
+              Reminders
+              {Boolean(props.remindersCount) && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white">
+                  {props.remindersCount}
+                </span>
+              )}
+            </Button>
+          )}
           <Button variant="white" className="ring-1 ring-black/[0.08]" icon={<KeyRound className="size-4" />} onClick={props.onJoin}>
             Join a card
           </Button>

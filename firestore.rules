@@ -120,5 +120,14 @@ service cloud.firestore {
         && request.resource.data.image.size() < 900000;
       allow delete: if isOwnerOf(gid);
     }
+
+    // User profile, notification preferences, and Web Push subscriptions
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+
+      match /subscriptions/{subId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
+import { Bell, ChevronRight, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
@@ -16,6 +16,8 @@ import { CardActionsSheet } from '../components/home/CardActionsSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { ProfileMenu } from '../components/home/ProfileMenu';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
+import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
+import { evaluateDueReminders, checkAndDispatchDueReminders } from '../lib/notifications';
 import { ItemSheet } from '../components/group/ItemSheet';
 import { ItemFormSheet } from '../components/group/ItemFormSheet';
 import { PaySheet } from '../components/group/PaySheet';
@@ -150,6 +152,41 @@ export function HomePage() {
   // Confirmed payments received and sent, newest first
   const transactions = useMemo(() => buildTransactions(items, user.uid), [items, user.uid]);
   const activeTx = useMemo(() => transactions.find((t) => t.key === txKey) ?? null, [transactions, txKey]);
+
+  // Due date reminders for personal loans & peer debts
+  const [remindersOpen, setRemindersOpen] = useState(false);
+  const reminders = useMemo(
+    () => evaluateDueReminders(items, groups, user.uid),
+    [items, groups, user.uid],
+  );
+  const urgentReminders = useMemo(
+    () => reminders.filter((r) => r.urgency === 'today' || r.urgency === 'overdue'),
+    [reminders],
+  );
+  const hasUrgentReminder = urgentReminders.length > 0;
+
+  // Background and on-open system notification check
+  useEffect(() => {
+    if (items.length > 0 && groups.length > 0) {
+      checkAndDispatchDueReminders(items, groups, user.uid).catch((err) => {
+        console.warn('Notification check failed:', err);
+      });
+    }
+  }, [items, groups, user.uid]);
+
+  const handleSelectReminder = (targetGroup: Group, targetItem: Item) => {
+    setRemindersOpen(false);
+    if (targetItem.isPersonalLoan || targetGroup.groupType === 'loan') {
+      setTab('loans');
+      setViewingLoan({ group: targetGroup, item: targetItem });
+    } else if (targetGroup.ownerId === user.uid) {
+      setTab('lend');
+      setViewingItemId(targetItem.id);
+    } else {
+      setTab('owe');
+      setPayingItemId(targetItem.id);
+    }
+  };
 
   // Automatically determine the initial tab on open/login
   useEffect(() => {
@@ -318,6 +355,8 @@ export function HomePage() {
           transactions={transactions}
           onOpenTx={(tx) => setTxKey(tx.key)}
           onViewAllTx={() => setTxListOpen(true)}
+          onOpenReminders={() => setRemindersOpen(true)}
+          remindersCount={reminders.length}
         />
       ) : (
         <>
@@ -337,6 +376,24 @@ export function HomePage() {
             </IconButton>
             <button
               type="button"
+              onClick={() => setRemindersOpen(true)}
+              aria-label="Due date reminders"
+              title="Due date reminders"
+              className="relative grid size-9 shrink-0 place-items-center rounded-full bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-hairline transition hover:text-accent active:scale-90"
+            >
+              <Bell className="size-4" strokeWidth={2.2} />
+              {reminders.length > 0 && (
+                <span
+                  className={`absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold text-white shadow-xs ${
+                    hasUrgentReminder ? 'bg-bad animate-pulse' : 'bg-amber-500'
+                  }`}
+                >
+                  {reminders.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="Your account"
               className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full transition active:scale-90"
@@ -347,7 +404,11 @@ export function HomePage() {
         }
       />
 
-      <ProfileMenu open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileMenu
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onOpenReminders={() => setRemindersOpen(true)}
+      />
 
       <PageBody>
         {loading ? (
@@ -393,6 +454,40 @@ export function HomePage() {
                   <SlidersHorizontal className="size-4" strokeWidth={2.2} />
                 </button>
               </div>
+
+              {/* Actionable Due Date Reminder Alert Banner */}
+              {reminders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRemindersOpen(true)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-[18px] p-3 text-left transition hover:opacity-95 active:scale-[0.99] select-none ${
+                    hasUrgentReminder
+                      ? 'bg-rose-50/95 text-rose-950 ring-1 ring-rose-200 shadow-xs'
+                      : 'bg-amber-50/95 text-amber-950 ring-1 ring-amber-200 shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`grid size-7 shrink-0 place-items-center rounded-full text-white shadow-xs ${
+                        hasUrgentReminder ? 'bg-bad animate-pulse' : 'bg-amber-500'
+                      }`}
+                    >
+                      <Bell className="size-3.5" strokeWidth={2.5} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold truncate">
+                        {hasUrgentReminder
+                          ? `${urgentReminders.length} Bill${urgentReminders.length > 1 ? 's' : ''} Due Today or Overdue`
+                          : `${reminders.length} Bill${reminders.length > 1 ? 's' : ''} Due in 1–2 Days`}
+                      </p>
+                      <p className="text-[11px] opacity-80 truncate">
+                        Tap to review payment schedule & push alerts
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 opacity-60" />
+                </button>
+              )}
 
               <MotionPrompt />
 
@@ -556,6 +651,13 @@ export function HomePage() {
         onSelect={onSelectPref}
         layoutMode={cardLayout}
         onSelectLayoutMode={onSelectLayoutMode}
+      />
+      <DueRemindersSheet
+        open={remindersOpen}
+        onClose={() => setRemindersOpen(false)}
+        reminders={reminders}
+        userId={user.uid}
+        onSelectReminder={handleSelectReminder}
       />
     </>
   );

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { LogOut, X } from 'lucide-react';
+import { Bell, LogOut, X } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { Avatar } from '../ui/Avatar';
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  onOpenReminders?: () => void;
 }
 
-export function ProfileMenu({ open, onClose }: Props) {
+export function ProfileMenu({ open, onClose, onOpenReminders }: Props) {
   const user = useUser();
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -74,6 +75,20 @@ export function ProfileMenu({ open, onClose }: Props) {
         </div>
 
         <div className="my-3 h-px bg-black/[0.06]" />
+
+        {onOpenReminders && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenReminders();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-semibold text-ink transition hover:bg-black/5 active:scale-[0.98]"
+          >
+            <Bell className="size-4 shrink-0 text-accent" strokeWidth={2.2} />
+            <span>Due Reminders & Alerts</span>
+          </button>
+        )}
 
         <button
           type="button"

@@ -7,6 +7,15 @@ import { initMotion } from './lib/motion';
 // Card shine follows the phone's tilt.
 initMotion();
 
+// Register PWA service worker for push notifications & offline caching
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('SW registration failed:', err);
+    });
+  });
+}
+
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');
 
