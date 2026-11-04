@@ -30,8 +30,8 @@ export default async function handler(req: any, res: any) {
       await webpush.sendNotification(
         subscription,
         JSON.stringify({
-          title: title || 'Utang List Reminder',
-          body: body || 'Payment due today: Please check your active cards.',
+          title: title || 'Reminder:',
+          body: body || 'Please pay your bill or check your active cards today.',
           url: '/',
         }),
       );

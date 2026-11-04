@@ -19,11 +19,11 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = data.title || 'Utang List Reminder';
+  const title = data.title || 'Reminder:';
   const options = {
-    body: data.body || 'You have a payment or collection due.',
-    icon: data.icon || '/icon.svg',
-    badge: data.badge || '/icon.svg',
+    body: data.body || 'Please check your active bill reminders.',
+    icon: data.icon || '/apple-touch-icon.png',
+    badge: data.badge || '/apple-touch-icon.png',
     tag: data.tag || 'due-reminder',
     renotify: true,
     data: {

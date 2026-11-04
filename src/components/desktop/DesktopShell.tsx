@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { KeyRound, LayoutDashboard, LogOut, Plus } from 'lucide-react';
+import { KeyRound, LayoutDashboard, LogOut, Plus, Sparkles } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { useGroups } from '../../hooks/useGroups';
 import { navigate, type Route } from '../../hooks/useRoute';
@@ -12,6 +12,7 @@ import { Avatar } from '../ui/Avatar';
 import { CreateGroupSheet } from '../home/CreateGroupSheet';
 import { CreateLoanSheet } from '../loan/CreateLoanSheet';
 import { JoinCodeSheet } from '../home/JoinCodeSheet';
+import { AppIconSheet } from '../home/AppIconSheet';
 
 const SIDEBAR = 'w-[260px]';
 
@@ -28,6 +29,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
     return savedGroups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
   }, [savedGroups, items]);
   const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | null>(null);
+  const [appIconOpen, setAppIconOpen] = useState(false);
   const name = user.displayName || user.email || 'You';
 
   // Robust loan classification: checks groupType or if items inside have isPersonalLoan
@@ -50,7 +52,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
     <div className="min-h-dvh bg-canvas">
       <aside className={`fixed inset-y-0 left-0 z-30 flex ${SIDEBAR} flex-col border-r border-hairline bg-white`}>
         <div className="flex items-center gap-2.5 px-5 pt-6 pb-5">
-          <img src="/icon.svg" alt="" className="size-8 rounded-[10px]" />
+          <img src="/apple-touch-icon.png" alt="Utang List" className="size-8 rounded-[10px] shadow-xs" />
           <span className="text-[17px] font-bold tracking-tight">Utang List</span>
         </div>
 
@@ -78,12 +80,21 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
           </div>
         </div>
 
-        <div className="flex items-center gap-3 border-t border-hairline px-4 py-4">
+        <div className="flex items-center gap-2 border-t border-hairline px-4 py-4">
           <Avatar name={name} photo={user.photoURL ?? ''} size="sm" ring="subtle" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold">{user.displayName || 'You'}</p>
             <p className="truncate text-[11px] text-muted">{user.email}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setAppIconOpen(true)}
+            title="Customize App Icon"
+            aria-label="Customize App Icon"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-fill hover:text-accent"
+          >
+            <Sparkles className="size-4" />
+          </button>
           <button
             type="button"
             onClick={() => signOut()}
@@ -101,6 +112,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
       <CreateGroupSheet open={panel === 'create'} onClose={() => setPanel(null)} />
       <CreateLoanSheet open={panel === 'create_loan'} onClose={() => setPanel(null)} />
       <JoinCodeSheet open={panel === 'join'} onClose={() => setPanel(null)} />
+      <AppIconSheet open={appIconOpen} onClose={() => setAppIconOpen(false)} />
     </div>
   );
 }

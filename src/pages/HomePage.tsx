@@ -15,6 +15,7 @@ import { CreateGroupSheet } from '../components/home/CreateGroupSheet';
 import { CardActionsSheet } from '../components/home/CardActionsSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { ProfileMenu } from '../components/home/ProfileMenu';
+import { AppIconSheet } from '../components/home/AppIconSheet';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
 import { evaluateDueReminders, checkAndDispatchDueReminders } from '../lib/notifications';
@@ -56,6 +57,7 @@ export function HomePage() {
 
   const [panel, setPanel] = useState<Panel>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [appIconOpen, setAppIconOpen] = useState(false);
   // Card the person pressed and held (shows Edit / Remove)
   const [heldId, setHeldId] = useState<string | null>(null);
   const [txListOpen, setTxListOpen] = useState(false);
@@ -416,6 +418,7 @@ export function HomePage() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onOpenReminders={() => setRemindersOpen(true)}
+        onOpenAppIcon={() => setAppIconOpen(true)}
       />
 
       <PageBody>
@@ -666,6 +669,10 @@ export function HomePage() {
         reminders={reminders}
         userId={user.uid}
         onSelectReminder={handleSelectReminder}
+      />
+      <AppIconSheet
+        open={appIconOpen}
+        onClose={() => setAppIconOpen(false)}
       />
     </>
   );

@@ -3,9 +3,13 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { initMotion } from './lib/motion';
+import { initAppIcon } from './lib/appIcon';
 
 // Card shine follows the phone's tilt.
 initMotion();
+
+// Apply custom PWA app icon if configured by user
+initAppIcon();
 
 // Register PWA service worker for push notifications & offline caching
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {

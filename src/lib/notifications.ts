@@ -108,8 +108,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `loan_${item.id}_due_${stats.nextDueDate}`,
           type: 'loan',
-          title: `Due Date Today: ${item.description}`,
-          body: `Please pay your bill of ${formattedAmount} to ${group.name} today!${termInfo}`,
+          title: 'Reminder:',
+          body: `Please pay your bill of ${formattedAmount} for ${item.description} (${group.name}) today!${termInfo}`,
           item,
           group,
           amountCents: amount,
@@ -122,8 +122,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `loan_${item.id}_due_${stats.nextDueDate}`,
           type: 'loan',
-          title: `Payment Due Tomorrow: ${item.description}`,
-          body: `Your bill of ${formattedAmount} to ${group.name} is due tomorrow (${formattedDate}).${termInfo}`,
+          title: 'Reminder:',
+          body: `Please prepare ${formattedAmount} for ${item.description} (${group.name}) due tomorrow (${formattedDate}).${termInfo}`,
           item,
           group,
           amountCents: amount,
@@ -136,8 +136,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `loan_${item.id}_due_${stats.nextDueDate}`,
           type: 'loan',
-          title: `Payment in 2 Days: ${item.description}`,
-          body: `Reminder: Please prepare ${formattedAmount} for ${group.name}. Due on ${formattedDate}.${termInfo}`,
+          title: 'Reminder:',
+          body: `Please prepare ${formattedAmount} for ${item.description} (${group.name}) due in 2 days (${formattedDate}).${termInfo}`,
           item,
           group,
           amountCents: amount,
@@ -151,8 +151,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `loan_${item.id}_due_${stats.nextDueDate}`,
           type: 'loan',
-          title: `Overdue Payment: ${item.description}`,
-          body: `Please pay your bill of ${formattedAmount} to ${group.name}. Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago (${formattedDate}).`,
+          title: 'Reminder:',
+          body: `Please pay your bill of ${formattedAmount} for ${item.description} (${group.name}). Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago (${formattedDate}).`,
           item,
           group,
           amountCents: amount,
@@ -170,7 +170,6 @@ export function evaluateDueReminders(
       const daysDiff = diffCalendarDays(item.dueDate, todayStr);
       if (daysDiff > 2) continue; // Not within 2-day reminder window yet
 
-      const formattedDate = formatDueDateReadable(item.dueDate);
       const others = otherShares(item, currentUserId);
 
       for (const [uid, share] of others) {
@@ -186,8 +185,8 @@ export function evaluateDueReminders(
           reminders.push({
             id: `peer_lend_${item.id}_${uid}_${item.dueDate}`,
             type: 'peer_lend',
-            title: `Due Date Today: Collect from ${borrowerName}`,
-            body: `Today is the due date to collect ${formattedAmount} from ${borrowerName} for ${item.description} (${group.name}).`,
+            title: 'Reminder:',
+            body: `Please collect ${formattedAmount} from ${borrowerName} for ${item.description} (${group.name}) today!`,
             item,
             group,
             amountCents: remaining,
@@ -200,8 +199,8 @@ export function evaluateDueReminders(
           reminders.push({
             id: `peer_lend_${item.id}_${uid}_${item.dueDate}`,
             type: 'peer_lend',
-            title: `Collection Tomorrow: ${borrowerName}`,
-            body: `${borrowerName} owes ${formattedAmount} for ${item.description} (${group.name}) due tomorrow.`,
+            title: 'Reminder:',
+            body: `Please follow up ${borrowerName} for ${formattedAmount} (${item.description}) due tomorrow.`,
             item,
             group,
             amountCents: remaining,
@@ -214,8 +213,8 @@ export function evaluateDueReminders(
           reminders.push({
             id: `peer_lend_${item.id}_${uid}_${item.dueDate}`,
             type: 'peer_lend',
-            title: `Due in 2 Days: Collect from ${borrowerName}`,
-            body: `Reminder: ${borrowerName} owes ${formattedAmount} for ${item.description} (${group.name}). Due on ${formattedDate}.`,
+            title: 'Reminder:',
+            body: `Please follow up ${borrowerName} for ${formattedAmount} (${item.description}) due in 2 days.`,
             item,
             group,
             amountCents: remaining,
@@ -229,8 +228,8 @@ export function evaluateDueReminders(
           reminders.push({
             id: `peer_lend_${item.id}_${uid}_${item.dueDate}`,
             type: 'peer_lend',
-            title: `Overdue Collection: ${borrowerName}`,
-            body: `${borrowerName} still owes ${formattedAmount} for ${item.description} (${group.name}). Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago.`,
+            title: 'Reminder:',
+            body: `Please collect ${formattedAmount} from ${borrowerName} for ${item.description} (${group.name}). Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago.`,
             item,
             group,
             amountCents: remaining,
@@ -257,14 +256,13 @@ export function evaluateDueReminders(
       if (daysDiff > 2) continue;
 
       const formattedAmount = formatMoney(remaining);
-      const formattedDate = formatDueDateReadable(item.dueDate);
 
       if (daysDiff === 0) {
         reminders.push({
           id: `peer_owe_${item.id}_${item.dueDate}`,
           type: 'peer_owe',
-          title: `Due Date Today: ${item.description}`,
-          body: `Please pay your share of ${formattedAmount} to ${group.name} today!`,
+          title: 'Reminder:',
+          body: `Please pay your share of ${formattedAmount} to ${group.name} for ${item.description} today!`,
           item,
           group,
           amountCents: remaining,
@@ -277,8 +275,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `peer_owe_${item.id}_${item.dueDate}`,
           type: 'peer_owe',
-          title: `Due Tomorrow: ${item.description}`,
-          body: `Your payment of ${formattedAmount} to ${group.name} is due tomorrow (${formattedDate}).`,
+          title: 'Reminder:',
+          body: `Please prepare ${formattedAmount} to ${group.name} for ${item.description} due tomorrow.`,
           item,
           group,
           amountCents: remaining,
@@ -291,8 +289,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `peer_owe_${item.id}_${item.dueDate}`,
           type: 'peer_owe',
-          title: `Due in 2 Days: ${item.description}`,
-          body: `Reminder: You have a payment of ${formattedAmount} to ${group.name} due on ${formattedDate}.`,
+          title: 'Reminder:',
+          body: `Please prepare ${formattedAmount} to ${group.name} for ${item.description} due in 2 days.`,
           item,
           group,
           amountCents: remaining,
@@ -306,8 +304,8 @@ export function evaluateDueReminders(
         reminders.push({
           id: `peer_owe_${item.id}_${item.dueDate}`,
           type: 'peer_owe',
-          title: `Overdue Payment: ${item.description}`,
-          body: `You have an overdue balance of ${formattedAmount} to ${group.name}. Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago.`,
+          title: 'Reminder:',
+          body: `Please pay your overdue balance of ${formattedAmount} to ${group.name} for ${item.description}. Was due ${lateDays} day${lateDays > 1 ? 's' : ''} ago.`,
           item,
           group,
           amountCents: remaining,
@@ -537,8 +535,8 @@ export async function sendInstantTestNotification(): Promise<boolean> {
     throw new Error('Notification permission was denied. Please allow notifications in your browser settings.');
   }
 
-  await showSystemNotification('Utang List Reminder Active!', {
-    body: 'Sample: Please pay your bill of ₱3,500 for PCX 160 (Sumisho) today!',
+  await showSystemNotification('Reminder:', {
+    body: 'Please pay your bill of ₱3,500 for PCX 160 (Sumisho) today!',
     tag: 'test_notification',
     data: { url: '/' },
   });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, LogOut, X } from 'lucide-react';
+import { Bell, LogOut, Smartphone, X } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { Avatar } from '../ui/Avatar';
 
@@ -7,9 +7,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onOpenReminders?: () => void;
+  onOpenAppIcon?: () => void;
 }
 
-export function ProfileMenu({ open, onClose, onOpenReminders }: Props) {
+export function ProfileMenu({ open, onClose, onOpenReminders, onOpenAppIcon }: Props) {
   const user = useUser();
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -87,6 +88,20 @@ export function ProfileMenu({ open, onClose, onOpenReminders }: Props) {
           >
             <Bell className="size-4 shrink-0 text-accent" strokeWidth={2.2} />
             <span>Due Reminders & Alerts</span>
+          </button>
+        )}
+
+        {onOpenAppIcon && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenAppIcon();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-semibold text-ink transition hover:bg-black/5 active:scale-[0.98]"
+          >
+            <Smartphone className="size-4 shrink-0 text-accent" strokeWidth={2.2} />
+            <span>Customize App Icon</span>
           </button>
         )}
 
