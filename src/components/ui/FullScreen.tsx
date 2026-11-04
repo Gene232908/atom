@@ -20,6 +20,7 @@ export function FullScreen({ label, onClose, children, zIndex = 'z-40' }: Props)
     const id = Symbol('fullscreen');
     stack.push(id);
     const unlock = lockScroll();
+    document.documentElement.style.backdropFilter = 'blur(8px)';
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || stack[stack.length - 1] !== id) return;
       if (document.querySelector('[role="dialog"]:not([data-fullscreen])')) return;
@@ -28,6 +29,7 @@ export function FullScreen({ label, onClose, children, zIndex = 'z-40' }: Props)
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      document.documentElement.style.backdropFilter = '';
       stack.splice(stack.indexOf(id), 1);
       unlock();
     };

@@ -31,12 +31,14 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
     if (!open) return;
     openedAt.current = Date.now();
     const unlock = lockScroll();
+    document.documentElement.style.backdropFilter = 'blur(8px)';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      document.documentElement.style.backdropFilter = '';
       unlock();
     };
   }, [open]);
