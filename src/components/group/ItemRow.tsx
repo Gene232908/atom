@@ -52,7 +52,9 @@ function ItemRowBase({ item, group, uid, focusUid, onOpen }: Props) {
       statusText = 'All paid';
       statusColor = 'text-ok-ink';
     } else if (waiting) {
-      statusText = 'Waiting confirmation';
+      // Show amount received when waiting for confirmation
+      const received = Object.values(item.shares).reduce((sum, s) => sum + (s.paidCents ?? 0), 0);
+      statusText = received > 0 ? `${formatMoney(received)} received, waiting` : 'Waiting confirmation';
       statusColor = 'text-warn-ink';
     } else {
       statusText = `${paid} of ${total} paid`;
