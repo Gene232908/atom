@@ -5,6 +5,8 @@ import { navigate } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
 import { firstName } from '../../lib/items';
 import { daysUntil, remainingFor, rowStatus } from '../../lib/itemStatus';
+import type { Transaction } from '../../lib/transactions';
+import { TransactionRow } from '../transactions/TransactionRow';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { EmptyState } from '../ui/EmptyState';
@@ -32,6 +34,9 @@ interface Props {
   onPay: (item: GroupItem) => void;
   onNewItem: () => void;
   onJoin: () => void;
+  transactions: Transaction[];
+  onOpenTx: (tx: Transaction) => void;
+  onViewAllTx: () => void;
 }
 
 function greeting(): string {
@@ -210,6 +215,29 @@ export function HomeDashboard(props: Props) {
                   );
                 })}
               </ul>
+            )}
+          </Panel>
+
+          <Panel
+            title="Recent transactions"
+            subtitle="Latest confirmed payments"
+            delay={110}
+            actions={
+              props.transactions.length > 0 && (
+                <button type="button" onClick={props.onViewAllTx} className="text-[13px] font-semibold text-accent hover:underline">
+                  View all
+                </button>
+              )
+            }
+          >
+            {props.transactions.length === 0 ? (
+              <p className="border-t border-hairline px-6 py-8 text-center text-[13px] text-muted">No payments yet.</p>
+            ) : (
+              <div className="divide-y divide-hairline border-t border-hairline">
+                {props.transactions.slice(0, 4).map((tx) => (
+                  <TransactionRow key={tx.key} tx={tx} roomy onClick={() => props.onOpenTx(tx)} />
+                ))}
+              </div>
             )}
           </Panel>
 

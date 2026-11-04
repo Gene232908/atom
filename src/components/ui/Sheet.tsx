@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { lockScroll } from '../../lib/scrollLock';
 
 interface Props {
   open: boolean;
@@ -12,7 +13,6 @@ interface Props {
   zIndex?: string;
 }
 
-let openSheets = 0;
 const CLOSE_DISTANCE = 110;
 
 /**
@@ -30,19 +30,14 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
   useEffect(() => {
     if (!open) return;
     openedAt.current = Date.now();
-    openSheets += 1;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
-      openSheets -= 1;
-      if (openSheets <= 0) {
-        openSheets = 0;
-        document.body.style.overflow = '';
-      }
+      unlock();
     };
   }, [open]);
 

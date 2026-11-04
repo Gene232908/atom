@@ -5,7 +5,8 @@ import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/m
 import { amountProgress, cleanRef, confirmedPaid, dueInfo, isItemDone, itemProgress } from '../../lib/items';
 import { recordPayment, rejectPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
-import type { Group, Item, PaymentRecord, ShareStatus } from '../../lib/types';
+import { confirmedHistory } from '../../lib/transactions';
+import type { Group, Item, ShareStatus } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { WalletCard } from '../ui/WalletCard';
@@ -42,26 +43,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   }, [item, uid, group.ownerId]);
 
   // Only payments the lender has confirmed. Waiting payments are shown on each person instead.
-  const history = useMemo(() => {
-    if (!item) return [];
-    const list: PaymentRecord[] = (item.payments ?? []).filter((p) => p && p.status === 'confirmed');
-    const withRecord = new Set(list.map((p) => p.uid));
-    for (const [pid, share] of Object.entries(item.shares ?? {})) {
-      // Older items marked paid before payment records existed
-      if (share?.status === 'paid' && pid !== group.ownerId && !withRecord.has(pid)) {
-        list.push({
-          id: `paid-${pid}`,
-          uid: pid,
-          payerName: group.members[pid]?.name ?? share.name ?? 'Borrower',
-          amountCents: share.paidCents && share.paidCents > 0 ? share.paidCents : item.splitCents,
-          refNumber: cleanRef(share.refNumber),
-          status: 'confirmed',
-          paidAt: share.updatedAt || item.updatedAt || 0,
-        });
-      }
-    }
-    return list.sort((a, b) => (b.paidAt || 0) - (a.paidAt || 0));
-  }, [item, group.members, group.ownerId]);
+  const history = useMemo(() => (item ? confirmedHistory(item, group) : []), [item, group]);
 
   if (!item) return null;
   const isOwner = group.ownerId === uid;

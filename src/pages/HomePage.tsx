@@ -32,6 +32,10 @@ import { MotionPrompt } from '../components/ui/MotionPrompt';
 import { HomeDashboard } from '../components/desktop/HomeDashboard';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 import { LAYOUT_KEY, PREF_KEY, getStoredLayout, getStoredPref } from '../lib/prefs';
+import { buildTransactions } from '../lib/transactions';
+import { RecentTransactions } from '../components/transactions/RecentTransactions';
+import { TransactionsScreen } from '../components/transactions/TransactionsScreen';
+import { TransactionDetail } from '../components/transactions/TransactionDetail';
 
 type Panel = 'create' | 'join' | null;
 
@@ -47,6 +51,8 @@ export function HomePage() {
   const [profileOpen, setProfileOpen] = useState(false);
   // Card the person pressed and held (shows Edit / Remove)
   const [heldId, setHeldId] = useState<string | null>(null);
+  const [txListOpen, setTxListOpen] = useState(false);
+  const [txKey, setTxKey] = useState<string | null>(null);
   const [defaultViewOpen, setDefaultViewOpen] = useState(false);
   const [pref, setPref] = useState<DefaultViewPref>(getStoredPref);
   const [cardLayout, setCardLayout] = useState<CardLayoutMode>(getStoredLayout);
@@ -98,6 +104,10 @@ export function HomePage() {
 
   // Live remaining balances, counting partial and confirmed payments
   const { youOwe, owedToYou } = useMemo(() => computeBalances(items, groups, user.uid), [items, groups, user.uid]);
+
+  // Confirmed payments received and sent, newest first
+  const transactions = useMemo(() => buildTransactions(items, user.uid), [items, user.uid]);
+  const activeTx = useMemo(() => transactions.find((t) => t.key === txKey) ?? null, [transactions, txKey]);
 
   // Automatically determine the initial tab on open/login
   useEffect(() => {
@@ -237,6 +247,9 @@ export function HomePage() {
           onPay={(it) => setPayingItemId(it.id)}
           onNewItem={() => setPanel('create')}
           onJoin={() => setPanel('join')}
+          transactions={transactions}
+          onOpenTx={(tx) => setTxKey(tx.key)}
+          onViewAllTx={() => setTxListOpen(true)}
         />
       ) : (
         <>
@@ -305,7 +318,7 @@ export function HomePage() {
 
               {/* My cards: each list is one card */}
               {(tab === 'lend' ? lendingGroups : owingGroups).length > 0 ? (
-                <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} />
+                <WalletCardsView groups={tab === 'lend' ? lendingGroups : owingGroups} uid={user.uid} mode={cardLayout} onHold={(g) => setHeldId(g.id)} items={items} />
               ) : tab === 'lend' ? (
                 <EmptyState
                   icon={<WalletCards className="size-7" />}
@@ -329,11 +342,32 @@ export function HomePage() {
                   }
                 />
               )}
+
+              {groups.length > 0 && (
+                <RecentTransactions
+                  transactions={transactions}
+                  onOpen={(tx) => setTxKey(tx.key)}
+                  onViewAll={() => setTxListOpen(true)}
+                />
+              )}
             </div>
           </div>
         )}
       </PageBody>
         </>
+      )}
+
+      {/* All transactions, then one transaction on top of it */}
+      {txListOpen && (
+        <TransactionsScreen transactions={transactions} onClose={() => setTxListOpen(false)} onOpen={(tx) => setTxKey(tx.key)} />
+      )}
+      {activeTx && (
+        <TransactionDetail
+          tx={activeTx}
+          uid={user.uid}
+          onClose={() => setTxKey(null)}
+          onOpenItem={() => setViewingItemId(activeTx.item.id)}
+        />
       )}
 
       {/* Item Details Sheet */}

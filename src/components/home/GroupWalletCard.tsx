@@ -9,7 +9,7 @@ import { WalletCard } from '../ui/WalletCard';
 import { AvatarStack } from '../ui/AvatarStack';
 
 /** One list shown as a loan card (exactly matching the user's approved layout) */
-export function GroupWalletCard({ group, uid, index }: { group: Group; uid: string; index: number }) {
+export function GroupWalletCard({ group, uid, index, itemsInGroup = [] }: { group: Group; uid: string; index: number; itemsInGroup?: any[] }) {
   const isOwner = group.ownerId === uid;
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
   const amount = isOwner ? sumOwed(group.totals) : (group.totals[uid] ?? 0);
@@ -20,6 +20,7 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
   const last4 = group.inviteCode.slice(-4) || '0000';
 
   const hasOtherMembers = people.length > 0;
+  const hasItems = itemsInGroup.length > 0;
 
   return (
     <button
@@ -39,14 +40,14 @@ export function GroupWalletCard({ group, uid, index }: { group: Group; uid: stri
             {group.name}
           </p>
           <p className="shrink-0 text-[17px] font-semibold text-white tabular-nums">
-            {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : 'Paid ✓'}
+            {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : hasOtherMembers && !hasItems ? 'Add items' : 'Paid ✓'}
           </p>
         </div>
 
         {isOwner ? (
           hasOtherMembers ? (
             <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
-              {amount > 0 ? 'Left to collect' : 'All debts settled'}
+              {amount > 0 ? 'Left to collect' : !hasItems ? 'Waiting for items' : 'All debts settled'}
             </p>
           ) : null
         ) : (
@@ -85,16 +86,19 @@ function HoldArea({ group, onHold, children }: { group: Group; onHold: OnHold; c
 }
 
 /** Stacked like Apple Wallet on phones, a neat grid on tablets and laptops */
-export function WalletStack({ groups, uid, onHold }: { groups: Group[]; uid: string; onHold?: OnHold }) {
+export function WalletStack({ groups, uid, onHold, items = [] }: { groups: Group[]; uid: string; onHold?: OnHold; items?: any[] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {groups.map((g, i) => (
-        <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[138px]' : ''}`} style={{ zIndex: i }}>
-          <HoldArea group={g} onHold={onHold}>
-            <GroupWalletCard group={g} uid={uid} index={i} />
-          </HoldArea>
-        </div>
-      ))}
+      {groups.map((g, i) => {
+        const groupItems = items.filter((it: any) => it.group?.id === g.id);
+        return (
+          <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[138px]' : ''}`} style={{ zIndex: i }}>
+            <HoldArea group={g} onHold={onHold}>
+              <GroupWalletCard group={g} uid={uid} index={i} itemsInGroup={groupItems} />
+            </HoldArea>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -104,10 +108,12 @@ function DeckCardItem({
   group,
   uid,
   isFront,
+  itemsInGroup = [],
 }: {
   group: Group;
   uid: string;
   isFront: boolean;
+  itemsInGroup?: any[];
 }) {
   const isOwner = group.ownerId === uid;
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
@@ -118,6 +124,7 @@ function DeckCardItem({
     .filter(Boolean);
   const last4 = group.inviteCode.slice(-4) || '0000';
   const hasOtherMembers = people.length > 0;
+  const hasItems = itemsInGroup.length > 0;
 
   return (
     <WalletCard
@@ -131,14 +138,14 @@ function DeckCardItem({
           {group.name}
         </p>
         <p className="shrink-0 text-[17px] font-semibold text-white tabular-nums">
-          {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : 'Paid ✓'}
+          {amount > 0 ? formatMoney(amount) : isOwner && !hasOtherMembers ? 'No members' : hasOtherMembers && !hasItems ? 'Add items' : 'Paid ✓'}
         </p>
       </div>
 
         {isOwner ? (
           hasOtherMembers ? (
             <p className="mt-0.5 truncate text-[12px] font-medium text-white/75">
-              {amount > 0 ? 'Left to collect' : 'All debts settled'}
+              {amount > 0 ? 'Left to collect' : !hasItems ? 'Waiting for items' : 'All debts settled'}
             </p>
           ) : null
         ) : (
@@ -163,7 +170,7 @@ function DeckCardItem({
 }
 
 /** 3D stacked card deck: cards behind peek out; swipe left/right flips & cycles seamlessly */
-export function SingleCardCarousel({ groups, uid, onHold }: { groups: Group[]; uid: string; onHold?: OnHold }) {
+export function SingleCardCarousel({ groups, uid, onHold, items = [] }: { groups: Group[]; uid: string; onHold?: OnHold; items?: any[] }) {
   const [current, setCurrent] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -315,6 +322,7 @@ export function SingleCardCarousel({ groups, uid, onHold }: { groups: Group[]; u
       <div className="relative mx-auto w-full max-w-[420px] h-[224px]">
         {groups.map((group, i) => {
           const rel = (i - activeIndex + total) % total;
+          const groupItems = items.filter((it: any) => it.group?.id === group.id);
 
           // Only render visible cards in stack: current, next 2 cards, and previous card
           const isVisible = rel === 0 || rel === 1 || rel === 2 || rel === total - 1;
@@ -398,7 +406,7 @@ export function SingleCardCarousel({ groups, uid, onHold }: { groups: Group[]; u
               }}
             >
               <HoldArea group={group} onHold={rel === 0 ? onHold : undefined}>
-                <DeckCardItem group={group} uid={uid} isFront={rel === 0} />
+                <DeckCardItem group={group} uid={uid} isFront={rel === 0} itemsInGroup={groupItems} />
               </HoldArea>
             </div>
           );
@@ -414,14 +422,16 @@ export function WalletCardsView({
   uid,
   mode = 'stack',
   onHold,
+  items = [],
 }: {
   groups: Group[];
   uid: string;
   mode?: 'stack' | 'single';
   onHold?: OnHold;
+  items?: any[];
 }) {
   if (mode === 'single') {
-    return <SingleCardCarousel groups={groups} uid={uid} onHold={onHold} />;
+    return <SingleCardCarousel groups={groups} uid={uid} onHold={onHold} items={items} />;
   }
-  return <WalletStack groups={groups} uid={uid} onHold={onHold} />;
+  return <WalletStack groups={groups} uid={uid} onHold={onHold} items={items} />;
 }
