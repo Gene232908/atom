@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy, Download, QrCode, ReceiptText, ShoppingBag } from 'lucide-react';
+import { Check, Download, QrCode, ReceiptText, ShoppingBag } from 'lucide-react';
 import { loadQr } from '../../services/groups';
-import { copyText } from '../../lib/clipboard';
 import { groupGradient, itemGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
 import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
@@ -10,6 +9,7 @@ import type { Group, Item } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
+import { CopyLines } from '../ui/CopyLines';
 import { WalletCard } from '../ui/WalletCard';
 
 interface Props {
@@ -29,7 +29,6 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
   const [qr, setQr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'GCash' | 'Maya' | 'Bank Transfer' | 'Cash'>('GCash');
   const [refNumber, setRefNumber] = useState('');
   const [note, setNote] = useState('');
@@ -74,12 +73,6 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
     };
   }, [open, group.id, group.hasQr]);
 
-  const copyNote = async () => {
-    if (await copyText(group.paymentNote)) {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2500);
-    }
-  };
 
   const customCents = toCents(customAmountInput) ?? 0;
   const isPartial = Boolean(item) && payMode === 'custom';
@@ -156,7 +149,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
               onClick={() => setPayMode('full')}
               className={`rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition active:scale-95 ${
                 payMode === 'full'
-                  ? 'bg-ink text-white shadow-sm'
+                  ? 'bg-accent/10 text-accent ring-1 ring-accent/40'
                   : 'bg-fill text-muted hover:text-ink'
               }`}
             >
@@ -173,7 +166,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
               }}
               className={`rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition active:scale-95 ${
                 payMode === 'custom'
-                  ? 'bg-ink text-white shadow-sm'
+                  ? 'bg-accent/10 text-accent ring-1 ring-accent/40'
                   : 'bg-fill text-muted hover:text-ink'
               }`}
             >
@@ -221,7 +214,7 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
               onClick={() => setPaymentMethod(method)}
               className={`rounded-full px-3 py-1 text-[12px] font-semibold transition active:scale-95 ${
                 paymentMethod === method
-                  ? 'bg-ink text-white shadow-sm'
+                  ? 'bg-accent/10 text-accent ring-1 ring-accent/40'
                   : 'bg-fill text-muted hover:text-ink'
               }`}
             >
@@ -264,18 +257,8 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
 
       {group.paymentNote && (
         <div className="mt-4 rounded-[20px] bg-white p-4">
-          <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-[13px] font-medium text-muted">Payment details</p>
-            <button
-              type="button"
-              onClick={copyNote}
-              className="inline-flex h-7 items-center gap-1 rounded-full bg-fill px-2.5 text-[12px] font-semibold text-accent"
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <p className="mt-1 text-[14px] font-semibold wrap-break-word whitespace-pre-wrap">{group.paymentNote}</p>
+          <p className="mb-1.5 text-[11px] font-medium text-muted">Payment details</p>
+          <CopyLines text={group.paymentNote} />
         </div>
       )}
 

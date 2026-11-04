@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { KeyRound, LayoutDashboard, LogOut, Plus } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { useGroups } from '../../hooks/useGroups';
 import { navigate, type Route } from '../../hooks/useRoute';
-import { groupGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
-import { sumOwed } from '../../lib/items';
+import { computeTotals, sumOwed } from '../../lib/items';
+import { useAllItems, type GroupItem } from '../../hooks/useAllItems';
 import type { Group } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { CreateGroupSheet } from '../home/CreateGroupSheet';
@@ -17,7 +17,14 @@ const SIDEBAR = 'w-[260px]';
 export function DesktopShell({ route, children }: { route: Route; children: ReactNode }) {
   const user = useUser();
   const { signOut } = useAuth();
-  const { groups } = useGroups();
+  const { groups: savedGroups } = useGroups();
+  // Same live listeners as the overview (Firebase shares them), so balances are always current.
+  const { items } = useAllItems(savedGroups);
+  const groups = useMemo(() => {
+    const byGroup = new Map<string, GroupItem[]>();
+    for (const it of items) byGroup.set(it.group.id, [...(byGroup.get(it.group.id) ?? []), it]);
+    return savedGroups.map((g) => (byGroup.has(g.id) ? { ...g, totals: computeTotals(byGroup.get(g.id)!, g.ownerId) } : g));
+  }, [savedGroups, items]);
   const [panel, setPanel] = useState<'create' | 'join' | null>(null);
   const name = user.displayName || user.email || 'You';
 
@@ -95,10 +102,10 @@ function SideLink({
       type="button"
       onClick={onClick}
       className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition ${
-        active ? 'bg-ink text-white' : 'text-ink/80 hover:bg-fill'
+        active ? 'bg-accent/10 text-accent font-semibold' : 'text-ink/80 hover:bg-fill'
       }`}
     >
-      <span className={active ? 'text-white' : 'text-muted'}>{icon}</span>
+      <span className={active ? 'text-accent' : 'text-muted'}>{icon}</span>
       <span className="truncate">{children}</span>
     </button>
   );
@@ -108,7 +115,7 @@ function ListGroup({ title, groups, uid, activeId }: { title: string; groups: Gr
   if (groups.length === 0) return null;
   return (
     <div className="mt-3">
-      <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</p>
+      <p className="px-3 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">{title}</p>
       <div className="space-y-0.5">
         {groups.map((g) => {
           const isOwner = g.ownerId === uid;
@@ -120,11 +127,10 @@ function ListGroup({ title, groups, uid, activeId }: { title: string; groups: Gr
               type="button"
               onClick={() => navigate(`/g/${g.id}`)}
               className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left transition ${
-                active ? 'bg-fill' : 'hover:bg-fill/70'
+                active ? 'bg-accent/10' : 'hover:bg-fill/70'
               }`}
             >
-              <span className="size-3 shrink-0 rounded-[4px]" style={{ backgroundImage: groupGradient(g) }} />
-              <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? 'font-semibold text-ink' : 'font-medium text-ink/80'}`}>
+              <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? 'font-semibold text-accent' : 'font-medium text-ink/80'}`}>
                 {g.name}
               </span>
               <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${amount > 0 ? (isOwner ? 'text-ok-ink' : 'text-bad-ink') : 'text-muted/60'}`}>

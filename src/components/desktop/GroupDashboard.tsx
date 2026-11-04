@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  CalendarClock,
   Check,
   ChevronRight,
-  Clock,
   Copy,
   LogOut,
   Plus,
@@ -16,7 +12,6 @@ import {
 } from 'lucide-react';
 import { navigate, inviteLink } from '../../hooks/useRoute';
 import { copyText } from '../../lib/clipboard';
-import { groupGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
 import { firstName, type ItemFilter } from '../../lib/items';
 import { remainingFor, shortDue } from '../../lib/itemStatus';
@@ -26,9 +21,9 @@ import { Avatar } from '../ui/Avatar';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBanner } from '../ui/ErrorBanner';
 import { Skeleton } from '../ui/Skeleton';
-import { FilterBar } from '../group/FilterBar';
+import { CopyLines } from '../ui/CopyLines';
 import { ItemTable } from './ItemTable';
-import { Panel, StatTile } from './Panel';
+import { Panel, Segmented, StatStrip } from './Panel';
 
 export interface GroupDashboardProps {
   group: Group;
@@ -90,9 +85,8 @@ export function GroupDashboard(p: GroupDashboardProps) {
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="size-12 shrink-0 rounded-2xl shadow-sm" style={{ backgroundImage: groupGradient(group) }} />
           <div className="min-w-0">
-            <h1 className="truncate text-[28px] leading-tight font-bold tracking-tight">{group.name}</h1>
+            <h1 className="truncate text-[26px] leading-tight font-semibold tracking-tight text-ink">{group.name}</h1>
             <p className="truncate text-[13px] text-muted">
               {isOwner ? 'You lend' : `${owner?.name ?? 'Lender'} lends`} · {members.length} {members.length === 1 ? 'person' : 'people'} · {items.length} {items.length === 1 ? 'item' : 'items'}
             </p>
@@ -101,10 +95,10 @@ export function GroupDashboard(p: GroupDashboardProps) {
         <div className="flex gap-2">
           {isOwner ? (
             <>
-              <Button variant="white" className="ring-1 ring-hairline" icon={<Settings className="size-4" />} onClick={p.onSettings}>
+              <Button variant="white" className="ring-1 ring-black/[0.08]" icon={<Settings className="size-4" />} onClick={p.onSettings}>
                 Settings
               </Button>
-              <Button variant="white" className="ring-1 ring-hairline" icon={<UserPlus className="size-4" />} onClick={p.onInvite}>
+              <Button variant="white" className="ring-1 ring-black/[0.08]" icon={<UserPlus className="size-4" />} onClick={p.onInvite}>
                 Invite
               </Button>
               <Button icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={p.onAdd}>
@@ -113,7 +107,7 @@ export function GroupDashboard(p: GroupDashboardProps) {
             </>
           ) : (
             <>
-              <Button variant="white" className="ring-1 ring-hairline" icon={<LogOut className="size-4" />} onClick={p.onLeave}>
+              <Button variant="white" className="ring-1 ring-black/[0.08]" icon={<LogOut className="size-4" />} onClick={p.onLeave}>
                 Leave list
               </Button>
               {p.myUnpaidTotal > 0 && <Button onClick={p.onPayAll}>Pay total {formatMoney(p.myUnpaidTotal)}</Button>}
@@ -122,22 +116,24 @@ export function GroupDashboard(p: GroupDashboardProps) {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
-        {isOwner ? (
-          <>
-            <StatTile label="Still owed to you" value={formatMoney(owed)} hint={`From ${members.filter((m) => m.owes > 0).length} people`} tone="ok" icon={<ArrowDownLeft className="size-4" strokeWidth={2.5} />} />
-            <StatTile label="Collected" value={formatMoney(collected)} hint="Confirmed payments" tone="accent" icon={<Check className="size-4" strokeWidth={2.5} />} />
-            <StatTile label="To confirm" value={String(p.waitingCount)} hint={p.waitingCount ? 'Tap to review' : 'Nothing to check'} tone="warn" icon={<Clock className="size-4" />} onClick={p.waitingCount ? p.onShowWaiting : undefined} />
-            <StatTile label="Items fully paid" value={`${doneCount} / ${items.length}`} hint={nextDueInfo ? `Next: ${nextDueInfo.text}` : 'No due dates'} tone="muted" icon={<ReceiptText className="size-4" />} />
-          </>
-        ) : (
-          <>
-            <StatTile label={`You owe ${ownerName}`} value={formatMoney(me?.owes ?? 0)} hint="Remaining balance" tone="bad" icon={<ArrowUpRight className="size-4" strokeWidth={2.5} />} />
-            <StatTile label="You paid" value={formatMoney(me?.paid ?? 0)} hint="Confirmed by the lender" tone="ok" icon={<Check className="size-4" strokeWidth={2.5} />} />
-            <StatTile label="Waiting" value={formatMoney(me?.waiting ?? 0)} hint="Sent, not yet confirmed" tone="warn" icon={<Clock className="size-4" />} />
-            <StatTile label="Next due" value={nextDue ? formatMoney(remainingFor(nextDue, uid)) : '—'} hint={nextDueInfo ? `${nextDueInfo.text} · ${nextDue?.description}` : 'No due dates'} tone="accent" icon={<CalendarClock className="size-4" />} />
-          </>
-        )}
+      <div className="mt-6">
+        <StatStrip
+          items={
+            isOwner
+              ? [
+                  { label: 'Still owed to you', value: formatMoney(owed), hint: `From ${members.filter((m) => m.owes > 0).length} people`, tone: owed > 0 ? 'ok' : 'muted' },
+                  { label: 'Collected', value: formatMoney(collected), hint: 'Confirmed payments', tone: 'muted' },
+                  { label: 'To confirm', value: String(p.waitingCount), hint: p.waitingCount ? 'Click to review' : 'Nothing to check', tone: p.waitingCount ? 'warn' : 'muted', onClick: p.waitingCount ? p.onShowWaiting : undefined },
+                  { label: 'Fully paid', value: `${doneCount} of ${items.length}`, hint: nextDueInfo ? `Next: ${nextDueInfo.text}` : 'No due dates', tone: 'muted' },
+                ]
+              : [
+                  { label: `You owe ${ownerName}`, value: formatMoney(me?.owes ?? 0), hint: 'Remaining balance', tone: (me?.owes ?? 0) > 0 ? 'bad' : 'muted' },
+                  { label: 'You paid', value: formatMoney(me?.paid ?? 0), hint: 'Confirmed by the lender', tone: 'muted' },
+                  { label: 'Waiting', value: formatMoney(me?.waiting ?? 0), hint: 'Sent, not yet confirmed', tone: (me?.waiting ?? 0) > 0 ? 'warn' : 'muted' },
+                  { label: 'Next due', value: nextDue ? formatMoney(remainingFor(nextDue, uid)) : '—', hint: nextDueInfo ? `${nextDueInfo.text} · ${nextDue?.description}` : 'No due dates', tone: nextDueInfo?.tone === 'red' ? 'bad' : 'muted' },
+                ]
+          }
+        />
       </div>
 
       {p.error && <div className="mt-6"><ErrorBanner message={p.error} onRetry={p.onRetry} /></div>}
@@ -145,14 +141,32 @@ export function GroupDashboard(p: GroupDashboardProps) {
       <div className="mt-6 grid items-start gap-6 2xl:grid-cols-12">
         <Panel className="2xl:col-span-8" title="Items" subtitle={isOwner ? 'Everything people owe you in this list' : 'Your share is shown for each item'}>
           {items.length > 0 && (
-            <div className="border-b border-hairline px-5 py-3">
-              <div className="max-w-md">
-                <FilterBar filter={p.filter} counts={p.counts} showWaiting={isOwner} onChange={p.onFilter} personName={p.focusName} onClearPerson={p.onClearFocus} />
+            <div className="px-6 pb-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Segmented
+                  value={p.filter}
+                  onChange={p.onFilter}
+                  options={[
+                    { key: 'all', label: 'All', count: p.counts.all },
+                    { key: 'unpaid', label: 'Unpaid', count: p.counts.unpaid },
+                    ...(isOwner ? [{ key: 'waiting' as ItemFilter, label: 'To confirm', count: p.counts.waiting }] : []),
+                    { key: 'paid', label: 'Paid', count: p.counts.paid },
+                  ]}
+                />
+                {p.focusName !== null && (
+                  <button
+                    type="button"
+                    onClick={p.onClearFocus}
+                    className="h-8 rounded-lg bg-fill px-3 text-[12px] font-medium text-ink transition hover:bg-fill-strong"
+                  >
+                    {p.focusName === '' ? 'Your items' : `${p.focusName}'s items`} ✕
+                  </button>
+                )}
               </div>
             </div>
           )}
           {p.loading ? (
-            <div className="space-y-3 p-5">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="space-y-3 border-t border-hairline p-6">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : (
             <ItemTable
               rows={p.visible.map((item) => ({ item, group }))}
@@ -174,14 +188,14 @@ export function GroupDashboard(p: GroupDashboardProps) {
         </Panel>
 
         <div className="grid items-start gap-6 lg:grid-cols-2 2xl:col-span-4 2xl:grid-cols-1">
-          <Panel title="People" subtitle={`${people.length} in this list`} actions={isOwner ? <Button size="sm" variant="secondary" icon={<UserPlus className="size-3.5" />} onClick={p.onInvite}>Invite</Button> : undefined}>
-            <ul className="divide-y divide-hairline">
+          <Panel delay={80} title="People" subtitle={`${people.length} in this list`} actions={isOwner ? <Button size="sm" variant="secondary" icon={<UserPlus className="size-3.5" />} onClick={p.onInvite}>Invite</Button> : undefined}>
+            <ul className="divide-y divide-hairline border-t border-hairline">
               {people.map((person) => {
                 const total = person.owes + person.paid;
                 const pct = total > 0 ? Math.round((person.paid / total) * 100) : 100;
                 return (
                   <li key={person.uid}>
-                    <button type="button" onClick={() => p.onOpenPerson(person.uid)} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-canvas/70">
+                    <button type="button" onClick={() => p.onOpenPerson(person.uid)} className="flex w-full items-center gap-3 px-6 py-3 text-left transition hover:bg-canvas/70">
                       <Avatar name={person.name} photo={person.photo} size="sm" />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
@@ -226,10 +240,10 @@ function PaymentPanel({ group, isOwner, owed, onPay, onEdit }: { group: Group; i
   };
 
   return (
-    <Panel title="Payment details" actions={isOwner ? <Button size="sm" variant="secondary" onClick={onEdit}>Edit</Button> : undefined}>
-      <div className="space-y-4 px-5 py-4">
+    <Panel delay={140} title="Payment details" actions={isOwner ? <Button size="sm" variant="secondary" onClick={onEdit}>Edit</Button> : undefined}>
+      <div className="space-y-4 border-t border-hairline px-6 py-4">
         {group.paymentNote ? (
-          <p className="text-[14px] font-medium whitespace-pre-wrap text-ink">{group.paymentNote}</p>
+          <CopyLines text={group.paymentNote} />
         ) : (
           <p className="text-[13px] text-muted">{isOwner ? 'Add your GCash, Maya or bank details so people know where to pay.' : 'The lender has not added payment details yet.'}</p>
         )}
@@ -247,7 +261,7 @@ function PaymentPanel({ group, isOwner, owed, onPay, onEdit }: { group: Group; i
               <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Invite code</p>
               <p className="font-mono text-[17px] font-semibold tracking-[0.18em]">{group.inviteCode}</p>
             </div>
-            <Button size="sm" variant="white" className="ring-1 ring-hairline" icon={copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={copy}>
+            <Button size="sm" variant="white" className="ring-1 ring-black/[0.08]" icon={copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={copy}>
               {copied ? 'Copied' : 'Copy link'}
             </Button>
           </div>

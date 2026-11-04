@@ -82,7 +82,7 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
                     setError('');
                   }}
                   className={`h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition active:scale-95 ${
-                    on ? 'bg-ink text-white' : 'bg-white text-ink ring-1 ring-hairline'
+                    on ? 'bg-accent/10 text-accent ring-1 ring-accent/40' : 'bg-white text-ink ring-1 ring-hairline'
                   }`}
                 >
                   {s}

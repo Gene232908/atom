@@ -20,7 +20,7 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
         >
           <span
             className={`relative grid size-14 place-items-center rounded-full transition ${
-              a.highlight ? 'bg-ink text-white' : 'bg-white text-ink group-hover:bg-white/70'
+              a.highlight ? 'bg-accent/10 text-accent ring-1 ring-accent/40' : 'bg-white text-ink group-hover:bg-white/70'
             }`}
           >
             {a.icon}

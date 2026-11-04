@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { itemGradient } from '../../lib/cardTheme';
 import { formatMoney } from '../../lib/money';
 import { rowStatus, shortDue } from '../../lib/itemStatus';
 import type { Group, Item } from '../../lib/types';
@@ -15,7 +14,7 @@ interface Props {
   rows: TableRow[];
   uid: string;
   focusUid?: string | null;
-  /** Show which list each item belongs to (home dashboard). */
+  /** Show which card each item belongs to (overview page). */
   showList?: boolean;
   amountLabel: string;
   onOpen: (row: TableRow) => void;
@@ -23,37 +22,36 @@ interface Props {
   empty?: ReactNode;
 }
 
-const COLS = 'grid grid-cols-[minmax(0,1fr)_96px_112px_112px_52px] items-center gap-3 xl:gap-4';
-
-const DUE_TONE = { red: 'text-bad-ink font-semibold', amber: 'text-warn-ink font-semibold', slate: 'text-muted' };
+const COLS = 'grid grid-cols-[minmax(0,1fr)_110px_120px_120px_56px] items-center gap-4';
+const DUE_TONE = { red: 'text-bad-ink', amber: 'text-warn-ink', slate: 'text-muted' };
 
 /** Clean transactions table for laptops and PCs. */
 export function ItemTable({ rows, uid, focusUid = null, showList = false, amountLabel, onOpen, onPay, empty }: Props) {
-  if (rows.length === 0) return <div className="px-5 py-12">{empty}</div>;
+  if (rows.length === 0) return <div className="border-t border-hairline px-6 py-12">{empty}</div>;
 
   return (
-    <div role="table" className="min-w-0">
-      <div role="row" className={`${COLS} border-b border-hairline bg-canvas/60 px-5 py-2.5 text-[11px] font-semibold tracking-wide text-muted uppercase`}>
+    <div role="table" className="min-w-0 border-t border-hairline">
+      <div role="row" className={`${COLS} px-6 py-3 text-[12px] font-medium text-muted`}>
         <span>Item</span>
         <span>Due</span>
         <span className="text-right">{amountLabel}</span>
         <span className="text-right">Status</span>
         <span />
       </div>
-      <div className="divide-y divide-hairline">
+      <div className="divide-y divide-hairline border-t border-hairline">
         {rows.map((row) => {
           const { item, group } = row;
           const st = rowStatus(item, group.ownerId, uid, focusUid);
           const due = shortDue(item.dueDate, st.done);
           const store = (item.store || '').trim();
           const sub = [
-            store,
-            showList ? group.name : '',
-            item.installmentsCount && item.installmentsCount > 1 ? `${item.installmentsCount} mos` : '',
+            showList ? group.name : store,
+            showList && store && store.toLowerCase() !== group.name.toLowerCase() ? store : '',
+            item.installmentsCount && item.installmentsCount > 1 ? `${item.installmentsCount} months` : '',
           ]
             .filter(Boolean)
             .join(' · ');
-          const canPay = Boolean(onPay) && group.ownerId !== uid && item.shares?.[uid] && item.shares[uid].status === 'unpaid';
+          const canPay = Boolean(onPay) && group.ownerId !== uid && item.shares?.[uid]?.status === 'unpaid';
 
           return (
             <div
@@ -64,24 +62,15 @@ export function ItemTable({ rows, uid, focusUid = null, showList = false, amount
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onOpen(row);
               }}
-              className={`${COLS} cursor-pointer px-5 py-3 outline-none transition hover:bg-canvas/70 focus-visible:bg-canvas`}
+              className={`${COLS} group cursor-pointer px-6 py-3.5 outline-none transition hover:bg-canvas/70 focus-visible:bg-canvas`}
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <span
-                  className={`grid size-10 shrink-0 place-items-center rounded-xl text-[14px] font-bold text-white shadow-sm ${st.done ? 'opacity-60' : ''}`}
-                  style={{ backgroundImage: itemGradient(item, group) }}
-                  aria-hidden
-                >
-                  {(store || group.name || item.description || '?').charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-[14px] font-semibold text-ink">{item.description}</p>
-                  <p className="truncate text-[12px] text-muted">{sub || 'No store set'}</p>
-                </div>
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-medium text-ink">{item.description}</p>
+                {sub && <p className="truncate text-[12px] text-muted">{sub}</p>}
               </div>
-              <span className={`truncate text-[13px] ${due ? DUE_TONE[due.tone] : 'text-muted/60'}`}>{due ? due.text : '—'}</span>
-              <span className={`truncate text-right text-[14px] font-semibold tabular-nums ${st.done ? 'text-muted' : 'text-ink'}`}>
-                {formatMoney(st.amount)}
+              <span className={`truncate text-[13px] ${due ? DUE_TONE[due.tone] : 'text-muted/50'}`}>{due ? due.text : '—'}</span>
+              <span className={`truncate text-right text-[14px] tabular-nums ${st.done ? 'text-muted/60' : 'font-medium text-ink'}`}>
+                {st.done ? '—' : formatMoney(st.amount)}
               </span>
               <span className="flex justify-end">
                 <StatusPill label={st.label} tone={st.tone} />
@@ -94,12 +83,12 @@ export function ItemTable({ rows, uid, focusUid = null, showList = false, amount
                       e.stopPropagation();
                       onPay?.(row);
                     }}
-                    className="h-8 rounded-full bg-ink px-3.5 text-[12px] font-semibold text-white transition hover:bg-black active:scale-95"
+                    className="h-7 rounded-lg bg-accent/10 px-3 text-[12px] font-semibold text-accent transition hover:bg-accent/15 active:scale-95"
                   >
                     Pay
                   </button>
                 ) : (
-                  <ChevronRight className="size-4 text-muted/50" strokeWidth={2.5} />
+                  <ChevronRight className="size-4 text-muted/40 transition group-hover:translate-x-0.5 group-hover:text-muted" />
                 )}
               </span>
             </div>

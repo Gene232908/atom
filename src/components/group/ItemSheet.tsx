@@ -114,7 +114,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
           </Button>
         ) : canPay ? (
           <Button size="lg" full onClick={() => onPay(item)}>
-            Pay {formatMoney(myLeft)}
+            Pay
           </Button>
         ) : undefined
       }

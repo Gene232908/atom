@@ -319,7 +319,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     }}
                     className={`rounded-full px-3 py-1 text-[12px] font-semibold transition active:scale-95 ${
                       installmentsCount === n
-                        ? 'bg-ink text-white shadow-sm'
+                        ? 'bg-accent/10 text-accent ring-1 ring-accent/40'
                         : 'bg-fill text-muted hover:text-ink'
                     }`}
                   >

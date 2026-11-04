@@ -33,7 +33,7 @@ export function LendOweToggle({
             {o.count > 0 && (
               <span
                 className={`grid min-w-[18px] h-[18px] place-items-center rounded-full px-1 text-[11px] font-bold ${
-                  on ? 'bg-ink text-white' : 'bg-black/10 text-muted'
+                  on ? 'bg-accent/15 text-accent' : 'bg-black/10 text-muted'
                 }`}
               >
                 {o.count}
