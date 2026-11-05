@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Bell,
   BellOff,
   CheckCircle2,
   ChevronRight,
@@ -65,56 +64,36 @@ export function DueRemindersSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Due Reminders">
       <div className="space-y-4">
-        {/* Notification Permission Card */}
-        <div className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-black/[0.06]">
-          <div className="flex items-start gap-3">
-            <div
-              className={`grid size-10 shrink-0 place-items-center rounded-full ${
-                permission === 'granted'
-                  ? 'bg-emerald-500/10 text-emerald-600'
-                  : 'bg-amber-500/10 text-amber-600'
-              }`}
-            >
-              {permission === 'granted' ? (
-                <Bell className="size-5" />
-              ) : (
-                <BellOff className="size-5" />
-              )}
+        {/* Compact Online Status UI */}
+        {permission === 'granted' ? (
+          <div className="flex items-center justify-between rounded-[16px] bg-white px-3.5 py-2.5 shadow-xs ring-1 ring-black/[0.06]">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="relative flex size-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+              </span>
+              <span className="truncate text-[13px] font-bold text-ink">Push Alerts Active</span>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-[15px] font-semibold text-ink">
-                  {permission === 'granted' ? 'Push Alerts Active' : 'Automatic Reminders'}
-                </p>
-                {permission === 'granted' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Active
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
-                {permission === 'granted'
-                  ? 'You will receive push reminders 2 days before, 1 day before, on due dates, and daily follow-ups if unpaid.'
-                  : 'Get notified 2 days before, on due dates, and daily if unpaid so you never miss a payment or collection.'}
-              </p>
-            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+              Online ✓
+            </span>
           </div>
-
-          {permission !== 'granted' && supported && (
-            <div className="mt-3 pt-1 border-t border-hairline">
-              <Button
-                size="sm"
-                variant="primary"
-                className="w-full"
-                disabled={enabling}
-                onClick={handleEnableNotifications}
-              >
-                {enabling ? 'Enabling...' : 'Turn on Push Alerts'}
-              </Button>
+        ) : supported ? (
+          <div className="flex items-center justify-between gap-3 rounded-[16px] bg-white px-3.5 py-2.5 shadow-xs ring-1 ring-black/[0.06]">
+            <div className="flex items-center gap-2 min-w-0">
+              <BellOff className="size-4 shrink-0 text-amber-500" />
+              <span className="truncate text-[13px] font-semibold text-ink">Push alerts off</span>
             </div>
-          )}
-        </div>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={enabling}
+              onClick={handleEnableNotifications}
+            >
+              {enabling ? 'Enabling...' : 'Turn on'}
+            </Button>
+          </div>
+        ) : null}
 
         {/* Reminders List */}
         {reminders.length === 0 ? (

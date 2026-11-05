@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Pencil,
   Plus,
   ReceiptText,
+  Settings,
   Trash2,
 } from 'lucide-react';
 import { storeGradient } from '../../lib/cardTheme';
@@ -34,6 +35,19 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [gearMenuOpen, setGearMenuOpen] = useState(false);
+  const gearRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!gearMenuOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (gearRef.current && !gearRef.current.contains(e.target as Node)) {
+        setGearMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onClickOutside);
+    return () => window.removeEventListener('mousedown', onClickOutside);
+  }, [gearMenuOpen]);
 
   const provider = group.name || item.store || 'Personal Loan';
   const payments = stats.confirmedPayments;
@@ -58,15 +72,51 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
         title={item.description}
         description={`Personal Loan · ${provider}`}
         headerAction={
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            aria-label="Delete loan"
-            title="Delete loan"
-            className="grid size-8 place-items-center rounded-full bg-fill text-muted/70 transition hover:bg-bad/10 hover:text-bad active:scale-90"
-          >
-            <Trash2 className="size-4" strokeWidth={2.2} />
-          </button>
+          <div className="relative" ref={gearRef}>
+            <button
+              type="button"
+              onClick={() => setGearMenuOpen((v) => !v)}
+              aria-label="Loan options"
+              title="Loan options"
+              className={`grid size-8 place-items-center rounded-full transition active:scale-90 ${
+                gearMenuOpen
+                  ? 'bg-ink text-white'
+                  : 'bg-fill text-muted hover:bg-black/5 hover:text-ink'
+              }`}
+            >
+              <Settings className="size-4" strokeWidth={2.2} />
+            </button>
+
+            {gearMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-44 origin-top-right overflow-hidden rounded-[20px] bg-white/95 p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.16)] ring-1 ring-black/[0.08] backdrop-blur-xl animate-pop z-30 select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGearMenuOpen(false);
+                    setEditOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2 text-left text-[13px] font-medium text-ink hover:bg-black/[0.04] transition active:scale-[0.98]"
+                >
+                  <Pencil className="size-3.5 text-accent" strokeWidth={2.2} />
+                  <span>Edit details</span>
+                </button>
+
+                <div className="my-1 h-px bg-black/[0.06] mx-1.5" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGearMenuOpen(false);
+                    setConfirmDelete(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2 text-left text-[13px] font-medium text-bad hover:bg-bad/8 transition active:scale-[0.98]"
+                >
+                  <Trash2 className="size-3.5" strokeWidth={2.2} />
+                  <span>Delete loan</span>
+                </button>
+              </div>
+            )}
+          </div>
         }
         footer={
           !stats.isFullyPaid ? (
@@ -132,31 +182,32 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
           </WalletCard>
 
           {/* Key Loan Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Total Loan</p>
-              <p className="mt-1 text-[15px] font-semibold text-ink tabular-nums">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="rounded-[16px] bg-fill p-3 ring-1 ring-hairline/80">
+              <p className="text-[10.5px] font-bold text-muted uppercase tracking-wider">Total Loan</p>
+              <p className="mt-1 text-[15.5px] font-bold text-ink tabular-nums">
                 {formatMoney(stats.totalPriceCents)}
               </p>
             </div>
 
-            <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Paid so far</p>
-              <p className="mt-1 text-[15px] font-semibold text-ok tabular-nums">
+            {/* Paid so far: high contrast, modern emerald design */}
+            <div className="rounded-[16px] bg-emerald-500/10 p-3 ring-1 ring-emerald-500/25">
+              <p className="text-[10.5px] font-bold text-emerald-800 uppercase tracking-wider">Paid so far</p>
+              <p className="mt-1 text-[16px] font-extrabold text-emerald-950 tabular-nums">
                 {formatMoney(stats.totalPaidCents)}
               </p>
             </div>
 
-            <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Monthly Bill</p>
-              <p className="mt-1 text-[15px] font-semibold text-ink tabular-nums">
+            <div className="rounded-[16px] bg-fill p-3 ring-1 ring-hairline/80">
+              <p className="text-[10.5px] font-bold text-muted uppercase tracking-wider">Monthly Bill</p>
+              <p className="mt-1 text-[15.5px] font-bold text-ink tabular-nums">
                 {formatMoney(stats.monthlyCents)}
               </p>
             </div>
 
-            <div className="rounded-[14px] bg-fill p-3 ring-1 ring-hairline/80">
-              <p className="text-[10px] font-medium text-muted uppercase tracking-wider">Next Bill Due</p>
-              <p className="mt-1 text-[13px] font-semibold text-accent truncate">
+            <div className="rounded-[16px] bg-fill p-3 ring-1 ring-hairline/80">
+              <p className="text-[10.5px] font-bold text-muted uppercase tracking-wider">Next Bill Due</p>
+              <p className="mt-1 text-[13.5px] font-bold text-accent truncate">
                 {stats.isFullyPaid ? 'Done ✓' : formatDueDateReadable(stats.nextDueDate || item.dueDate)}
               </p>
             </div>
@@ -266,18 +317,6 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
                 })}
               </div>
             )}
-          </div>
-
-          {/* Actions: Edit Loan details */}
-          <div className="pt-4 pb-1 flex items-center justify-center border-t border-hairline">
-            <button
-              type="button"
-              onClick={() => setEditOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-accent/8 px-4 py-2 text-[13px] font-semibold text-accent hover:bg-accent/15 transition active:scale-95"
-            >
-              <Pencil className="size-3.5" />
-              <span>Edit loan details</span>
-            </button>
           </div>
         </div>
       </Sheet>

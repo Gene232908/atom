@@ -102,7 +102,7 @@ export function LoanWalletCard({ group, item, index = 0, onOpen, interactive = t
                   ? `All ${stats.totalTerms} months paid in full ✓`
                   : `${stats.currentPaidTerms} of ${stats.totalTerms} months paid (${stats.progressPercent}%)`}
               </span>
-              <span className="shrink-0 ml-1.5 font-semibold text-white">
+              <span className="shrink-0 ml-1.5 rounded-full bg-black/25 px-2 py-0.5 text-[10.5px] sm:text-[11.5px] font-bold text-white shadow-xs backdrop-blur">
                 {formatMoney(stats.totalPaidCents)} paid
               </span>
             </div>

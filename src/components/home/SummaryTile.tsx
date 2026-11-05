@@ -24,7 +24,7 @@ export function SummaryTile({
           >
             <Icon className="size-3.5 sm:size-4" strokeWidth={2.5} />
           </span>
-          <p className="truncate text-[12px] sm:text-[13px] font-semibold text-muted">{label}</p>
+          <p className="truncate text-[12.5px] sm:text-[13.5px] font-bold text-ink/85">{label}</p>
         </div>
         {sublabel && (
           <span className="shrink-0 text-[11px] sm:text-[11px] font-medium text-muted/70 lowercase">
