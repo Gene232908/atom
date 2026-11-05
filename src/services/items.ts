@@ -114,7 +114,8 @@ export async function addItem(groupId: string, input: ItemInput): Promise<string
   if (!input.isPersonalLoan) {
     const desc = String(data.description);
     for (const uid of Object.keys(input.shares)) {
-      notify(uid, groupId, `item_${docRef.id}`, 'New item added', `${desc}: you owe ${formatMoney(Math.round(input.splitCents))}.`);
+      const shareOwed = input.shares[uid]?.splitCents ?? input.splitCents;
+      notify(uid, groupId, `item_${docRef.id}`, 'New item added', `${desc}: you owe ${formatMoney(Math.round(shareOwed))}.`);
     }
   }
   return docRef.id;

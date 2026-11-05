@@ -333,11 +333,23 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                 className="h-6 rounded-full bg-white/20 px-2.5 text-[11px] font-semibold backdrop-blur transition active:scale-95 hover:bg-white/30"
                 onClick={() => {
                   if (splitMode === 'equal') {
-                    // Switching to custom: pre-fill member amounts with even split or existing
+                    // Switching to custom: pre-fill member amounts with exact distribution if empty
+                    const count = selected.size;
                     const newAmts: Record<string, string> = { ...memberAmounts };
+                    let hasAny = false;
                     for (const uid of selected) {
-                      if (!newAmts[uid] || newAmts[uid] === '0.00' || newAmts[uid] === '0') {
-                        newAmts[uid] = centsToInput(autoSplit);
+                      if (newAmts[uid] && (toCents(newAmts[uid]) ?? 0) > 0) {
+                        hasAny = true;
+                        break;
+                      }
+                    }
+                    if (!hasAny && count > 0 && priceCents > 0) {
+                      const baseCents = Math.floor(priceCents / count);
+                      let remainder = priceCents % count;
+                      for (const uid of selected) {
+                        const share = baseCents + (remainder > 0 ? 1 : 0);
+                        if (remainder > 0) remainder--;
+                        newAmts[uid] = centsToInput(share);
                       }
                     }
                     setMemberAmounts(newAmts);
