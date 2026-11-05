@@ -30,28 +30,31 @@ const ALIASES: Record<string, string> = {
   cyberpunk: 'plum', lavender: 'plum',
 };
 
-/** Bright colors for common cards and pay-later apps, so a card is easy to recognize. */
-const KNOWN: { match: RegExp; colors: [string, string]; brand: string; network?: string }[] = [
-  { match: /union\s?bank|\bub\b/i, colors: ['#ffa21a', '#e04e0c'], brand: 'UnionBank', network: 'VISA' },
-  { match: /spaylater|shopee\s?pay|shopee/i, colors: ['#ff7043', '#e0301e'], brand: 'Shopee', network: 'PAYLATER' },
-  { match: /atome/i, colors: ['#9ad61b', '#3f7a0c'], brand: 'Atome', network: 'PAYLATER' },
-  { match: /apple\s?cash|apple/i, colors: ['#3a3a3c', '#0b0b0c'], brand: 'Apple Cash', network: 'CASH' },
-  { match: /lazada|lazpaylater/i, colors: ['#6a5cff', '#3a1fb8'], brand: 'Lazada', network: 'PAYLATER' },
-  { match: /tiktok/i, colors: ['#33333a', '#0b0b0c'], brand: 'TikTok', network: 'PAYLATER' },
-  { match: /ggives|gcredit|g\s?cash|gloan/i, colors: ['#2f8cff', '#0049b7'], brand: 'GCash', network: 'VISA' },
-  { match: /maya/i, colors: ['#22c48a', '#0b6b4d'], brand: 'Maya', network: 'MASTERCARD' },
-  { match: /billease/i, colors: ['#14c3b0', '#0b6b62'], brand: 'BillEase', network: 'CREDIT' },
-  { match: /home\s?credit/i, colors: ['#f2554f', '#a51818'], brand: 'Home Credit', network: 'LOAN' },
-  { match: /\bbdo\b/i, colors: ['#2a5bea', '#0a1f6b'], brand: 'BDO', network: 'MASTERCARD' },
-  { match: /\bbpi\b/i, colors: ['#e8344f', '#8a1030'], brand: 'BPI', network: 'VISA' },
-  { match: /metrobank|metro\s?bank/i, colors: ['#1f80e8', '#0b3b80'], brand: 'Metrobank', network: 'VISA' },
-  { match: /security\s?bank/i, colors: ['#36b7e8', '#0b5f95'], brand: 'Security Bank', network: 'MASTERCARD' },
-  { match: /\brcbc\b/i, colors: ['#3366d6', '#0c2558'], brand: 'RCBC', network: 'VISA' },
-  { match: /east\s?west/i, colors: ['#a24fd4', '#4c1d6e'], brand: 'EastWest', network: 'VISA' },
-  { match: /landbank|land\s?bank/i, colors: ['#26b062', '#0b5a2c'], brand: 'Landbank', network: 'VISA' },
-  { match: /\bpnb\b/i, colors: ['#2547c9', '#0b1a4d'], brand: 'PNB', network: 'MASTERCARD' },
-  { match: /grab/i, colors: ['#00c159', '#006b30'], brand: 'GrabPay', network: 'PAYLATER' },
-  { match: /amazon|temu|shein/i, colors: ['#f7a21b', '#b45309'], brand: 'Store', network: 'DEBIT' },
+/**
+ * Real brand colors for common banks and pay-later apps, so a card looks like the actual card.
+ * Each one is a single brand color; brandGradient() adds a gentle light-to-shade around it.
+ */
+const KNOWN: { match: RegExp; base: string; brand: string; network?: string }[] = [
+  { match: /union\s?bank|\bub\b/i, base: '#ff7f00', brand: 'UnionBank', network: 'VISA' },
+  { match: /spaylater|shopee\s?pay|shopee/i, base: '#ee4d2d', brand: 'Shopee', network: 'PAYLATER' },
+  { match: /atome/i, base: '#7cb518', brand: 'Atome', network: 'PAYLATER' },
+  { match: /apple\s?cash|apple/i, base: '#1c1c1e', brand: 'Apple Cash', network: 'CASH' },
+  { match: /lazada|lazpaylater/i, base: '#1a1f8f', brand: 'Lazada', network: 'PAYLATER' },
+  { match: /tiktok/i, base: '#1c1c1e', brand: 'TikTok', network: 'PAYLATER' },
+  { match: /ggives|gcredit|g\s?cash|gloan/i, base: '#007dfe', brand: 'GCash', network: 'VISA' },
+  { match: /maya/i, base: '#00b464', brand: 'Maya', network: 'MASTERCARD' },
+  { match: /billease/i, base: '#00a99d', brand: 'BillEase', network: 'CREDIT' },
+  { match: /home\s?credit/i, base: '#e11931', brand: 'Home Credit', network: 'LOAN' },
+  { match: /\bbdo\b/i, base: '#0047ba', brand: 'BDO', network: 'MASTERCARD' },
+  { match: /\bbpi\b/i, base: '#c8102e', brand: 'BPI', network: 'VISA' },
+  { match: /metrobank|metro\s?bank/i, base: '#0057b8', brand: 'Metrobank', network: 'VISA' },
+  { match: /security\s?bank/i, base: '#0098d8', brand: 'Security Bank', network: 'MASTERCARD' },
+  { match: /\brcbc\b/i, base: '#0057a8', brand: 'RCBC', network: 'VISA' },
+  { match: /east\s?west/i, base: '#6a2c91', brand: 'EastWest', network: 'VISA' },
+  { match: /landbank|land\s?bank/i, base: '#00964b', brand: 'Landbank', network: 'VISA' },
+  { match: /\bpnb\b/i, base: '#0a3d91', brand: 'PNB', network: 'MASTERCARD' },
+  { match: /grab/i, base: '#00b14f', brand: 'GrabPay', network: 'PAYLATER' },
+  { match: /amazon|temu|shein/i, base: '#f59e0b', brand: 'Store', network: 'DEBIT' },
 ];
 
 export const STORE_SUGGESTIONS = [
@@ -80,6 +83,23 @@ function hash(text: string): number {
 /** One rich color, bright at the top-left and deep at the bottom-right. */
 function gradient([from, to]: [string, string]): string {
   return `linear-gradient(150deg, ${from} 0%, ${to} 100%)`;
+}
+
+/** Blend a #rrggbb color toward white (amount > 0) or black (amount < 0). */
+function shade(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const target = amount > 0 ? 255 : 0;
+  const a = Math.abs(amount);
+  const ch = (v: number) => Math.round(v + (target - v) * a);
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
+/** Keeps the real brand color in the middle, a little lighter at the top and only a little deeper below. */
+function brandGradient(base: string): string {
+  return `linear-gradient(150deg, ${shade(base, 0.16)} 0%, ${base} 45%, ${shade(base, -0.18)} 100%)`;
 }
 
 function resolveKey(key: string): string {
@@ -123,7 +143,7 @@ export function cardGradient(seed: string): string {
 /** Card color from a card / store name when no color was picked */
 export function autoStoreGradient(store: string, seed: string): string {
   const known = KNOWN.find((t) => t.match.test(store));
-  if (known) return gradient(known.colors);
+  if (known) return brandGradient(known.base);
   return cardGradient(store.trim() ? store.trim().toLowerCase() : seed);
 }
 
