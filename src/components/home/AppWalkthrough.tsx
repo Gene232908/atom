@@ -20,6 +20,7 @@ export interface TourStep {
   icon: typeof Plus;
   badge: string;
   description: string;
+  actionPrompt: string;
   shape?: 'circle' | 'rect';
 }
 
@@ -31,6 +32,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Add a Card or Loan',
     icon: Plus,
     description: 'Tap "+" to create a new credit card, pay-later store, or personal installment loan.',
+    actionPrompt: 'Tap the "+" button to proceed',
   },
   {
     targetId: 'tour-wallet-cards',
@@ -39,6 +41,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Open Card & Add Items',
     icon: CreditCard,
     description: 'Tap any card to open it. Inside, tap "+ Add item" to split bills equally or set custom amounts per person.',
+    actionPrompt: 'Tap the card area to proceed',
   },
   {
     targetId: 'tour-summary-tiles',
@@ -47,6 +50,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Balance Overview',
     icon: Coins,
     description: '"You owe" is what you pay. "To collect" is what others owe you. Automatically updates when payments are confirmed.',
+    actionPrompt: 'Tap the summary tiles to proceed',
   },
   {
     targetId: 'tour-tabs-toggle',
@@ -55,6 +59,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Switch Views',
     icon: ArrowLeftRight,
     description: 'Toggle between "You lend" (debts to collect), "You owe" (debts you pay), and "My loans" (your installment loans).',
+    actionPrompt: 'Tap the tabs toggle to proceed',
   },
   {
     targetId: 'tour-profile-btn',
@@ -63,6 +68,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Profile & Settings',
     icon: MoreHorizontal,
     description: 'Tap here to add friends, view completed payment history, and customize your wallet settings.',
+    actionPrompt: 'Tap the profile button to proceed',
   },
   {
     targetId: 'tour-profile-btn',
@@ -71,6 +77,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Phone Alerts & Reminders',
     icon: Bell,
     description: 'Get lock-screen alerts for upcoming due dates, payment confirmations, and friend requests.',
+    actionPrompt: 'Tap here to proceed to final step',
   },
   {
     targetId: 'tour-help-btn',
@@ -79,6 +86,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Quick Guide & Replay',
     icon: HelpCircle,
     description: 'Tap this "?" icon anytime to replay this step-by-step walkthrough.',
+    actionPrompt: 'Tap the "?" button to finish',
   },
 ];
 
@@ -147,6 +155,21 @@ export function AppWalkthrough({ open, onClose }: Props) {
     };
   }, [open, updateRect]);
 
+  // Handle clicking the interactive highlighted target element to advance
+  const handleTargetClick = () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(25);
+      }
+    } catch {}
+
+    if (isLast) {
+      onClose();
+    } else {
+      setStepIndex((i) => i + 1);
+    }
+  };
+
   // Keyboard navigation
   useEffect(() => {
     if (!open) return;
@@ -154,6 +177,7 @@ export function AppWalkthrough({ open, onClose }: Props) {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight' && !isLast) setStepIndex((i) => i + 1);
       else if (e.key === 'ArrowLeft' && !isFirst) setStepIndex((i) => i - 1);
+      else if (e.key === 'Enter') handleTargetClick();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -205,9 +229,11 @@ export function AppWalkthrough({ open, onClose }: Props) {
         />
       </svg>
 
-      {/* Glowing Pulsing Ring around Target Element */}
+      {/* Clickable Interactive Target Overlay - Tapping it advances to the next step */}
       {targetRect && (
-        <div
+        <button
+          type="button"
+          onClick={handleTargetClick}
           style={{
             left: `${targetRect.left}px`,
             top: `${targetRect.top}px`,
@@ -215,8 +241,14 @@ export function AppWalkthrough({ open, onClose }: Props) {
             height: `${targetRect.height}px`,
             borderRadius: `${targetRect.radius}px`,
           }}
-          className="pointer-events-none fixed transition-all duration-300 ring-4 ring-accent/70 shadow-[0_0_24px_rgba(0,122,255,0.7)] animate-pulse"
-        />
+          aria-label={`Tap ${step.title} to proceed`}
+          className="fixed z-[101] cursor-pointer transition-transform active:scale-95 ring-4 ring-accent shadow-[0_0_28px_rgba(0,122,255,0.85)] animate-pulse hover:ring-white focus:outline-none"
+        >
+          {/* Animated Bouncing Pointer Hand */}
+          <span className="pointer-events-none absolute -bottom-2.5 -right-2.5 flex size-7 items-center justify-center rounded-full bg-accent text-white shadow-lg animate-bounce text-[13px]">
+            👆
+          </span>
+        </button>
       )}
 
       {/* Compact Floating Glassmorphic Bubble Card (Positioned away from target) */}
@@ -265,8 +297,14 @@ export function AppWalkthrough({ open, onClose }: Props) {
           {step.description}
         </p>
 
+        {/* Interactive Action Prompt Banner */}
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-bold text-accent">
+          <span className="animate-pulse">👉</span>
+          <span className="truncate">{step.actionPrompt}</span>
+        </div>
+
         {/* Footer: Progress Dots & Action Buttons */}
-        <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-hairline/60">
+        <div className="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-hairline/60">
           {/* Progress dots */}
           <div className="flex items-center gap-1">
             {TOUR_STEPS.map((_, idx) => (
