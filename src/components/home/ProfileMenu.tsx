@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Bell,
+  HelpCircle,
   History,
   LogOut,
   SlidersHorizontal,
@@ -22,6 +23,7 @@ interface Props {
   onOpenHistory?: () => void;
   onOpenSettings?: () => void;
   onOpenAppIcon?: () => void;
+  onStartTour?: () => void;
 }
 
 export function ProfileMenu({
@@ -35,6 +37,7 @@ export function ProfileMenu({
   onOpenHistory,
   onOpenSettings,
   onOpenAppIcon,
+  onStartTour,
 }: Props) {
   const user = useUser();
   const { signOut } = useAuth();
@@ -147,6 +150,17 @@ export function ProfileMenu({
               onClick={() => {
                 onClose();
                 onOpenSettings();
+              }}
+            />
+          )}
+
+          {onStartTour && (
+            <MenuRow
+              icon={<HelpCircle className="size-[17px]" strokeWidth={2.2} />}
+              label="App Walkthrough / Guide"
+              onClick={() => {
+                onClose();
+                onStartTour();
               }}
             />
           )}

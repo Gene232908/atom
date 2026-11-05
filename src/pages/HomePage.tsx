@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, History, MoreHorizontal, Plus, UserPlus, WalletCards, X } from 'lucide-react';
+import { Bell, ChevronRight, HelpCircle, History, MoreHorizontal, Plus, UserPlus, WalletCards, X } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
@@ -19,6 +19,7 @@ import { AppIconSheet } from '../components/home/AppIconSheet';
 import { HistorySheet } from '../components/home/HistorySheet';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
+import { AppWalkthrough } from '../components/home/AppWalkthrough';
 import {
   evaluateDueReminders,
   checkAndDispatchDueReminders,
@@ -86,6 +87,31 @@ export function HomePage() {
   const [payingItemId, setPayingItemId] = useState<string | null>(null);
   const [inviteGroupId, setInviteGroupId] = useState<string | null>(null);
   const [viewingLoan, setViewingLoan] = useState<{ group: Group; item: Item } | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  // Automatically trigger walkthrough for newly signed-in users on their first visit
+  useEffect(() => {
+    if (!user?.uid || groupsLoading) return;
+    try {
+      const seenKey = `utang_walkthrough_seen_${user.uid}`;
+      const hasSeen = localStorage.getItem(seenKey);
+      if (!hasSeen) {
+        const timer = setTimeout(() => {
+          setTourOpen(true);
+        }, 700);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, [user?.uid, groupsLoading]);
+
+  const handleCloseTour = useCallback(() => {
+    setTourOpen(false);
+    try {
+      if (user?.uid) {
+        localStorage.setItem(`utang_walkthrough_seen_${user.uid}`, 'true');
+      }
+    } catch {}
+  }, [user?.uid]);
 
   const onSelectLayoutMode = (mode: CardLayoutMode) => {
     setCardLayout(mode);
@@ -461,15 +487,29 @@ export function HomePage() {
           onViewAllTx={() => setTxListOpen(true)}
           onOpenReminders={() => setRemindersOpen(true)}
           remindersCount={reminders.length}
+          onOpenTour={() => setTourOpen(true)}
         />
       ) : (
         <>
       <NavBar
         title="Wallet"
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Small '?' Help/Guide Button */}
+            <button
+              id="tour-help-btn"
+              type="button"
+              onClick={() => setTourOpen(true)}
+              aria-label="App guide & walkthrough"
+              title="Paano gamitin? (Step-by-step walkthrough)"
+              className="relative grid size-9 shrink-0 place-items-center rounded-full liquid-rim bg-white/55 text-ink/80 shadow-[0_0_0_0.5px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150 transition hover:text-accent hover:bg-white/75 active:scale-90"
+            >
+              <HelpCircle className="size-4.5" strokeWidth={2.2} />
+            </button>
+
             {/* 1. Circular Plus Button (Image 2 style) */}
             <button
+              id="tour-add-btn"
               type="button"
               onClick={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
               aria-label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
@@ -481,6 +521,7 @@ export function HomePage() {
 
             {/* 2. Elongated Pill Capsule with Avatar and Three Dots ••• (Image 2 style) */}
             <button
+              id="tour-profile-btn"
               type="button"
               onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="More options & profile"
@@ -520,6 +561,7 @@ export function HomePage() {
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenSettings={() => setDefaultViewOpen(true)}
         onOpenAppIcon={() => setAppIconOpen(true)}
+        onStartTour={() => setTourOpen(true)}
       />
 
       <PageBody>
@@ -529,7 +571,7 @@ export function HomePage() {
           <div className="animate-fade-in lg:grid lg:grid-cols-12 lg:items-start lg:gap-8 pt-1 sm:pt-2">
             {/* Left Column on Desktop / Top Section on Mobile */}
             <div className="lg:sticky lg:top-20 lg:col-span-5 xl:col-span-4">
-              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 sm:gap-3.5">
+              <div id="tour-summary-tiles" className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 sm:gap-3.5">
                 {tab === 'loans' ? (
                   <>
                     <SummaryTile label="Remaining loan" amount={loanRemainingTotal} tone="bad" sublabel="balance" />
@@ -547,7 +589,7 @@ export function HomePage() {
             {/* Right Column: Cards & Toggle Switch */}
             <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
               {/* Top Bar: Tabs Switch */}
-              <div className="flex items-center justify-between gap-3">
+              <div id="tour-tabs-toggle" className="flex items-center justify-between gap-3">
                 <LendOweToggle
                   tab={tab}
                   onChange={setTab}
@@ -642,7 +684,8 @@ export function HomePage() {
               {error && <ErrorBanner message={error} onRetry={retry} />}
 
               {/* My cards: each list is one card */}
-              {tab === 'loans' ? (
+              <div id="tour-wallet-cards" className="space-y-3.5">
+                {tab === 'loans' ? (
                 activeLoanItems.length > 0 ? (
                   <div className="space-y-3.5">
                     {activeLoanItems.map((loanIt, idx) => {
@@ -782,6 +825,7 @@ export function HomePage() {
                   ) : null}
                 </>
               )}
+              </div>
 
               {groups.length > 0 && (
                 <RecentTransactions
@@ -914,6 +958,7 @@ export function HomePage() {
           }
         }}
       />
+      <AppWalkthrough open={tourOpen} onClose={handleCloseTour} />
     </>
   );
 }
