@@ -135,7 +135,7 @@ export function FriendsSheet({ open, onClose, onOpenJoinCode }: Props) {
         title="Friends & Contacts"
         description="Connect with friends to easily invite them to cards and split debts"
       >
-        <div className="space-y-4 pt-1">
+        <div id="tour-friends-content" className="space-y-4 pt-1">
           {/* My Unique ID Card */}
           <div className="rounded-[18px] bg-fill p-3.5 sm:p-4 ring-1 ring-hairline">
             <div className="flex items-center gap-3">

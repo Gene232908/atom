@@ -21,51 +21,84 @@ const MOBILE_TOUR_STEPS: TourStep[] = [
     targetId: 'tour-profile-btn',
     shape: 'circle',
     title: 'Profile & Settings',
-    description: 'Tap your profile icon to open Friends, History, and Due Reminders.',
+    description: 'Tap your profile icon to open your friends list, bill reminders, and completed history.',
     actionHint: 'Tap profile button',
     preferredPos: 'bottom',
   },
   {
-    targetId: 'tour-profile-menu',
+    targetId: 'tour-profile-friends',
+    fallbackTargetId: 'tour-profile-menu',
     shape: 'rect',
-    title: 'Friends & Push Alerts',
-    description: 'Add friends by email, manage lock-screen alerts, and view completed loans.',
-    actionHint: 'Tap Next to continue',
+    title: 'Friends & Contacts',
+    description: 'Tap "Friends & Contacts" to manage your split companions and add friends by their email.',
+    actionHint: 'Tap Friends & Contacts',
+    preferredPos: 'bottom',
+  },
+  {
+    targetId: 'tour-friends-content',
+    shape: 'rect',
+    title: 'Add Friends & Share ID',
+    description: 'Search friends by email, copy your User ID to share, and accept incoming friend requests.',
+    actionHint: 'Tap Next for Due Reminders',
+    preferredPos: 'bottom',
+  },
+  {
+    targetId: 'tour-reminders-content',
+    shape: 'rect',
+    title: 'Due Reminders & Alerts',
+    description: 'Track urgent payment countdowns, overdue items, and turn on lock-screen push alerts.',
+    actionHint: 'Tap Next for History',
+    preferredPos: 'bottom',
+  },
+  {
+    targetId: 'tour-history-content',
+    shape: 'rect',
+    title: 'Completed History',
+    description: 'Review all completed personal loans, settled debts, and past payment records safely archived here.',
+    actionHint: 'Tap Next for Wallet Cards',
     preferredPos: 'bottom',
   },
   {
     targetId: 'tour-front-card',
-    fallbackTargetId: 'tour-add-btn',
+    fallbackTargetId: 'tour-wallet-cards',
     shape: 'rect',
     title: 'Open Card & Debts',
-    description: 'Tap the card to view its items, or tap "+" to create a new card.',
-    actionHint: 'Tap to open card',
+    description: 'Tap any card to view its list of purchases, or swipe left and right to switch between your cards.',
+    actionHint: 'Tap card or Next',
     preferredPos: 'top',
   },
   {
     targetId: 'tour-add-item-btn',
-    fallbackTargetId: 'tour-wallet-cards',
+    fallbackTargetId: 'tour-add-btn',
     shape: 'circle',
     title: 'Add an Item',
-    description: 'Tap "+ Item" to list a purchase or loan and split it with friends.',
-    actionHint: 'Tap "+ Item" to open form',
+    description: 'Tap "+ Item" to list a purchase or loan, enter the store, and choose payment installment terms.',
+    actionHint: 'Tap "+ Item" or Next',
     preferredPos: 'bottom',
   },
   {
     targetId: 'item-price',
-    fallbackTargetId: 'item-desc',
+    fallbackTargetId: 'tour-summary-tiles',
     shape: 'rect',
     title: 'Equal or Custom Split',
-    description: 'Enter price, choose 1x or installments, and split equally or with custom amounts.',
-    actionHint: 'Tap "Got it!" to finish',
+    description: 'Choose 1x or installments, and split bills equally or enter custom amounts for each friend.',
+    actionHint: 'Tap Next',
     preferredPos: 'top',
+  },
+  {
+    targetId: 'tour-add-btn',
+    shape: 'circle',
+    title: 'Create New Cards',
+    description: 'Tap "+" in the top bar anytime to create a new shared credit card or personal loan.',
+    actionHint: 'Tap Next',
+    preferredPos: 'bottom',
   },
   {
     targetId: 'tour-help-btn',
     shape: 'circle',
     title: 'Quick Guide & Replay',
-    description: 'Tap this "?" icon anytime to replay this interactive walkthrough.',
-    actionHint: 'Tap to finish',
+    description: 'Tap this "?" icon anytime to replay this step-by-step walkthrough whenever you need help.',
+    actionHint: 'Tap "Got it!" to finish',
     preferredPos: 'bottom',
   },
 ];
@@ -134,6 +167,7 @@ const DESKTOP_TOUR_STEPS: TourStep[] = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  onStepTransition?: (targetId: string) => void;
 }
 
 interface TargetRect {
@@ -144,21 +178,28 @@ interface TargetRect {
   radius: number;
 }
 
-export function AppWalkthrough({ open, onClose }: Props) {
+export function AppWalkthrough({ open, onClose, onStepTransition }: Props) {
   const isDesktop = useIsDesktop();
   const tourSteps = isDesktop ? DESKTOP_TOUR_STEPS : MOBILE_TOUR_STEPS;
 
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const activeElRef = useRef<HTMLElement | null>(null);
+  const isAdvancingRef = useRef(false);
 
   const step = tourSteps[stepIndex] || tourSteps[0];
   const isLast = stepIndex === tourSteps.length - 1;
 
-  // Reset step index if switched between desktop/mobile
+  // Initialize step 0 when opening or switching layout
   useEffect(() => {
-    setStepIndex(0);
-  }, [isDesktop]);
+    if (open) {
+      setStepIndex(0);
+      const first = tourSteps[0];
+      if (first) {
+        onStepTransition?.(first.targetId);
+      }
+    }
+  }, [open, isDesktop]);
 
   // Resolve target element (with optional fallback)
   const resolveTarget = useCallback(() => {
@@ -197,7 +238,7 @@ export function AppWalkthrough({ open, onClose }: Props) {
     setTargetRect({ left, top, width, height, radius });
   }, [open, resolveTarget, step.shape]);
 
-  // Scroll target element smoothly into view
+  // Multi-pass measurements to ensure smooth attachment across sheet mount animations
   useLayoutEffect(() => {
     if (!open) return;
     const el = resolveTarget();
@@ -205,9 +246,19 @@ export function AppWalkthrough({ open, onClose }: Props) {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    const timer = setTimeout(updateRect, 120);
-    return () => clearTimeout(timer);
-  }, [open, resolveTarget, updateRect]);
+    updateRect();
+    const t1 = setTimeout(updateRect, 50);
+    const t2 = setTimeout(updateRect, 160);
+    const t3 = setTimeout(updateRect, 320);
+    const t4 = setTimeout(updateRect, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [open, stepIndex, resolveTarget, updateRect]);
 
   // Listen to window resize, scroll, and mutations
   useEffect(() => {
@@ -227,8 +278,14 @@ export function AppWalkthrough({ open, onClose }: Props) {
     };
   }, [open, updateRect]);
 
-  // Advance to next step (or close if last)
+  // Advance to next step with debounce lock to prevent double-skipping
   const advance = useCallback(() => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+    }, 320);
+
     try {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(20);
@@ -236,11 +293,17 @@ export function AppWalkthrough({ open, onClose }: Props) {
     } catch {}
 
     if (isLast) {
+      onStepTransition?.('done');
       onClose();
     } else {
-      setStepIndex((i) => i + 1);
+      const nextIndex = stepIndex + 1;
+      const nextStep = tourSteps[nextIndex];
+      setStepIndex(nextIndex);
+      if (nextStep) {
+        onStepTransition?.(nextStep.targetId);
+      }
     }
-  }, [isLast, onClose]);
+  }, [isLast, onClose, stepIndex, tourSteps, onStepTransition]);
 
   // Real interaction handler: Triggers the real underlying button/action and advances
   const handleSpotlightClick = useCallback(() => {
@@ -252,7 +315,6 @@ export function AppWalkthrough({ open, onClose }: Props) {
         el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       }
     }
-    // Advance so the guide explains the newly opened screen or action
     advance();
   }, [resolveTarget, advance]);
 
@@ -278,11 +340,17 @@ export function AppWalkthrough({ open, onClose }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight') advance();
-      else if (e.key === 'ArrowLeft' && stepIndex > 0) setStepIndex((i) => i - 1);
+      else if (e.key === 'ArrowLeft' && stepIndex > 0) {
+        const prevIndex = stepIndex - 1;
+        setStepIndex(prevIndex);
+        if (tourSteps[prevIndex]) {
+          onStepTransition?.(tourSteps[prevIndex].targetId);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, stepIndex, advance, onClose]);
+  }, [open, stepIndex, advance, onClose, tourSteps, onStepTransition]);
 
   if (!open) return null;
 
@@ -347,14 +415,17 @@ export function AppWalkthrough({ open, onClose }: Props) {
     ? targetRect.top + targetRect.height / 2
     : vh / 2;
   const isTargetInLowerHalf = targetCenterY > vh * 0.45;
-  const placeAtTop = step.preferredPos === 'top' || isTargetInLowerHalf;
+  const placeAtTop = step.preferredPos === 'top' || (step.preferredPos !== 'bottom' && isTargetInLowerHalf);
 
   const mobileCardStyle: React.CSSProperties = placeAtTop
-    ? { top: 'max(12px, env(safe-area-inset-top, 12px))' }
-    : { bottom: 'max(12px, env(safe-area-inset-bottom, 12px))' };
+    ? { top: 'max(14px, env(safe-area-inset-top, 14px))' }
+    : { bottom: 'max(14px, env(safe-area-inset-bottom, 14px))' };
 
   return (
-    <div className="fixed inset-0 z-[48] pointer-events-none select-none animate-fade-in">
+    <div
+      data-tour-walkthrough="true"
+      className="fixed inset-0 z-[9990] pointer-events-none select-none animate-fade-in"
+    >
       {/* SVG Spotlight Mask Cutout */}
       <svg
         className="fixed inset-0 h-full w-full pointer-events-none"
@@ -398,17 +469,18 @@ export function AppWalkthrough({ open, onClose }: Props) {
           }}
           title="Click to interact"
           aria-label={`Interact with ${step.title}`}
-          className="fixed z-[49] pointer-events-auto cursor-pointer transition-all duration-200 ring-2 ring-accent shadow-[0_0_20px_rgba(0,122,255,0.7)] animate-pulse active:scale-[0.99] hover:ring-white"
+          className="fixed z-[9995] pointer-events-auto cursor-pointer transition-all duration-200 ring-2 ring-accent shadow-[0_0_20px_rgba(0,122,255,0.7)] animate-pulse active:scale-[0.99] hover:ring-white"
         />
       )}
 
-      {/* Ultra-Compact Micro Instruction Floating Bar (Contextually positioned without overlap) */}
+      {/* Ultra-Compact Micro Instruction Floating Bar (High z-index, never obscured) */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={step.title}
+        data-tour-walkthrough="true"
         style={isDesktop ? desktopCardStyle : mobileCardStyle}
-        className={`fixed z-[50] pointer-events-auto w-auto rounded-[18px] bg-white/95 px-3.5 py-2.5 shadow-[0_12px_32px_-6px_rgba(0,0,0,0.32),0_0_0_0.5px_rgba(0,0,0,0.08)] ring-1 ring-white/90 ring-inset backdrop-blur-xl backdrop-saturate-150 animate-pop transition-all duration-200 ${
+        className={`fixed z-[9999] pointer-events-auto w-auto rounded-[18px] bg-white/95 px-3.5 py-2.5 shadow-[0_12px_32px_-6px_rgba(0,0,0,0.32),0_0_0_0.5px_rgba(0,0,0,0.08)] ring-1 ring-white/90 ring-inset backdrop-blur-xl backdrop-saturate-150 animate-pop transition-all duration-200 ${
           isDesktop
             ? 'w-[360px]'
             : 'inset-x-3 sm:inset-x-6 mx-auto max-w-[340px]'

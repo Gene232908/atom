@@ -104,8 +104,47 @@ export function HomePage() {
     } catch {}
   }, [user?.uid, groupsLoading]);
 
+  const handleTourStepTransition = useCallback((targetId: string) => {
+    if (targetId === 'tour-profile-btn') {
+      setProfileOpen(false);
+      setPanel(null);
+      setRemindersOpen(false);
+      setHistoryOpen(false);
+    } else if (targetId === 'tour-profile-friends' || targetId === 'tour-profile-menu') {
+      setProfileOpen(true);
+      setPanel(null);
+      setRemindersOpen(false);
+      setHistoryOpen(false);
+    } else if (targetId === 'tour-friends-content') {
+      setProfileOpen(false);
+      setPanel('friends');
+      setRemindersOpen(false);
+      setHistoryOpen(false);
+    } else if (targetId === 'tour-reminders-content') {
+      setProfileOpen(false);
+      setPanel(null);
+      setRemindersOpen(true);
+      setHistoryOpen(false);
+    } else if (targetId === 'tour-history-content') {
+      setProfileOpen(false);
+      setPanel(null);
+      setRemindersOpen(false);
+      setHistoryOpen(true);
+    } else {
+      // Return to main cards view
+      setProfileOpen(false);
+      setPanel(null);
+      setRemindersOpen(false);
+      setHistoryOpen(false);
+    }
+  }, []);
+
   const handleCloseTour = useCallback(() => {
     setTourOpen(false);
+    setProfileOpen(false);
+    setPanel(null);
+    setRemindersOpen(false);
+    setHistoryOpen(false);
     try {
       if (user?.uid) {
         localStorage.setItem(`utang_walkthrough_seen_${user.uid}`, 'true');
@@ -958,7 +997,11 @@ export function HomePage() {
           }
         }}
       />
-      <AppWalkthrough open={tourOpen} onClose={handleCloseTour} />
+      <AppWalkthrough
+        open={tourOpen}
+        onClose={handleCloseTour}
+        onStepTransition={handleTourStepTransition}
+      />
     </>
   );
 }

@@ -51,6 +51,10 @@ export function ProfileMenu({
       if (e.key === 'Escape') onClose();
     };
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-tour-walkthrough], [role="dialog"][aria-label*="walkthrough"], [aria-label*="Walkthrough"]')) {
+        return;
+      }
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -109,6 +113,7 @@ export function ProfileMenu({
         <div className="space-y-0.5">
           {onOpenFriends && (
             <MenuRow
+              id="tour-profile-friends"
               icon={<UserPlus className="size-[17px]" strokeWidth={2.2} />}
               label="Friends & Contacts"
               badge={friendRequestsCount > 0 ? `+${friendRequestsCount}` : undefined}
@@ -122,6 +127,7 @@ export function ProfileMenu({
 
           {onOpenReminders && (
             <MenuRow
+              id="tour-profile-reminders"
               icon={<Bell className="size-[17px]" strokeWidth={2.2} />}
               label="Due Reminders"
               badge={remindersCount > 0 ? String(remindersCount) : undefined}
@@ -135,6 +141,7 @@ export function ProfileMenu({
 
           {onOpenHistory && (
             <MenuRow
+              id="tour-profile-history"
               icon={<History className="size-[17px]" strokeWidth={2.2} />}
               label="Completed History"
               onClick={() => {
@@ -146,6 +153,7 @@ export function ProfileMenu({
 
           {onOpenSettings && (
             <MenuRow
+              id="tour-profile-settings"
               icon={<SlidersHorizontal className="size-[17px]" strokeWidth={2.2} />}
               label="Wallet Settings"
               onClick={() => {
@@ -205,6 +213,7 @@ export function ProfileMenu({
 }
 
 function MenuRow({
+  id,
   icon,
   label,
   badge,
@@ -213,6 +222,7 @@ function MenuRow({
   tone = 'default',
   disabled = false,
 }: {
+  id?: string;
   icon: ReactNode;
   label: string;
   badge?: string;
@@ -223,6 +233,7 @@ function MenuRow({
 }) {
   return (
     <button
+      id={id}
       type="button"
       disabled={disabled}
       onClick={onClick}
