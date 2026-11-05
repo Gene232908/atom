@@ -51,6 +51,7 @@ function toShare(raw: unknown): Share {
     name: str(s.name, 'Someone'),
     status,
     updatedAt: num(s.updatedAt),
+    splitCents: typeof s.splitCents === 'number' ? Math.round(s.splitCents) : undefined,
     paidCents: typeof s.paidCents === 'number' ? Math.round(s.paidCents) : undefined,
     refNumber: typeof s.refNumber === 'string' ? s.refNumber : undefined,
     claimCents: typeof s.claimCents === 'number' && s.claimCents > 0 ? Math.round(s.claimCents) : undefined,

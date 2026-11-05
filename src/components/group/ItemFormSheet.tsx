@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CircleAlert, CreditCard, Trash2, UserPlus } from 'lucide-react';
+import { Check, CircleAlert, CreditCard, Trash2, UserPlus } from 'lucide-react';
 import { useSafeWrite } from '../../hooks/useToast';
 import { addItem, deleteItem, updateItem } from '../../services/items';
 import { centsToInput, cleanMoneyInput, formatMoney, splitEvenly, toCents } from '../../lib/money';
@@ -8,6 +8,7 @@ import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { TextField } from '../ui/Field';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
+import { Avatar } from '../ui/Avatar';
 import { itemGradient } from '../../lib/cardTheme';
 import { PeoplePicker, type PickPerson } from './PeoplePicker';
 
@@ -57,17 +58,34 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(item ? Object.keys(item.shares) : people.filter((p) => !p.isMe).map((p) => p.uid)),
   );
-  const [custom, setCustom] = useState(
-    () => !!item && item.splitCents !== splitEvenly(item.priceCents, Object.keys(item.shares).length),
-  );
-  const [splitInput, setSplitInput] = useState(item ? centsToInput(item.splitCents) : '');
+
+  // Check if item was previously saved with custom per-person amounts
+  const hasCustomShares = useMemo(() => {
+    if (!item?.shares) return false;
+    const shareValues = Object.values(item.shares);
+    return shareValues.some((s) => typeof s.splitCents === 'number' && s.splitCents !== item.splitCents);
+  }, [item]);
+
+  const [splitMode, setSplitMode] = useState<'equal' | 'custom'>(() => (hasCustomShares ? 'custom' : 'equal'));
+
+  const [memberAmounts, setMemberAmounts] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    if (item?.shares) {
+      for (const [uid, s] of Object.entries(item.shares)) {
+        const val = s.splitCents ?? item.splitCents;
+        map[uid] = centsToInput(val);
+      }
+    }
+    return map;
+  });
+
   const [dueDate, setDueDate] = useState(item?.dueDate ?? '');
   const [billingCycle, setBillingCycle] = useState(item?.billingCycle ?? '');
   const [installmentsCount, setInstallmentsCount] = useState<number>(item?.installmentsCount ?? 1);
   const [monthlyInput, setMonthlyInput] = useState(
     item?.monthlyCents ? centsToInput(item.monthlyCents) : '',
   );
-  // Card name and color come from the list now. Older items keep what they had.
+
   const store = item?.store ?? '';
   const color = item?.color ?? '';
   const [errors, setErrors] = useState<Errors>({});
@@ -75,17 +93,54 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
 
   const priceCents = toCents(price) ?? 0;
   const autoSplit = splitEvenly(priceCents, selected.size);
-  const splitCents = custom ? (toCents(splitInput) ?? 0) : autoSplit;
+
+  // Sum of custom amounts
+  const customSumCents = useMemo(() => {
+    let sum = 0;
+    for (const uid of selected) {
+      sum += toCents(memberAmounts[uid]) ?? 0;
+    }
+    return sum;
+  }, [selected, memberAmounts]);
+
+  const diffCents = priceCents - customSumCents;
+  const effectiveSplitCents = splitMode === 'custom' ? Math.round(customSumCents / (selected.size || 1)) : autoSplit;
   const hasOtherMembers = people.some((p) => !p.isMe);
 
   const toggle = (uid: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(uid)) next.delete(uid);
-      else next.add(uid);
+      if (next.has(uid)) {
+        next.delete(uid);
+      } else {
+        next.add(uid);
+        // Pre-fill amount for added member if in custom mode
+        if (splitMode === 'custom' && !memberAmounts[uid]) {
+          const remaining = priceCents - customSumCents;
+          if (remaining > 0) {
+            setMemberAmounts((m) => ({ ...m, [uid]: centsToInput(remaining) }));
+          }
+        }
+      }
       return next;
     });
-    setErrors((e) => ({ ...e, people: undefined }));
+    setErrors((e) => ({ ...e, people: undefined, split: undefined }));
+  };
+
+  const autoDistributeEvenly = () => {
+    if (selected.size === 0 || priceCents <= 0) return;
+    const count = selected.size;
+    const baseCents = Math.floor(priceCents / count);
+    let remainder = priceCents % count;
+
+    const newAmts: Record<string, string> = {};
+    for (const uid of selected) {
+      const share = baseCents + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder--;
+      newAmts[uid] = centsToInput(share);
+    }
+    setMemberAmounts(newAmts);
+    setErrors((x) => ({ ...x, split: undefined }));
   };
 
   const submit = (e: FormEvent) => {
@@ -98,8 +153,25 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
     if (selected.size === 0) {
       next.people = 'Please select which member owes this item.';
     }
-    if (splitCents <= 0) {
-      next.split = 'Please type how much each person pays.';
+
+    if (splitMode === 'custom') {
+      if (priceCents > 0 && diffCents !== 0) {
+        next.split =
+          diffCents < 0
+            ? `Invalid amount: Total split (${formatMoney(customSumCents)}) exceeds total price by ${formatMoney(Math.abs(diffCents))}. Hindi equal sa total amount.`
+            : `Invalid amount: Total split (${formatMoney(customSumCents)}) is not equal to total price (${formatMoney(priceCents)}). May kulang pa na ${formatMoney(diffCents)}.`;
+      }
+      for (const uid of selected) {
+        const pCents = toCents(memberAmounts[uid]) ?? 0;
+        if (pCents <= 0) {
+          next.split = 'Each selected person must be assigned an amount greater than 0.';
+          break;
+        }
+      }
+    } else {
+      if (autoSplit <= 0 && priceCents > 0) {
+        next.split = 'Please type how much each person pays.';
+      }
     }
 
     setErrors(next);
@@ -111,20 +183,21 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
       const foundPerson = people.find((p) => p.uid === uid);
       const name = foundPerson?.name ?? group.members[uid]?.name ?? item?.shares[uid]?.name ?? 'Someone';
       const prev = item?.shares[uid];
+      const personShareCents = splitMode === 'custom' ? (toCents(memberAmounts[uid]) ?? autoSplit) : autoSplit;
       shares[uid] = prev
-        ? { ...prev, name }
-        : { name, status: 'unpaid', updatedAt: now };
+        ? { ...prev, name, splitCents: personShareCents }
+        : { name, status: 'unpaid', splitCents: personShareCents, updatedAt: now };
     }
 
-    const manualMonthlyCents = toCents(monthlyInput);
+    const manualMonthlyCents = installmentsCount > 1 ? toCents(monthlyInput) : undefined;
 
     const input = {
       description: desc.slice(0, 200),
       priceCents,
-      splitCents,
+      splitCents: autoSplit,
       shares,
       dueDate: dueDate || null,
-      billingCycle: billingCycle.trim() || undefined,
+      billingCycle: installmentsCount > 1 && billingCycle.trim() ? billingCycle.trim() : undefined,
       installmentsCount: installmentsCount > 1 ? installmentsCount : undefined,
       monthlyCents: manualMonthlyCents && manualMonthlyCents > 0 ? manualMonthlyCents : undefined,
       store: store.trim().slice(0, 40),
@@ -203,8 +276,9 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             value={price}
             error={errors.price}
             onChange={(e) => {
-              setPrice(cleanMoneyInput(e.target.value));
-              setErrors((x) => ({ ...x, price: undefined }));
+              const val = cleanMoneyInput(e.target.value);
+              setPrice(val);
+              setErrors((x) => ({ ...x, price: undefined, split: undefined }));
             }}
           />
 
@@ -242,7 +316,7 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
             )}
           </div>
 
-          {/* Compact Split Summary Card */}
+          {/* Split Summary & Custom Distribution Card */}
           <div
             className="rounded-[18px] p-4 text-white shadow-sm ring-1 ring-white/20 select-none"
             style={{ backgroundImage: itemGradient({ id: 'split-cost', store, color }, group) }}
@@ -251,48 +325,120 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
               {store.trim() || group.name || 'Item Split'}
             </p>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[12px] font-medium text-white/85">Each person pays</p>
+              <p className="text-[12px] font-medium text-white/85">
+                {splitMode === 'custom' ? 'Custom amount per person' : 'Each person pays'}
+              </p>
               <button
                 type="button"
                 className="h-6 rounded-full bg-white/20 px-2.5 text-[11px] font-semibold backdrop-blur transition active:scale-95 hover:bg-white/30"
                 onClick={() => {
-                  if (!custom) setSplitInput(centsToInput(autoSplit));
-                  setCustom(!custom);
+                  if (splitMode === 'equal') {
+                    // Switching to custom: pre-fill member amounts with even split or existing
+                    const newAmts: Record<string, string> = { ...memberAmounts };
+                    for (const uid of selected) {
+                      if (!newAmts[uid] || newAmts[uid] === '0.00' || newAmts[uid] === '0') {
+                        newAmts[uid] = centsToInput(autoSplit);
+                      }
+                    }
+                    setMemberAmounts(newAmts);
+                    setSplitMode('custom');
+                  } else {
+                    setSplitMode('equal');
+                  }
                   setErrors((x) => ({ ...x, split: undefined }));
                 }}
               >
-                {custom ? 'Split evenly' : 'Change'}
+                {splitMode === 'custom' ? 'Split evenly' : 'Custom per person'}
               </button>
             </div>
-            {custom ? (
-              <div className="mt-2 flex items-center gap-1 rounded-xl bg-white/15 px-3 backdrop-blur">
-                <span className="text-[18px] font-bold">₱</span>
-                <input
-                  id="item-split"
-                  aria-label="Amount each person pays"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  placeholder="0.00"
-                  value={splitInput}
-                  onChange={(e) => {
-                    setSplitInput(cleanMoneyInput(e.target.value));
-                    setErrors((x) => ({ ...x, split: undefined }));
-                  }}
-                  className="h-10 w-full min-w-0 bg-transparent text-[20px] font-bold text-white outline-none placeholder:text-white/50"
-                />
-              </div>
+
+            {splitMode === 'equal' ? (
+              <>
+                <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
+                  {formatMoney(autoSplit)}
+                </p>
+                <p className="mt-1 text-[11px] text-white/80">
+                  {selected.size > 0
+                    ? `${formatMoney(priceCents)} split evenly by ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
+                    : 'Select members above to split the price.'}
+                </p>
+              </>
             ) : (
-              <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight tabular-nums wrap-break-word">
-                {formatMoney(autoSplit)}
-              </p>
+              <div className="mt-3 space-y-2">
+                {Array.from(selected).map((uid) => {
+                  const p = people.find((item) => item.uid === uid);
+                  const name = p?.name || group.members[uid]?.name || 'Member';
+                  return (
+                    <div
+                      key={uid}
+                      className="flex items-center justify-between gap-3 rounded-xl bg-white/15 px-3 py-2 backdrop-blur-md ring-1 ring-white/15"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar name={name} photo={p?.photo} size="sm" />
+                        <span className="text-[13px] font-semibold text-white truncate">{name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg bg-black/20 px-2.5 py-1 ring-1 ring-white/20 focus-within:ring-white">
+                        <span className="text-[13px] font-bold text-white/80">₱</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          placeholder="0.00"
+                          value={memberAmounts[uid] ?? ''}
+                          onChange={(e) => {
+                            const val = cleanMoneyInput(e.target.value);
+                            setMemberAmounts((prev) => ({ ...prev, [uid]: val }));
+                            setErrors((x) => ({ ...x, split: undefined }));
+                          }}
+                          className="w-24 bg-transparent text-right text-[14px] font-bold text-white outline-none placeholder:text-white/40"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Status & Validation Indicator */}
+                <div className="pt-1.5">
+                  {priceCents <= 0 ? (
+                    <p className="text-[11.5px] text-white/80 italic">Enter total price above to calculate split.</p>
+                  ) : diffCents === 0 ? (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-100 ring-1 ring-emerald-300/40">
+                      <span className="flex items-center gap-1.5">
+                        <Check className="size-3.5" />
+                        Total matches price ({formatMoney(priceCents)})
+                      </span>
+                      <span className="tabular-nums font-bold">{formatMoney(customSumCents)}</span>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-rose-500/30 px-3 py-2 text-[12px] font-semibold text-white ring-1 ring-rose-300/40 space-y-1">
+                      <p className="flex items-center gap-1.5">
+                        <CircleAlert className="size-3.5 shrink-0" />
+                        <span>
+                          {diffCents < 0
+                            ? `Invalid amount: Total split (${formatMoney(customSumCents)}) is ${formatMoney(Math.abs(diffCents))} over total price (${formatMoney(priceCents)}). Hindi equal sa total amount.`
+                            : `Invalid amount: Total split (${formatMoney(customSumCents)}) is not equal to total price (${formatMoney(priceCents)}). Remaining: ${formatMoney(diffCents)}.`}
+                        </span>
+                      </p>
+                      <div className="flex items-center justify-between pt-0.5 text-[11px] text-white/85">
+                        <span>Dapat eksaktong {formatMoney(priceCents)} ang kabuuan</span>
+                        <button
+                          type="button"
+                          onClick={autoDistributeEvenly}
+                          className="underline font-bold hover:text-white"
+                        >
+                          Split evenly
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-            <p className="mt-1 text-[11px] text-white/80">
-              {selected.size > 0
-                ? `${formatMoney(priceCents)} split by ${selected.size} ${selected.size === 1 ? 'person' : 'people'}`
-                : 'Select members above to split the price.'}
-            </p>
+
             {errors.split && (
-              <p className="mt-1.5 rounded-lg bg-white px-2.5 py-1 text-[12px] font-semibold text-bad">{errors.split}</p>
+              <p className="mt-2 rounded-lg bg-white px-2.5 py-1 text-[12px] font-semibold text-bad shadow-xs">
+                {errors.split}
+              </p>
             )}
           </div>
 
@@ -312,8 +458,8 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                     type="button"
                     onClick={() => {
                       setInstallmentsCount(n);
-                      if (n > 1 && splitCents > 0) {
-                        setMonthlyInput(centsToInput(Math.round(splitCents / n)));
+                      if (n > 1 && effectiveSplitCents > 0) {
+                        setMonthlyInput(centsToInput(Math.round(effectiveSplitCents / n)));
                       } else if (n === 1) {
                         setMonthlyInput('');
                       }
@@ -328,8 +474,15 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                   </button>
                 ))}
 
-                <div className="flex items-center gap-1 rounded-full bg-fill pl-2.5 pr-2 py-0.5 text-[12px] ring-1 ring-hairline">
-                  <span className="text-muted text-[11px] font-medium">Custom:</span>
+                {/* Custom Month Pill with balanced font size */}
+                <div
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] transition ring-1 ${
+                    ![1, 2, 3, 6, 12, 24].includes(installmentsCount) && installmentsCount > 0
+                      ? 'bg-accent/10 text-accent ring-accent/40 font-semibold'
+                      : 'bg-fill text-muted ring-hairline'
+                  }`}
+                >
+                  <span className="text-[11px] font-medium">Custom:</span>
                   <input
                     type="number"
                     min="1"
@@ -340,62 +493,77 @@ function ItemForm({ onClose, group, item, onInvite }: Props) {
                       const val = parseInt(e.target.value);
                       if (!isNaN(val) && val >= 1) {
                         setInstallmentsCount(val);
-                        if (val > 1 && splitCents > 0) {
-                          setMonthlyInput(centsToInput(Math.round(splitCents / val)));
+                        if (val > 1 && effectiveSplitCents > 0) {
+                          setMonthlyInput(centsToInput(Math.round(effectiveSplitCents / val)));
                         } else if (val === 1) {
                           setMonthlyInput('');
                         }
+                      } else if (e.target.value === '') {
+                        setInstallmentsCount(1);
+                        setMonthlyInput('');
                       }
                     }}
-                    className="w-12 bg-transparent text-center font-bold text-ink outline-none"
+                    className="w-10 bg-transparent text-center text-[12px] font-semibold text-ink outline-none placeholder:text-[11px] placeholder:font-normal placeholder:text-muted/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-[11px] text-muted">mos</span>
+                  <span className="text-[11px] font-medium">mos</span>
                 </div>
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-[12px] font-semibold text-ink">
-                  Monthly / Cut-off amount (₱)
-                </label>
-                {installmentsCount > 1 && splitCents > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setMonthlyInput(centsToInput(Math.round(splitCents / installmentsCount)))}
-                    className="text-[11px] font-semibold text-accent hover:underline"
-                  >
-                    Auto calculate ({formatMoney(Math.round(splitCents / installmentsCount))})
-                  </button>
-                )}
-              </div>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={monthlyInput}
-                onChange={(e) => setMonthlyInput(cleanMoneyInput(e.target.value))}
-                placeholder={
-                  installmentsCount > 1 && splitCents > 0
-                    ? centsToInput(Math.round(splitCents / installmentsCount))
-                    : '0.00'
-                }
-                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[15px] font-bold text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
-              />
-              <p className="mt-1 text-[11px] text-muted">
-                Type the exact monthly or cut-off bill stated on your billing statement (SOA).
-              </p>
-            </div>
+            {/* If 1x Full Payment: show clean one-time info badge without confusing 0.00 input */}
+            {installmentsCount > 1 ? (
+              <div className="space-y-3 pt-1 border-t border-hairline">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[12px] font-semibold text-ink">
+                      Monthly / Cut-off amount (₱)
+                    </label>
+                    {effectiveSplitCents > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMonthlyInput(centsToInput(Math.round(effectiveSplitCents / installmentsCount)))}
+                        className="text-[11px] font-semibold text-accent hover:underline"
+                      >
+                        Auto calculate ({formatMoney(Math.round(effectiveSplitCents / installmentsCount))})
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={monthlyInput}
+                    onChange={(e) => setMonthlyInput(cleanMoneyInput(e.target.value))}
+                    placeholder={
+                      effectiveSplitCents > 0
+                        ? centsToInput(Math.round(effectiveSplitCents / installmentsCount))
+                        : '0.00'
+                    }
+                    className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2.5 text-[15px] font-bold text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+                  />
+                  <p className="mt-1 text-[11px] text-muted">
+                    Type the exact monthly or cut-off bill stated on your billing statement (SOA).
+                  </p>
+                </div>
 
-            <div>
-              <label className="block text-[12px] font-medium text-muted">Cut-off / Billing Cycle (optional)</label>
-              <input
-                type="text"
-                value={billingCycle}
-                onChange={(e) => setBillingCycle(e.target.value)}
-                placeholder="e.g. Every 15th of the month, Every cut-off"
-                className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2 text-[14px] text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
-              />
-            </div>
+                <div>
+                  <label className="block text-[12px] font-medium text-muted">Cut-off / Billing Cycle (optional)</label>
+                  <input
+                    type="text"
+                    value={billingCycle}
+                    onChange={(e) => setBillingCycle(e.target.value)}
+                    placeholder="e.g. Every 15th of the month, Every cut-off"
+                    className="mt-1 w-full rounded-xl bg-fill px-3.5 py-2 text-[14px] text-ink outline-none ring-1 ring-hairline placeholder:text-muted/60 focus:ring-accent"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-fill/60 p-3 text-[12px] text-muted flex items-center justify-between gap-2 border border-hairline">
+                <span className="text-muted/80">One-time payment upon due date.</span>
+                <span className="inline-flex items-center gap-1 font-semibold text-ink text-[11.5px] rounded-full bg-white px-2.5 py-0.5 shadow-2xs">
+                  1x Full Payment
+                </span>
+              </div>
+            )}
           </div>
 
           <div>

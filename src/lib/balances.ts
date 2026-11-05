@@ -1,5 +1,5 @@
 import type { GroupItem } from '../hooks/useAllItems';
-import { sumOwed } from './items';
+import { itemShareOwed, sumOwed } from './items';
 import type { Group, Item } from './types';
 
 function confirmedPaid(item: Item, uid: string): number {
@@ -31,12 +31,12 @@ export function computeBalances(items: GroupItem[], groups: Group[], uid: string
     if (item.group.ownerId === uid) {
       for (const [pid, share] of Object.entries(item.shares || {})) {
         if (pid === uid || !share || share.status === 'paid') continue;
-        owed += Math.max(0, item.splitCents - confirmedPaid(item, pid));
+        owed += Math.max(0, itemShareOwed(item, pid) - confirmedPaid(item, pid));
       }
     } else {
       const mine = item.shares?.[uid];
       if (mine && mine.status !== 'paid' && item.group.members[uid]?.status !== 'pending') {
-        owe += Math.max(0, item.splitCents - confirmedPaid(item, uid));
+        owe += Math.max(0, itemShareOwed(item, uid) - confirmedPaid(item, uid));
       }
     }
   }

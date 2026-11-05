@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, Pencil, Plus, ReceiptText } from 'lucide-react';
 import { itemGradient } from '../../lib/cardTheme';
 import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
-import { amountProgress, cleanRef, confirmedPaid, itemProgress } from '../../lib/items';
+import { amountProgress, cleanRef, confirmedPaid, itemProgress, itemShareOwed } from '../../lib/items';
 import { nextDueInfo } from '../../lib/itemStatus';
 import { recordPayment, rejectPayment } from '../../services/items';
 import { useSafeWrite } from '../../hooks/useToast';
@@ -52,13 +52,14 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
   const { total } = itemProgress(item, group.ownerId);
   const progress = amountProgress(item, group.ownerId);
   const mine = item.shares?.[uid];
+  const myOwed = itemShareOwed(item, uid);
   const myPaid = confirmedPaid(item, uid);
-  const myLeft = Math.max(0, item.splitCents - myPaid);
-  const myPct = item.splitCents > 0 ? Math.min(100, Math.round((myPaid / item.splitCents) * 100)) : 0;
+  const myLeft = Math.max(0, myOwed - myPaid);
+  const myPct = myOwed > 0 ? Math.min(100, Math.round((myPaid / myOwed) * 100)) : 0;
   const canPay = !isOwner && !!mine && myLeft > 0 && mine.status !== 'claimed';
   const monthly =
     item.monthlyCents ||
-    (item.installmentsCount && item.installmentsCount > 1 ? Math.round(item.splitCents / item.installmentsCount) : 0);
+    (item.installmentsCount && item.installmentsCount > 1 ? Math.round(myOwed / item.installmentsCount) : 0);
   const cardName = (item.store || '').trim() || group.name;
 
   const borrowers = people.filter(([pid]) => pid !== group.ownerId);
@@ -130,8 +131,8 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[11px] text-white/75">{monthly ? 'Monthly' : 'Each person'}</p>
-            <p className="text-[14px] font-semibold tabular-nums">{formatMoney(monthly || item.splitCents)}</p>
+            <p className="text-[11px] text-white/75">{monthly ? 'Monthly' : isOwner ? 'Each person' : 'Your share'}</p>
+            <p className="text-[14px] font-semibold tabular-nums">{formatMoney(monthly || (isOwner ? item.splitCents : myOwed))}</p>
           </div>
         </div>
 
@@ -141,7 +142,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
               <span>
                 {isOwner
                   ? `${formatMoney(progress.paid)} of ${formatMoney(progress.total)} collected`
-                  : `${formatMoney(myPaid)} of ${formatMoney(item.splitCents)} paid`}
+                  : `${formatMoney(myPaid)} of ${formatMoney(myOwed)} paid`}
               </span>
               <span>{isOwner ? progress.percent : myPct}%</span>
             </div>
@@ -243,7 +244,7 @@ export function ItemSheet({ item, group, uid, onClose, onEdit, onPay, onSetStatu
                   inputMode="decimal"
                   value={recAmount}
                   onChange={(e) => setRecAmount(cleanMoneyInput(e.target.value))}
-                  placeholder={centsToInput(Math.max(0, item.splitCents - confirmedPaid(item, recordFor)))}
+                  placeholder={centsToInput(Math.max(0, itemShareOwed(item, recordFor) - confirmedPaid(item, recordFor)))}
                   className={input}
                 />
               </div>

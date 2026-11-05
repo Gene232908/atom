@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronRight,
   Clock,
@@ -62,6 +62,15 @@ const FILTERS: ItemFilter[] = ['all', 'unpaid', 'waiting', 'paid'];
 export function GroupView({ group, uid }: { group: Group; uid: string }) {
   const user = useUser();
   const isOwner = group.ownerId === uid;
+
+  useEffect(() => {
+    if (group?.id) {
+      try {
+        sessionStorage.setItem('utang_last_active_card_id', group.id);
+        localStorage.setItem('utang_last_active_card_id', group.id);
+      } catch {}
+    }
+  }, [group?.id]);
   const { items: allItems, loading, fromServer, error, retry } = useItems(group.id, isOwner);
   // The lender sees every item. Someone who owes only sees the items they are part of.
   const items = useMemo(

@@ -4,7 +4,7 @@ import { loadQr } from '../../services/groups';
 import { groupGradient, itemGradient } from '../../lib/cardTheme';
 import { friendlyError } from '../../lib/errors';
 import { centsToInput, cleanMoneyInput, formatMoney, toCents } from '../../lib/money';
-import { confirmedPaid, firstName } from '../../lib/items';
+import { confirmedPaid, firstName, itemShareOwed } from '../../lib/items';
 import type { Group, Item } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
@@ -39,11 +39,12 @@ export function PaySheet({ open, onClose, group, uid, item, totalCents, unpaidCo
 
   // Calculate user's remaining balance for this item
   const paidSoFar = item ? confirmedPaid(item, uid) : 0;
-  const remainingCents = item ? Math.max(0, item.splitCents - paidSoFar) : totalCents;
+  const userOwed = item ? itemShareOwed(item, uid) : totalCents;
+  const remainingCents = item ? Math.max(0, userOwed - paidSoFar) : totalCents;
 
   const installmentMonthly =
     item?.installmentsCount && item.installmentsCount > 1
-      ? Math.round(item.splitCents / item.installmentsCount)
+      ? (item.monthlyCents && item.monthlyCents > 0 ? item.monthlyCents : Math.round(userOwed / item.installmentsCount))
       : null;
 
   useEffect(() => {

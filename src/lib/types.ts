@@ -34,6 +34,8 @@ export interface Share {
   name: string;
   status: ShareStatus;
   updatedAt: number;
+  /** Amount in centavos this person owes on this item (if customized) */
+  splitCents?: number;
   /** Amount in centavos already paid towards this share (for installments / cut-offs) */
   paidCents?: number;
   /** Latest payment reference number (e.g. GCash / Maya reference string) */

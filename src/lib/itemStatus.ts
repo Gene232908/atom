@@ -1,4 +1,4 @@
-import { amountProgress, confirmedPaid, dueInfo, isItemDone, itemProgress, otherShares, type DueInfo } from './items';
+import { amountProgress, confirmedPaid, dueInfo, isItemDone, itemProgress, itemShareOwed, otherShares, type DueInfo } from './items';
 import { formatMoney } from './money';
 import type { Item } from './types';
 
@@ -16,7 +16,7 @@ export interface RowStatus {
 export function remainingFor(item: Item, uid: string): number {
   const share = item.shares?.[uid];
   if (!share || share.status === 'paid') return 0;
-  return Math.max(0, item.splitCents - (share.paidCents ?? 0));
+  return Math.max(0, itemShareOwed(item, uid) - (share.paidCents ?? 0));
 }
 
 /**
@@ -30,7 +30,8 @@ export function rowStatus(item: Item, ownerId: string, viewerUid: string, focusU
   if (person) {
     const share = item.shares?.[person];
     if (!share) return { label: 'Not included', tone: 'muted', amount: 0, done: false };
-    if (share.status === 'paid') return { label: 'Paid', tone: 'ok', amount: item.splitCents, done: true };
+    const owed = itemShareOwed(item, person);
+    if (share.status === 'paid') return { label: 'Paid', tone: 'ok', amount: owed, done: true };
     const left = remainingFor(item, person);
     if (share.status === 'claimed') return { label: 'Waiting', tone: 'warn', amount: left, done: false };
     if ((share.paidCents ?? 0) > 0) return { label: 'Partly paid', tone: 'accent', amount: left, done: false };

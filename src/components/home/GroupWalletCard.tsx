@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { groupGradient } from '../../lib/cardTheme';
 import { navigate } from '../../hooks/useRoute';
 import { useLongPress } from '../../hooks/useLongPress';
@@ -189,9 +189,25 @@ function DeckCardItem({
   );
 }
 
+const ACTIVE_CARD_STORAGE_KEY = 'utang_last_active_card_id';
+
 /** 3D stacked card deck: cards behind peek out; swipe left/right flips & cycles seamlessly */
 export function SingleCardCarousel({ groups, uid, onHold, items = [] }: { groups: Group[]; uid: string; onHold?: OnHold; items?: any[] }) {
-  const [current, setCurrent] = useState(0);
+  const total = groups.length;
+
+  const [current, setCurrent] = useState(() => {
+    try {
+      const savedId = sessionStorage.getItem(ACTIVE_CARD_STORAGE_KEY) || localStorage.getItem(ACTIVE_CARD_STORAGE_KEY);
+      if (savedId && groups.length > 0) {
+        const idx = groups.findIndex((g) => g.id === savedId);
+        if (idx >= 0) return idx;
+      }
+    } catch {
+      // ignore
+    }
+    return 0;
+  });
+
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -202,10 +218,37 @@ export function SingleCardCarousel({ groups, uid, onHold, items = [] }: { groups
   const currentDragXRef = useRef(0);
   const didMoveRef = useRef(false);
 
-  const total = groups.length;
   if (total === 0) return null;
 
   const activeIndex = ((current % total) + total) % total;
+
+  // Sync active card whenever index changes
+  useEffect(() => {
+    const activeGroup = groups[activeIndex];
+    if (activeGroup?.id) {
+      try {
+        sessionStorage.setItem(ACTIVE_CARD_STORAGE_KEY, activeGroup.id);
+        localStorage.setItem(ACTIVE_CARD_STORAGE_KEY, activeGroup.id);
+      } catch {
+        // ignore
+      }
+    }
+  }, [activeIndex, groups]);
+
+  // When groups load or change, restore position to saved active card
+  useEffect(() => {
+    try {
+      const savedId = sessionStorage.getItem(ACTIVE_CARD_STORAGE_KEY) || localStorage.getItem(ACTIVE_CARD_STORAGE_KEY);
+      if (savedId && groups.length > 0) {
+        const idx = groups.findIndex((g) => g.id === savedId);
+        if (idx >= 0) {
+          setCurrent(idx);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [groups]);
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (total <= 1) return;
@@ -319,10 +362,15 @@ export function SingleCardCarousel({ groups, uid, onHold, items = [] }: { groups
 
   const handleCardClick = (group: Group, rel: number) => {
     if (didMoveRef.current || Math.abs(currentDragXRef.current) > 8) return;
+    try {
+      sessionStorage.setItem(ACTIVE_CARD_STORAGE_KEY, group.id);
+      localStorage.setItem(ACTIVE_CARD_STORAGE_KEY, group.id);
+    } catch {}
     if (rel === 0) {
       navigate(`/g/${group.id}`);
     } else {
-      setCurrent((i) => (i + rel) % total);
+      const nextIdx = (current + rel + total) % total;
+      setCurrent(nextIdx);
     }
   };
 

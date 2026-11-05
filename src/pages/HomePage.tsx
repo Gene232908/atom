@@ -5,7 +5,7 @@ import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
 import { useSafeWrite, useToast } from '../hooks/useToast';
 import { formatMoney } from '../lib/money';
-import { computeTotals, confirmedPaid, firstName } from '../lib/items';
+import { computeTotals, confirmedPaid, firstName, itemShareOwed } from '../lib/items';
 import { computeBalances } from '../lib/balances';
 import type { Item, ShareStatus } from '../lib/types';
 import { confirmPayment, recordPayment, undoPayment } from '../services/items';
@@ -399,7 +399,8 @@ export function HomePage() {
       const ownerName = firstName(parent.members[parent.ownerId]?.name ?? 'The lender');
       {
         // Always save how much was sent, so the lender confirms the right amount.
-        const left = Math.max(0, item.splitCents - confirmedPaid(item, user.uid));
+        const owed = itemShareOwed(item, user.uid);
+        const left = Math.max(0, owed - confirmedPaid(item, user.uid));
         const payAmount = amountCents && amountCents > 0 ? Math.min(amountCents, left) : left;
         const payerName = parent.members[user.uid]?.name ?? item.shares[user.uid]?.name ?? 'You';
         write(
@@ -697,7 +698,8 @@ export function HomePage() {
                         const cardItems = items.filter((it) => it.group.id === card.id && it.shares?.[user.uid]);
                         const pendingTotalCents = cardItems.reduce((sum, it) => {
                           const share = it.shares[user.uid];
-                          return sum + (share?.paidCents ? Math.max(0, it.splitCents - share.paidCents) : it.splitCents);
+                          const owed = itemShareOwed(it, user.uid);
+                          return sum + (share?.paidCents ? Math.max(0, owed - share.paidCents) : owed);
                         }, 0);
 
                         return (
@@ -848,8 +850,8 @@ export function HomePage() {
           item={payingItem}
           totalCents={
             payingItem.shares?.[user.uid]?.paidCents
-              ? Math.max(0, payingItem.splitCents - payingItem.shares[user.uid].paidCents!)
-              : payingItem.splitCents
+              ? Math.max(0, itemShareOwed(payingItem, user.uid) - payingItem.shares[user.uid].paidCents!)
+              : itemShareOwed(payingItem, user.uid)
           }
           unpaidCount={1}
           onPaid={onPaid}

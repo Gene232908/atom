@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Clock, Copy, X } from 'lucide-react';
 import { formatMoney } from '../../lib/money';
 import { copyText } from '../../lib/clipboard';
-import { cleanRef, confirmedPaid, firstName, pendingClaim } from '../../lib/items';
+import { cleanRef, confirmedPaid, firstName, itemShareOwed, pendingClaim } from '../../lib/items';
 import type { Group, Item, Share, ShareStatus } from '../../lib/types';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -34,7 +34,8 @@ export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus
   const status: ShareStatus = share?.status ?? 'unpaid';
 
   const paid = confirmedPaid(item, personUid);
-  const left = Math.max(0, item.splitCents - paid);
+  const owed = itemShareOwed(item, personUid);
+  const left = Math.max(0, owed - paid);
   const sent = pendingClaim(item, personUid);
   const ref = cleanRef(share?.refNumber);
   const askAmount = Math.min(left, sent || left);
@@ -42,8 +43,8 @@ export function ShareRow({ personUid, share, item, group, viewerUid, onSetStatus
 
   let detail = '';
   if (isLender) detail = 'Lender';
-  else if (status === 'paid') detail = formatMoney(item.splitCents);
-  else if (paid > 0) detail = `${formatMoney(left)} left`;
+  else if (status === 'paid') detail = formatMoney(owed);
+  else if (paid > 0) detail = `${formatMoney(left)} left of ${formatMoney(owed)}`;
   else detail = `${formatMoney(left)} to pay`;
 
   return (

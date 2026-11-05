@@ -45,6 +45,13 @@ export function matchesFilter(
   }
 }
 
+/** Exact amount in centavos a specific member owes on this item. Falls back to item.splitCents if not customized. */
+export function itemShareOwed(item: Item, uid: string): number {
+  const share = item.shares?.[uid];
+  if (!share) return item.splitCents;
+  return typeof share.splitCents === 'number' && share.splitCents >= 0 ? share.splitCents : item.splitCents;
+}
+
 /** Unpaid amount per person, used for the totals shown on the home screen. */
 export function computeTotals(items: Item[], ownerId: string): Record<string, number> {
   const totals: Record<string, number> = {};
@@ -52,7 +59,8 @@ export function computeTotals(items: Item[], ownerId: string): Record<string, nu
     for (const [uid, share] of otherShares(item, ownerId)) {
       if (share.status !== 'paid') {
         const paid = share.paidCents ?? 0;
-        const remaining = Math.max(0, item.splitCents - paid);
+        const owed = itemShareOwed(item, uid);
+        const remaining = Math.max(0, owed - paid);
         totals[uid] = (totals[uid] ?? 0) + remaining;
       }
     }
@@ -153,14 +161,15 @@ export function firstName(name: string): string {
 export function confirmedPaid(item: Item, uid: string): number {
   const share = item.shares?.[uid];
   if (!share) return 0;
-  if (share.status === 'paid') return item.splitCents;
-  return Math.min(item.splitCents, Math.max(0, share.paidCents ?? 0));
+  const owed = itemShareOwed(item, uid);
+  if (share.status === 'paid') return owed;
+  return Math.min(owed, Math.max(0, share.paidCents ?? 0));
 }
 
 /** Progress by money (not by number of people), so half payments show as half. */
 export function amountProgress(item: Item, ownerId: string): { paid: number; total: number; percent: number } {
   const others = otherShares(item, ownerId);
-  const total = others.length * item.splitCents;
+  const total = others.reduce((sum, [uid]) => sum + itemShareOwed(item, uid), 0);
   const paid = others.reduce((sum, [uid]) => sum + confirmedPaid(item, uid), 0);
   return { paid, total, percent: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0 };
 }

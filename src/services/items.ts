@@ -16,7 +16,7 @@ import { auth, db } from '../lib/firebase';
 import { formatMoney } from '../lib/money';
 import { sendPushNotificationToUser } from '../lib/notifications';
 import { toItem } from '../lib/convert';
-import { cleanRef, confirmedPaid, pendingClaim, withAmountTag } from '../lib/items';
+import { cleanRef, confirmedPaid, itemShareOwed, pendingClaim, withAmountTag } from '../lib/items';
 import { computeLoanStats } from '../lib/loanUtils';
 import type { Item, PaymentRecord, Share, ShareStatus } from '../lib/types';
 import type { User } from 'firebase/auth';
@@ -292,8 +292,9 @@ export async function recordPayment(
   const ref = { groupId, itemId: item.id };
 
   if (payment.status === 'confirmed') {
-    const newPaid = Math.min(item.splitCents, confirmedPaid(item, payment.uid) + payment.amountCents);
-    const done = newPaid >= item.splitCents;
+    const owed = itemShareOwed(item, payment.uid);
+    const newPaid = Math.min(owed, confirmedPaid(item, payment.uid) + payment.amountCents);
+    const done = newPaid >= owed;
     await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), {
       payments,
       [`shares.${payment.uid}.paidCents`]: newPaid,
@@ -366,7 +367,8 @@ export async function confirmPayment(
 
   const share = item.shares[uid];
   const alreadyPaid = confirmedPaid(item, uid);
-  const left = Math.max(0, item.splitCents - alreadyPaid);
+  const owed = itemShareOwed(item, uid);
+  const left = Math.max(0, owed - alreadyPaid);
   const pendingId = payments.find((p) => p.uid === uid && p.status === 'pending')?.id ?? null;
   const suggested = pendingClaim(item, uid) || left;
   const amount = Math.min(left, Math.max(0, amountCents ?? suggested));
@@ -389,7 +391,7 @@ export async function confirmPayment(
   const newPaid = alreadyPaid + amount;
   await updateDoc(doc(db, 'groups', groupId, 'items', item.id), {
     payments,
-    [`shares.${uid}.status`]: newPaid >= item.splitCents ? 'paid' : 'unpaid',
+    [`shares.${uid}.status`]: newPaid >= owed ? 'paid' : 'unpaid',
     [`shares.${uid}.paidCents`]: newPaid,
     [`shares.${uid}.claimCents`]: 0,
     [`shares.${uid}.rejectedCents`]: 0,
@@ -397,7 +399,7 @@ export async function confirmPayment(
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   });
-  const leftAfter = Math.max(0, item.splitCents - newPaid);
+  const leftAfter = Math.max(0, owed - newPaid);
   notify(
     uid,
     groupId,
