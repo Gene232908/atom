@@ -47,7 +47,8 @@ export function InviteSheet({ open, onClose, group }: { open: boolean; onClose: 
   const handleAddFriend = async (friend: { uid: string; name: string; email: string; photo: string }) => {
     setAddingUid(friend.uid);
     try {
-      await inviteFriendToGroup(group.id, friend, user.uid);
+      const inviterName = user.displayName || user.email?.split('@')[0] || 'A friend';
+      await inviteFriendToGroup(group.id, friend, user.uid, group.name, inviterName);
       toast(`${friend.name} added to card! You can now split items with them.`);
     } catch (err: any) {
       toast(err.message || 'Failed to add friend');

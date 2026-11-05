@@ -105,7 +105,8 @@ export function FriendsSheet({ open, onClose, onOpenJoinCode }: Props) {
   };
 
   const handleAccept = async (contact: FriendContact) => {
-    write(acceptFriendRequest(contact.friendshipId), `Connected with ${contact.name}!`);
+    const myName = user.displayName || user.email?.split('@')[0] || 'Your friend';
+    write(acceptFriendRequest(contact.friendshipId, { uid: user.uid, name: myName }), `Connected with ${contact.name}!`);
   };
 
   const handleDecline = async (contact: FriendContact) => {

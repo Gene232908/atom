@@ -17,6 +17,7 @@ import {
 import { db } from '../lib/firebase';
 import { toGroup, toInvite } from '../lib/convert';
 import type { Group, Invite } from '../lib/types';
+import { sendPushNotificationToUser } from '../lib/notifications';
 
 const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -108,6 +109,8 @@ export async function inviteFriendToGroup(
   groupId: string,
   friend: { uid: string; name: string; email: string; photo: string },
   currentUid: string,
+  groupName?: string,
+  inviterName?: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'groups', groupId), {
     memberIds: arrayUnion(friend.uid),
@@ -121,17 +124,41 @@ export async function inviteFriendToGroup(
     },
     updatedAt: Date.now(),
   });
+
+  // Dispatch background push directly to friend's locked phone
+  sendPushNotificationToUser(friend.uid, {
+    title: 'New Card Invitation',
+    body: `${inviterName || 'A friend'} invited you to join "${groupName || 'Card'}". Tap to review and accept!`,
+    url: '/',
+    targetTab: 'owe',
+    tag: `card_invite_${groupId}`,
+    groupId,
+  }).catch((err) => console.warn('Card invite push error:', err));
 }
 
 /**
  * Payee / friend accepts the card invitation.
  * Their status becomes 'accepted', activating the card in their "You Owe".
  */
-export async function acceptGroupInvite(groupId: string, uid: string): Promise<void> {
+export async function acceptGroupInvite(groupId: string, uid: string, memberName?: string): Promise<void> {
+  const snap = await getDoc(doc(db, 'groups', groupId));
   await updateDoc(doc(db, 'groups', groupId), {
     [`members.${uid}.status`]: 'accepted',
     updatedAt: Date.now(),
   });
+
+  if (snap.exists()) {
+    const data = snap.data();
+    if (data.ownerId && data.ownerId !== uid) {
+      sendPushNotificationToUser(data.ownerId, {
+        title: 'Invitation Accepted',
+        body: `${memberName || 'Your friend'} accepted your invite to "${data.name}".`,
+        url: `/g/${groupId}`,
+        tag: `card_acc_${groupId}`,
+        groupId,
+      }).catch((err) => console.warn('Push error:', err));
+    }
+  }
 }
 
 /**

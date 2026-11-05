@@ -1,4 +1,4 @@
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { computeLoanStats, formatDueDateReadable } from './loanUtils';
 import { isItemDone, otherShares, firstName } from './items';
@@ -439,6 +439,109 @@ export async function unsubscribeFromPush(userId: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Ensures user is subscribed to Web Push if permission is granted.
+ * Called on startup/login to keep push tokens current.
+ */
+export async function ensurePushSubscribed(userId: string): Promise<boolean> {
+  if (!isPushSupported() || Notification.permission !== 'granted' || !userId) {
+    return false;
+  }
+  return subscribeToPush(userId);
+}
+
+/**
+ * Fetches all active Web Push subscriptions stored for a given user.
+ */
+export async function getUserPushSubscriptions(userId: string): Promise<any[]> {
+  if (!userId) return [];
+  try {
+    const snap = await getDocs(collection(db, 'users', userId, 'subscriptions'));
+    const list: any[] = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data && data.endpoint && data.keys) {
+        list.push({
+          id: d.id,
+          endpoint: data.endpoint,
+          keys: data.keys,
+        });
+      }
+    });
+    return list;
+  } catch (err) {
+    console.warn('Failed to fetch subscriptions for user', userId, err);
+    return [];
+  }
+}
+
+/**
+ * Sends a real Web Push notification via the serverless /api/send-push endpoint.
+ * This delivers directly to the user's phone via Google FCM or Apple APNs even if
+ * the phone is locked, asleep, or the app is closed!
+ */
+export async function sendPushNotificationToUser(
+  targetUserId: string,
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    tag?: string;
+    targetTab?: string;
+    groupId?: string;
+    itemId?: string;
+  },
+): Promise<{ success: boolean; delivered: number }> {
+  if (!targetUserId) return { success: false, delivered: 0 };
+  try {
+    const subs = await getUserPushSubscriptions(targetUserId);
+    if (subs.length === 0) {
+      return { success: false, delivered: 0 };
+    }
+
+    const res = await fetch('/api/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscriptions: subs.map((s) => ({ endpoint: s.endpoint, keys: s.keys })),
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || '/',
+        tag: payload.tag || 'utang_push',
+        targetTab: payload.targetTab || '',
+        groupId: payload.groupId || '',
+        itemId: payload.itemId || '',
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn('send-push returned status', res.status);
+      return { success: false, delivered: 0 };
+    }
+
+    const data = await res.json();
+
+    // Clean up any expired endpoints that Apple/Google reported as gone
+    if (Array.isArray(data.expiredEndpoints) && data.expiredEndpoints.length > 0) {
+      for (const s of subs) {
+        if (data.expiredEndpoints.includes(s.endpoint)) {
+          try {
+            await deleteDoc(doc(db, 'users', targetUserId, 'subscriptions', s.id));
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+
+    return { success: true, delivered: data.delivered || 0 };
+  } catch (err) {
+    console.error('sendPushNotificationToUser error:', err);
+    return { success: false, delivered: 0 };
+  }
+}
+
 
 /** Shows a native system notification via the Service Worker */
 export async function showSystemNotification(title: string, options: NotificationOptions): Promise<void> {

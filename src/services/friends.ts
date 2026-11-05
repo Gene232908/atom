@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Friendship, UserProfile } from '../lib/types';
+import { sendPushNotificationToUser } from '../lib/notifications';
 
 /**
  * Saves or updates user's searchable public profile in Firestore.
@@ -145,6 +146,15 @@ export async function sendFriendRequest(currentUser: User, target: UserProfile):
         [`userProfiles.${target.uid}`]: targetProfile,
         updatedAt: now,
       });
+
+      // Dispatch push notification to the friend
+      sendPushNotificationToUser(target.uid, {
+        title: 'Friend Request Accepted',
+        body: `${myProfile.name} accepted your friend request on Utang List!`,
+        url: '/',
+        tag: `friend_acc_${currentUser.uid}`,
+      }).catch((err) => console.warn('Push error:', err));
+
       return 'accepted';
     }
   }
@@ -167,17 +177,43 @@ export async function sendFriendRequest(currentUser: User, target: UserProfile):
     { merge: true },
   );
 
+  // Dispatch background push directly to friend's locked phone
+  sendPushNotificationToUser(target.uid, {
+    title: 'New Friend Request',
+    body: `${myProfile.name} sent you a friend request on Utang List!`,
+    url: '/',
+    tag: `friend_req_${currentUser.uid}`,
+  }).catch((err) => console.warn('Push dispatch error:', err));
+
   return 'sent';
 }
 
 /**
- * Accepts an incoming friend request.
+ * Accepts an incoming friend request and notifies the requester.
  */
-export async function acceptFriendRequest(friendshipId: string): Promise<void> {
+export async function acceptFriendRequest(
+  friendshipId: string,
+  currentUser?: { uid: string; name: string },
+): Promise<void> {
+  const snap = await getDoc(doc(db, 'friendships', friendshipId));
   await updateDoc(doc(db, 'friendships', friendshipId), {
     status: 'accepted',
     updatedAt: Date.now(),
   });
+
+  if (snap.exists()) {
+    const data = snap.data();
+    const otherUid = data.users?.find((u: string) => u !== currentUser?.uid) || data.senderUid;
+    if (otherUid && otherUid !== currentUser?.uid) {
+      const myName = currentUser?.name || 'Your friend';
+      sendPushNotificationToUser(otherUid, {
+        title: 'Friend Request Accepted',
+        body: `${myName} accepted your friend request on Utang List!`,
+        url: '/',
+        tag: `friend_acc_${friendshipId}`,
+      }).catch((err) => console.warn('Push error:', err));
+    }
+  }
 }
 
 /**

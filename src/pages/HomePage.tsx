@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, History, MoreHorizontal, Plus, UserPlus, WalletCards } from 'lucide-react';
+import { Bell, ChevronRight, History, MoreHorizontal, Plus, UserPlus, WalletCards, X } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
@@ -19,7 +19,15 @@ import { AppIconSheet } from '../components/home/AppIconSheet';
 import { HistorySheet } from '../components/home/HistorySheet';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
-import { evaluateDueReminders, checkAndDispatchDueReminders, checkAndDispatchFriendRequestNotification, checkAndDispatchCardInviteNotification } from '../lib/notifications';
+import {
+  evaluateDueReminders,
+  checkAndDispatchDueReminders,
+  checkAndDispatchFriendRequestNotification,
+  checkAndDispatchCardInviteNotification,
+  ensurePushSubscribed,
+  subscribeToPush,
+  isPushSupported,
+} from '../lib/notifications';
 import { ItemSheet } from '../components/group/ItemSheet';
 import { ItemFormSheet } from '../components/group/ItemFormSheet';
 import { PaySheet } from '../components/group/PaySheet';
@@ -238,6 +246,30 @@ export function HomePage() {
       });
     }
   }, [pendingCardInvites]);
+
+  // Auto-sync Web Push token so the phone can receive background push when locked
+  useEffect(() => {
+    if (user && user.uid && isPushSupported()) {
+      ensurePushSubscribed(user.uid).catch((err) => {
+        console.warn('Auto ensurePushSubscribed failed:', err);
+      });
+    }
+  }, [user]);
+
+  // Prompt banner state for enabling phone notifications if not yet granted
+  const [pushPermDismissed, setPushPermDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('dismissed_push_perm_prompt') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const shouldShowPushPrompt =
+    !pushPermDismissed &&
+    isPushSupported() &&
+    typeof Notification !== 'undefined' &&
+    Notification.permission === 'default';
 
   const handleSelectReminder = (targetGroup: Group, targetItem: Item) => {
     setRemindersOpen(false);
@@ -525,6 +557,53 @@ export function HomePage() {
                 />
               </div>
 
+              {/* Phone Alert Activation Banner for lock-screen push */}
+              {shouldShowPushPrompt && (
+                <div className="rounded-[18px] bg-gradient-to-r from-accent/12 via-white to-white p-3.5 ring-1 ring-accent/20 shadow-xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-white shadow-xs">
+                      <Bell className="size-4" strokeWidth={2.4} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold text-ink truncate">Receive phone alerts</p>
+                      <p className="text-[11.5px] text-muted truncate">
+                        Get alerts for friend requests & card invites even when phone is locked.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={async () => {
+                        const ok = await subscribeToPush(user.uid);
+                        if (ok) {
+                          toast('Phone alerts activated! You will receive notifications on your lock screen.');
+                          setPushPermDismissed(true);
+                        } else {
+                          toast('Notification permission was not granted.');
+                        }
+                      }}
+                    >
+                      Enable
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPushPermDismissed(true);
+                        try {
+                          localStorage.setItem('dismissed_push_perm_prompt', 'true');
+                        } catch {}
+                      }}
+                      className="grid size-7 place-items-center rounded-full text-muted hover:text-ink hover:bg-fill transition"
+                      title="Dismiss"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Actionable Due Date Reminder Alert Banner */}
               {reminders.length > 0 && (
                 <button
@@ -650,7 +729,10 @@ export function HomePage() {
                                   size="sm"
                                   variant="primary"
                                   onClick={() => {
-                                    write(acceptGroupInvite(card.id, user.uid), `Joined "${card.name}"! Debts are now active.`);
+                                    write(
+                                      acceptGroupInvite(card.id, user.uid, user.displayName || name || 'Your friend'),
+                                      `Joined "${card.name}"! Debts are now active.`,
+                                    );
                                   }}
                                 >
                                   Accept
