@@ -3,6 +3,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -191,16 +192,34 @@ export async function loadQr(groupId: string): Promise<string | null> {
 
 /** Deletes a list together with all its items, its invite and its QR picture. */
 export async function deleteGroup(group: Group): Promise<void> {
-  const items = await getDocs(collection(db, 'groups', group.id, 'items'));
-  const refs = items.docs.map((d) => d.ref);
-  for (let i = 0; i < refs.length; i += 400) {
-    const batch = writeBatch(db);
-    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
-    await batch.commit();
+  // 1. Delete all items in the subcollection
+  try {
+    const items = await getDocs(collection(db, 'groups', group.id, 'items'));
+    for (const d of items.docs) {
+      await deleteDoc(d.ref).catch(() => undefined);
+    }
+  } catch (err) {
+    console.warn('Error deleting sub-items:', err);
   }
-  const batch = writeBatch(db);
-  if (group.inviteCode) batch.delete(doc(db, 'invites', group.inviteCode));
-  if (group.hasQr) batch.delete(doc(db, 'qr', group.id));
-  batch.delete(doc(db, 'groups', group.id));
-  await batch.commit();
+
+  // 2. Delete invite code if shared group
+  if (group.groupType !== 'loan' && group.inviteCode) {
+    try {
+      await deleteDoc(doc(db, 'invites', group.inviteCode)).catch(() => undefined);
+    } catch {
+      // Ignore if invite doesn't exist
+    }
+  }
+
+  // 3. Delete QR picture if exists
+  if (group.hasQr) {
+    try {
+      await deleteDoc(doc(db, 'qr', group.id)).catch(() => undefined);
+    } catch {
+      // Ignore
+    }
+  }
+
+  // 4. Always delete the parent group document
+  await deleteDoc(doc(db, 'groups', group.id));
 }

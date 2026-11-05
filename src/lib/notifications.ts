@@ -544,3 +544,38 @@ export async function sendInstantTestNotification(): Promise<boolean> {
 
   return true;
 }
+
+/** Checks and dispatches push notification for incoming friend requests */
+export async function checkAndDispatchFriendRequestNotification(
+  incomingRequests: { uid: string; name: string; email?: string }[],
+): Promise<void> {
+  if (incomingRequests.length === 0 || !isPushSupported() || Notification.permission !== 'granted') {
+    return;
+  }
+  const key = `friend_req_${incomingRequests.map((r) => r.uid).sort().join('_')}`;
+  try {
+    const stored = localStorage.getItem('last_notified_friend_req');
+    if (stored === key) return;
+  } catch {
+    // ignore
+  }
+
+  const names = incomingRequests.map((r) => r.name).join(', ');
+  const title = incomingRequests.length === 1 ? 'New Friend Request' : `${incomingRequests.length} Friend Requests`;
+  const body =
+    incomingRequests.length === 1
+      ? `${names} sent you a friend request on Utang List!`
+      : `${names} want to connect with you on Utang List!`;
+
+  await showSystemNotification(title, {
+    body,
+    tag: 'friend_requests',
+    data: { url: '/' },
+  });
+
+  try {
+    localStorage.setItem('last_notified_friend_req', key);
+  } catch {
+    // ignore
+  }
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
+import { Bell, ChevronRight, History, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
@@ -16,9 +16,10 @@ import { CardActionsSheet } from '../components/home/CardActionsSheet';
 import { JoinCodeSheet } from '../components/home/JoinCodeSheet';
 import { ProfileMenu } from '../components/home/ProfileMenu';
 import { AppIconSheet } from '../components/home/AppIconSheet';
+import { HistorySheet } from '../components/home/HistorySheet';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
-import { evaluateDueReminders, checkAndDispatchDueReminders } from '../lib/notifications';
+import { evaluateDueReminders, checkAndDispatchDueReminders, checkAndDispatchFriendRequestNotification } from '../lib/notifications';
 import { ItemSheet } from '../components/group/ItemSheet';
 import { ItemFormSheet } from '../components/group/ItemFormSheet';
 import { PaySheet } from '../components/group/PaySheet';
@@ -57,11 +58,12 @@ export function HomePage() {
   const write = useSafeWrite();
   const { groups, loading: groupsLoading, error, retry } = useGroups();
   const { items, loading: itemsLoading } = useAllItems(groups);
-  const { requestsCount: friendRequestsCount } = useFriends();
+  const { requestsCount: friendRequestsCount, incomingRequests } = useFriends();
 
   const [panel, setPanel] = useState<Panel>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [appIconOpen, setAppIconOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Card the person pressed and held (shows Edit / Remove)
   const [heldId, setHeldId] = useState<string | null>(null);
   const [txListOpen, setTxListOpen] = useState(false);
@@ -96,10 +98,21 @@ export function HomePage() {
   const closePanel = () => setPanel(null);
   const name = user.displayName || 'there';
 
-  // Loan items vs Lending vs Owing items
+  // All personal loans
   const loanItems = useMemo(
     () => items.filter((it) => it.isPersonalLoan || it.group.groupType === 'loan'),
     [items],
+  );
+
+  // Active (ongoing) personal loans: completed loans transfer to History
+  const activeLoanItems = useMemo(
+    () => loanItems.filter((it) => !computeLoanStats(it).isFullyPaid),
+    [loanItems],
+  );
+
+  const completedLoanItems = useMemo(
+    () => loanItems.filter((it) => computeLoanStats(it).isFullyPaid),
+    [loanItems],
   );
 
   const lendingItems = useMemo(
@@ -151,21 +164,27 @@ export function HomePage() {
     [liveGroups, user.uid, isLoanGroup],
   );
   const loanGroups = useMemo(
-    () => liveGroups.filter((g) => isLoanGroup(g) && g.ownerId === user.uid),
-    [liveGroups, user.uid, isLoanGroup],
+    () =>
+      liveGroups.filter((g) => {
+        if (!isLoanGroup(g) || g.ownerId !== user.uid) return false;
+        const gItems = items.filter((it) => it.group.id === g.id);
+        // Exclude empty deleted groups and fully paid completed loans (moved to History)
+        return gItems.length > 0 && gItems.some((it) => !computeLoanStats(it).isFullyPaid);
+      }),
+    [liveGroups, user.uid, isLoanGroup, items],
   );
 
-  // Total remaining balance and paid amount across all personal loans
+  // Total remaining balance and paid amount across active personal loans
   const { loanRemainingTotal, loanPaidTotal } = useMemo(() => {
     let remaining = 0;
     let paid = 0;
-    for (const it of loanItems) {
+    for (const it of activeLoanItems) {
       const stats = computeLoanStats(it);
       remaining += stats.remainingCents;
       paid += stats.totalPaidCents;
     }
     return { loanRemainingTotal: remaining, loanPaidTotal: paid };
-  }, [loanItems]);
+  }, [activeLoanItems]);
 
   const activeLoanItem = useMemo(() => {
     if (!viewingLoan) return null;
@@ -202,6 +221,15 @@ export function HomePage() {
       });
     }
   }, [items, groups, user.uid]);
+
+  // Friend request push notification dispatch
+  useEffect(() => {
+    if (incomingRequests && incomingRequests.length > 0) {
+      checkAndDispatchFriendRequestNotification(incomingRequests).catch((err) => {
+        console.warn('Friend request notification failed:', err);
+      });
+    }
+  }, [incomingRequests]);
 
   const handleSelectReminder = (targetGroup: Group, targetItem: Item) => {
     setRemindersOpen(false);
@@ -357,7 +385,7 @@ export function HomePage() {
           onTab={setTab}
           lendingItems={lendingItems}
           owingItems={owingItems}
-          loanItems={loanItems}
+          loanItems={activeLoanItems}
           youOwe={youOwe}
           owedToYou={owedToYou}
           loanRemainingTotal={loanRemainingTotal}
@@ -398,8 +426,8 @@ export function HomePage() {
                 <UserPlus className="size-[18px]" strokeWidth={2.2} />
               </IconButton>
               {friendRequestsCount > 0 && (
-                <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold text-white shadow-xs">
-                  {friendRequestsCount}
+                <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white shadow-xs">
+                  +{friendRequestsCount}
                 </span>
               )}
             </div>
@@ -445,6 +473,7 @@ export function HomePage() {
         onClose={() => setProfileOpen(false)}
         onOpenReminders={() => setRemindersOpen(true)}
         onOpenAppIcon={() => setAppIconOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
       />
 
       <PageBody>
@@ -532,9 +561,9 @@ export function HomePage() {
 
               {/* My cards: each list is one card */}
               {tab === 'loans' ? (
-                loanItems.length > 0 ? (
+                activeLoanItems.length > 0 ? (
                   <div className="space-y-3.5">
-                    {loanItems.map((loanIt, idx) => {
+                    {activeLoanItems.map((loanIt, idx) => {
                       const parentGroup = groups.find((g) => g.id === loanIt.group.id) || loanIt.group;
                       return (
                         <LoanWalletCard
@@ -550,12 +579,23 @@ export function HomePage() {
                 ) : (
                   <EmptyState
                     icon={<WalletCards className="size-7" />}
-                    title="No personal loans yet"
-                    text="Add a loan for your motorcycle (e.g. PCX 160 under Sumisho), phone, or gadgets to track monthly progress, cut-off dates, and payments."
+                    title={completedLoanItems.length > 0 ? 'No active personal loans' : 'No personal loans yet'}
+                    text={
+                      completedLoanItems.length > 0
+                        ? 'All of your personal loans are fully paid! You can review them anytime under your Profile > History.'
+                        : 'Add a loan for your motorcycle (e.g. PCX 160 under Sumisho), phone, or gadgets to track monthly progress, cut-off dates, and payments.'
+                    }
                     action={
-                      <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create_loan')}>
-                        Add a personal loan
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button size="sm" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={() => setPanel('create_loan')}>
+                          Add a personal loan
+                        </Button>
+                        {completedLoanItems.length > 0 && (
+                          <Button size="sm" variant="white" icon={<History className="size-4" />} onClick={() => setHistoryOpen(true)}>
+                            View Completed History
+                          </Button>
+                        )}
+                      </div>
                     }
                   />
                 )
@@ -772,6 +812,21 @@ export function HomePage() {
       <AppIconSheet
         open={appIconOpen}
         onClose={() => setAppIconOpen(false)}
+      />
+      <HistorySheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        groups={groups}
+        items={items}
+        uid={user.uid}
+        onOpenLoan={(g, it) => setViewingLoan({ group: g, item: it })}
+        onOpenItem={(it: GroupItem) => {
+          if (it.isPersonalLoan || it.group.groupType === 'loan') {
+            setViewingLoan({ group: it.group, item: it });
+          } else {
+            setViewingItemId(it.id);
+          }
+        }}
       />
     </>
   );

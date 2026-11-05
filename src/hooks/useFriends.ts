@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useUser } from './useAuth';
 import { subscribeFriendships, syncUserProfile } from '../services/friends';
 import type { Friendship } from '../lib/types';
@@ -9,6 +9,14 @@ export interface FriendContact {
   name: string;
   email: string;
   photo: string;
+}
+
+export type RelationshipStatus = 'none' | 'friend' | 'outgoing' | 'incoming';
+
+export interface Relationship {
+  status: RelationshipStatus;
+  contact?: FriendContact;
+  friendshipId?: string;
 }
 
 export function useFriends() {
@@ -89,6 +97,24 @@ export function useFriends() {
       });
   }, [friendships, user.uid]);
 
+  // Relationship helper for any user UID
+  const getRelationship = useCallback(
+    (targetUid: string): Relationship => {
+      if (!targetUid || targetUid === user.uid) return { status: 'none' };
+      const friend = friends.find((f) => f.uid === targetUid);
+      if (friend) return { status: 'friend', contact: friend, friendshipId: friend.friendshipId };
+
+      const outgoing = outgoingRequests.find((r) => r.uid === targetUid);
+      if (outgoing) return { status: 'outgoing', contact: outgoing, friendshipId: outgoing.friendshipId };
+
+      const incoming = incomingRequests.find((r) => r.uid === targetUid);
+      if (incoming) return { status: 'incoming', contact: incoming, friendshipId: incoming.friendshipId };
+
+      return { status: 'none' };
+    },
+    [friends, outgoingRequests, incomingRequests, user.uid],
+  );
+
   return {
     friendships,
     friends,
@@ -97,5 +123,7 @@ export function useFriends() {
     loading,
     totalCount: friends.length,
     requestsCount: incomingRequests.length,
+    outgoingCount: outgoingRequests.length,
+    getRelationship,
   };
 }

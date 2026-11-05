@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, LogOut, Smartphone, X } from 'lucide-react';
+import { Bell, History, LogOut, Smartphone, X } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { Avatar } from '../ui/Avatar';
 
@@ -8,9 +8,10 @@ interface Props {
   onClose: () => void;
   onOpenReminders?: () => void;
   onOpenAppIcon?: () => void;
+  onOpenHistory?: () => void;
 }
 
-export function ProfileMenu({ open, onClose, onOpenReminders, onOpenAppIcon }: Props) {
+export function ProfileMenu({ open, onClose, onOpenReminders, onOpenAppIcon, onOpenHistory }: Props) {
   const user = useUser();
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -102,6 +103,20 @@ export function ProfileMenu({ open, onClose, onOpenReminders, onOpenAppIcon }: P
           >
             <Smartphone className="size-4 shrink-0 text-accent" strokeWidth={2.2} />
             <span>Customize App Icon</span>
+          </button>
+        )}
+
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenHistory();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-semibold text-ink transition hover:bg-black/5 active:scale-[0.98]"
+          >
+            <History className="size-4 shrink-0 text-accent" strokeWidth={2.2} />
+            <span>Completed History</span>
           </button>
         )}
 

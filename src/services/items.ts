@@ -137,6 +137,27 @@ export function updateItem(groupId: string, itemId: string, input: ItemInput): P
   return updateDoc(doc(db, 'groups', groupId, 'items', itemId), data);
 }
 
+/** Updates both the loan group metadata and the loan item details */
+export async function updateLoan(
+  groupId: string,
+  itemId: string,
+  groupUpdates: { name: string; color: string },
+  itemUpdates: Record<string, unknown>,
+): Promise<void> {
+  const now = Date.now();
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'groups', groupId), {
+    name: groupUpdates.name.trim().slice(0, 80),
+    color: groupUpdates.color || '',
+    updatedAt: now,
+  });
+  batch.update(doc(db, 'groups', groupId, 'items', itemId), {
+    ...itemUpdates,
+    updatedAt: now,
+  });
+  await batch.commit();
+}
+
 /** Record a self-loan payment directly with instant confirmation and advance to next due date */
 export async function recordLoanPayment(
   groupId: string,

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { KeyRound, LayoutDashboard, LogOut, Plus, Sparkles, Users } from 'lucide-react';
+import { History, KeyRound, LayoutDashboard, LogOut, Plus, Sparkles, Users } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { useGroups } from '../../hooks/useGroups';
 import { navigate, type Route } from '../../hooks/useRoute';
@@ -14,6 +14,7 @@ import { CreateLoanSheet } from '../loan/CreateLoanSheet';
 import { JoinCodeSheet } from '../home/JoinCodeSheet';
 import { AppIconSheet } from '../home/AppIconSheet';
 import { FriendsSheet } from '../home/FriendsSheet';
+import { HistorySheet } from '../home/HistorySheet';
 import { useFriends } from '../../hooks/useFriends';
 
 const SIDEBAR = 'w-[260px]';
@@ -33,6 +34,7 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
   const { requestsCount: friendRequestsCount } = useFriends();
   const [panel, setPanel] = useState<'create' | 'join' | 'create_loan' | 'friends' | null>(null);
   const [appIconOpen, setAppIconOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const name = user.displayName || user.email || 'You';
 
   // Robust loan classification: checks groupType or if items inside have isPersonalLoan
@@ -80,10 +82,13 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
             <SideLink onClick={() => setPanel('friends')} icon={<Users className="size-[18px]" />}>
               <span className="flex-1">Friends</span>
               {friendRequestsCount > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
-                  {friendRequestsCount}
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white">
+                  +{friendRequestsCount}
                 </span>
               )}
+            </SideLink>
+            <SideLink onClick={() => setHistoryOpen(true)} icon={<History className="size-[18px]" />}>
+              Completed History
             </SideLink>
             <SideLink onClick={() => setPanel('join')} icon={<KeyRound className="size-[18px]" />}>
               Join a card
@@ -124,6 +129,15 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
       <CreateLoanSheet open={panel === 'create_loan'} onClose={() => setPanel(null)} />
       <JoinCodeSheet open={panel === 'join'} onClose={() => setPanel(null)} />
       <FriendsSheet open={panel === 'friends'} onClose={() => setPanel(null)} onOpenJoinCode={() => setPanel('join')} />
+      <HistorySheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        groups={savedGroups}
+        items={items}
+        uid={user.uid}
+        onOpenLoan={(g) => navigate(`/g/${g.id}`)}
+        onOpenItem={(it: GroupItem) => navigate(`/g/${it.group.id}`)}
+      />
       <AppIconSheet open={appIconOpen} onClose={() => setAppIconOpen(false)} />
     </div>
   );

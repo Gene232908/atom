@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  Pencil,
   Plus,
   ReceiptText,
   Trash2,
@@ -10,12 +11,13 @@ import { formatMoney } from '../../lib/money';
 import { computeLoanStats, formatDueDateReadable } from '../../lib/loanUtils';
 import { deleteGroup } from '../../services/groups';
 import { useToast } from '../../hooks/useToast';
-import type { Group, Item } from '../../lib/types';
+import type { Group, Item, PaymentRecord } from '../../lib/types';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { WalletCard } from '../ui/WalletCard';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
 import { PayLoanSheet } from './PayLoanSheet';
+import { EditLoanSheet } from './EditLoanSheet';
 
 interface Props {
   open: boolean;
@@ -30,6 +32,7 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
   const stats = useMemo(() => computeLoanStats(item), [item]);
 
   const [payOpen, setPayOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const provider = group.name || item.store || 'Personal Loan';
@@ -198,7 +201,7 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
               </div>
             ) : (
               <div className="divide-y divide-hairline rounded-[16px] bg-fill ring-1 ring-hairline overflow-hidden">
-                {payments.map((p, idx) => {
+                {payments.map((p: PaymentRecord, idx: number) => {
                   const isAdvance = (p.termsCovered ?? 1) > 1;
                   const termStart = p.termNumber ?? 1;
                   const termEnd = termStart + (p.termsCovered ?? 1) - 1;
@@ -254,19 +257,41 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
             )}
           </div>
 
-          {/* Danger Action: Delete Loan */}
-          <div className="pt-4 pb-1 text-center">
+          {/* Actions: Edit Loan & Delete Loan */}
+          <div className="pt-4 pb-1 flex items-center justify-center gap-4 border-t border-hairline">
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent hover:underline transition active:scale-95"
+            >
+              <Pencil className="size-3.5" />
+              <span>Edit loan details</span>
+            </button>
+
+            <span className="text-muted/40">•</span>
+
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-bad/70 hover:text-bad transition active:scale-95"
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-bad/70 hover:text-bad transition active:scale-95"
             >
               <Trash2 className="size-3.5" />
-              <span>Delete this loan</span>
+              <span>Delete loan</span>
             </button>
           </div>
         </div>
       </Sheet>
+
+      {/* Edit Loan Sheet */}
+      {editOpen && (
+        <EditLoanSheet
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          group={group}
+          item={item}
+          onSuccess={() => onUpdated?.()}
+        />
+      )}
 
       {/* Pay Sheet */}
       {payOpen && (

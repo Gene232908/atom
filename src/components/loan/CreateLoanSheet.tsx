@@ -320,10 +320,15 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
                   setMonthlyInput(cleanMoneyInput(e.target.value));
                   setErrors((prev) => ({ ...prev, monthly: '' }));
                 }}
-                placeholder={autoMonthlyCents > 0 ? centsToInput(autoMonthlyCents) : '0.00'}
+                placeholder=""
                 className="w-full rounded-[14px] bg-fill py-2.5 pl-8 pr-3.5 text-[15px] font-bold text-ink outline-none ring-1 ring-hairline focus:ring-accent"
               />
             </div>
+            {autoMonthlyCents > 0 && !monthlyInput && (
+              <p className="mt-1 text-[11px] text-muted">
+                Calculated: <span className="font-semibold text-ink">{formatMoney(autoMonthlyCents)}/mo</span> (tap Auto above to apply)
+              </p>
+            )}
             {errors.monthly && <p className="mt-1 text-[12px] text-bad">{errors.monthly}</p>}
           </div>
         </div>

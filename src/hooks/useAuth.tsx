@@ -22,6 +22,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { errorCode, friendlyError } from '../lib/errors';
+import { syncUserProfile } from '../services/friends';
 
 interface AuthValue {
   user: User | null;
@@ -59,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return onAuthStateChanged(auth, (next) => {
       setUser(next);
       setLoading(false);
+      if (next) {
+        syncUserProfile(next).catch(() => undefined);
+      }
     });
   }, []);
 

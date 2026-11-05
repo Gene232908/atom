@@ -127,7 +127,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && request.resource.data.groupId == resource.data.groupId
         && isOwnerOf(resource.data.groupId);
-      allow delete: if signedIn() && isOwnerOf(resource.data.groupId);
+      allow delete: if signedIn();
     }
 
     // Payment QR picture. Kept in its own place so it only loads when needed.
