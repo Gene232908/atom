@@ -55,13 +55,13 @@ export function DesktopShell({ route, children }: { route: Route; children: Reac
 
   return (
     <div className="min-h-dvh bg-canvas">
-      <aside className={`fixed inset-y-0 left-0 z-30 flex ${SIDEBAR} flex-col border-r border-hairline bg-white`}>
+      <aside id="tour-desktop-sidebar" className={`fixed inset-y-0 left-0 z-30 flex ${SIDEBAR} flex-col border-r border-hairline bg-white`}>
         <div className="flex items-center gap-2.5 px-5 pt-6 pb-5">
           <img src="/apple-touch-icon.png" alt="Utang List" className="size-8 rounded-[10px] shadow-xs" />
           <span className="text-[17px] font-bold tracking-tight">Utang List</span>
         </div>
 
-        <nav className="px-3">
+        <nav id="tour-desktop-overview" className="px-3">
           <SideLink active={route.name === 'home'} onClick={() => navigate('/')} icon={<LayoutDashboard className="size-[18px]" />}>
             Overview
           </SideLink>

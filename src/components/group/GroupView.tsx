@@ -277,7 +277,7 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
             {isOwner && (
               <QuickActions
                 actions={[
-                  { label: 'Add item', icon: <Plus className="size-6" />, onClick: () => setPanel({ kind: 'add' }) },
+                  { id: 'tour-add-item-btn', label: 'Add item', icon: <Plus className="size-6" />, onClick: () => setPanel({ kind: 'add' }) },
                   {
                     label: 'Invite',
                     icon: <UserPlus className="size-[22px]" />,

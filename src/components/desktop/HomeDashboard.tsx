@@ -101,9 +101,10 @@ export function HomeDashboard(props: Props) {
             {greeting()}, {firstName(props.userName)}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div id="tour-desktop-actions" className="flex gap-2">
           {props.onOpenTour && (
             <Button
+              id="tour-help-btn"
               variant="white"
               className="ring-1 ring-black/[0.08]"
               icon={<HelpCircle className="size-4 text-accent" />}
@@ -115,6 +116,7 @@ export function HomeDashboard(props: Props) {
           )}
           {props.onOpenReminders && (
             <Button
+              id="tour-desktop-reminders"
               variant="white"
               className="relative ring-1 ring-black/[0.08]"
               icon={<Bell className="size-4 text-accent" />}
@@ -237,7 +239,7 @@ export function HomeDashboard(props: Props) {
           )}
         </Panel>
 
-        <div className="grid items-start gap-6 lg:grid-cols-2 2xl:col-span-4 2xl:grid-cols-1">
+        <div id="tour-desktop-widgets" className="grid items-start gap-6 lg:grid-cols-2 2xl:col-span-4 2xl:grid-cols-1">
           <Panel title="Coming up" subtitle="Next due dates" delay={80}>
             {upcoming.length === 0 ? (
               <p className="border-t border-hairline px-6 py-8 text-center text-[13px] text-muted">No upcoming due dates.</p>

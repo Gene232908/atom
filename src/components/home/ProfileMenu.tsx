@@ -80,6 +80,7 @@ export function ProfileMenu({
 
       {/* Liquid glass bubble menu */}
       <div
+        id="tour-profile-menu"
         ref={menuRef}
         role="dialog"
         aria-label="Actions and profile menu"
