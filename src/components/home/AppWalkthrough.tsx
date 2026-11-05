@@ -10,7 +10,6 @@ import {
   HelpCircle,
   MoreHorizontal,
   Plus,
-  Sparkles,
   X,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -21,8 +20,6 @@ export interface TourStep {
   icon: typeof Plus;
   badge: string;
   description: string;
-  scenario: string;
-  actionHint?: string;
   shape?: 'circle' | 'rect';
 }
 
@@ -30,86 +27,58 @@ const TOUR_STEPS: TourStep[] = [
   {
     targetId: 'tour-add-btn',
     shape: 'circle',
-    badge: '1. Pagsisimula',
-    title: 'Gumawa ng Card o Personal Loan',
+    badge: '1 of 7',
+    title: 'Add a Card or Loan',
     icon: Plus,
-    description:
-      'Dito ka magsisimula! Pindutin ang bilog na "+" icon para magdagdag ng bagong Credit Card o Pay-Later card (tulad ng UnionBank, BDO, SPayLater, Maya Credit, Atome) o Personal Loan (hulugang motor, gadget, o appliance).',
-    scenario:
-      'Halimbawa: Ginusto mong i-swipe ang ₱3,500 grocery ng barkada sa UnionBank mo. Pindutin ang "+" para gumawa ng "UnionBank" card kung saan mo ililista ang mga utang nila.',
-    actionHint: 'Pindutin ang "+" sa itaas para mag-create.',
+    description: 'Tap "+" to create a new credit card, pay-later store, or personal installment loan.',
   },
   {
     targetId: 'tour-wallet-cards',
     shape: 'rect',
-    badge: '2. Cards & Split',
-    title: 'Mag-Add ng Items & Mag-Split ng Utang',
+    badge: '2 of 7',
+    title: 'Open Card & Add Items',
     icon: CreditCard,
-    description:
-      'I-tap ang alinmang Card para pumasok sa loob nito. Pindutin ang "+ Add item" para magtala ng utang. Pwede kang pumili ng 1x Full Payment o Installment (2, 3, 6, 12 mos), at pumili kung Pantay na Hatian (Split evenly) o Custom amount bawat miyembro.',
-    scenario:
-      'Halimbawa: May binili kayong ₱100 pizza. Sa Custom Split, pwede mong ilagay na si Mathew ay ₱60 at si Christian ay ₱40. Awtomatikong iva-validate ng app na pantay sa ₱100 ang total bago ma-save.',
-    actionHint: 'I-tap ang card para makapasok sa listahan ng utang.',
+    description: 'Tap any card to open it. Inside, tap "+ Add item" to split bills equally or set custom amounts per person.',
   },
   {
     targetId: 'tour-summary-tiles',
     shape: 'rect',
-    badge: '3. Financial Overview',
-    title: 'Summary: "You Owe" & "To Collect"',
+    badge: '3 of 7',
+    title: 'Balance Overview',
     icon: Coins,
-    description:
-      'Ito ang live computation ng iyong balances: "To collect" ang perang kailangan mo pang kubrahin mula sa mga pinautang mo, samantalang "You owe" naman ang mga kailangan mong bayaran sa ibang cards. Awtomatiko itong nag-a-update tuwing may kumpirmadong bayad.',
-    scenario:
-      'Halimbawa: Nang magbayad si Juan ng ₱500 at kinumpirma mo ang resibo, agarang bababa ang "To collect" mo nang walang manual na kalkulasyon.',
-    actionHint: 'Live dashboard ng lahat ng papasok at lalabas na pera.',
+    description: '"You owe" is what you pay. "To collect" is what others owe you. Automatically updates when payments are confirmed.',
   },
   {
     targetId: 'tour-tabs-toggle',
     shape: 'rect',
-    badge: '4. View Switcher',
-    title: 'Lend vs Owe vs Personal Loans',
+    badge: '4 of 7',
+    title: 'Switch Views',
     icon: ArrowLeftRight,
-    description:
-      'Mabilis na magpalit ng view sa isang pindot lang:\n• "You lend": Ikaw ang nagpautang o nag-swipe ng card.\n• "You owe": In-invite ka ng kaibigan sa card nila at ikaw ang magbabayad.\n• "My loans": Sarili mong mga hulugang pautang (motor, gadget) na ikaw lang mag-isa ang nagbabayad.',
-    scenario:
-      'Halimbawa: Kung may sarili kang hulugang motor sa Sumisho, lumipat sa "My loans" para makita ang progress bar at susunod na cut-off date.',
-    actionHint: 'I-tap ang tabs para magbago ang listahan.',
+    description: 'Toggle between "You lend" (debts to collect), "You owe" (debts you pay), and "My loans" (your installment loans).',
   },
   {
     targetId: 'tour-profile-btn',
     shape: 'circle',
-    badge: '5. Profile & Actions',
-    title: 'Friends, History, at Settings',
+    badge: '5 of 7',
+    title: 'Profile & Settings',
     icon: MoreHorizontal,
-    description:
-      'I-tap ang capsule sa itaas na may three dots (•••) para sa mga sumusunod:\n• Friends & Contacts: Mag-add ng mga kaibigan via email o code.\n• Completed History: Dito napupunta ang 100% fully paid na loans at utang para malinis ang home screen.\n• Wallet Settings: I-set ang paborito mong default view.',
-    scenario:
-      'Halimbawa: Kapag may nag-send sa\'yo ng friend request, may lalabas na pulang "+1" badge dito para ma-accept mo sila agad.',
-    actionHint: 'Nandito ang lahat ng account options at kasaysayan.',
+    description: 'Tap here to add friends, view completed payment history, and customize your wallet settings.',
   },
   {
     targetId: 'tour-profile-btn',
     shape: 'circle',
-    badge: '6. Real-Time Alerts',
-    title: 'Phone Alerts & Due Reminders',
+    badge: '6 of 7',
+    title: 'Phone Alerts & Reminders',
     icon: Bell,
-    description:
-      'Wala nang makakalimutang singilin o bayaran! Makakatanggap ka ng lock-screen push notifications kapag may nagpadala ng bayad, may bagong friend request, o may parating na cut-off date (1–2 araw bago ang due date) kahit naka-lock ang cellphone mo.\n\nPindutin ang capsule na ito para buksan ang Due Reminders at i-activate ang lock-screen alerts.',
-    scenario:
-      'Halimbawa: Bukas na ang due date mo sa SPayLater. Tutunog ang phone mo: "Due tomorrow: SPayLater (₱1,200.00)" para maiwasan ang late penalty fees!',
-    actionHint: 'Pindutin ang capsule para tingnan ang Due Reminders.',
+    description: 'Get lock-screen alerts for upcoming due dates, payment confirmations, and friend requests.',
   },
   {
     targetId: 'tour-help-btn',
     shape: 'circle',
-    badge: '7. Tulong & Replay',
-    title: 'Maliit na "?" Icon — Gabay Anumang Oras',
+    badge: '7 of 7',
+    title: 'Quick Guide & Replay',
     icon: HelpCircle,
-    description:
-      'Para sa mga existing accounts o kapag may nais kang balikan, i-click lamang itong maliit na "?" button sa itaas (o buksan ang Profile Menu).\n\nAwtomatikong ipapaliwanag muli nang step-by-step ang bawat function at pindutan nang hindi naaapektuhan ang iyong mga nailistang data!',
-    scenario:
-      'Halimbawa: May bago kang kaibigang nagtanong kung paano mag-split ng utang o mag-add ng card, pindutin lang ang "?" button para ma-review agad.',
-    actionHint: 'Pindutin ang "?" icon kahit kailan para ulitin ang tour.',
+    description: 'Tap this "?" icon anytime to replay this step-by-step walkthrough.',
   },
 ];
 
@@ -155,7 +124,7 @@ export function AppWalkthrough({ open, onClose }: Props) {
     setTargetRect({ left, top, width, height, radius });
   }, [open, step.targetId, step.shape]);
 
-  // Scroll target element into view smoothly when step changes
+  // Scroll target element smoothly so it never collides with the card
   useLayoutEffect(() => {
     if (!open) return;
     const el = document.getElementById(step.targetId);
@@ -194,8 +163,18 @@ export function AppWalkthrough({ open, onClose }: Props) {
 
   const StepIcon = step.icon;
 
+  // Guarantee the card NEVER overlaps the highlighted element:
+  // If target element is in the lower half of viewport, place card at the top.
+  // If target element is in the upper half of viewport, place card at the bottom.
+  const targetCenterY = targetRect
+    ? targetRect.top + targetRect.height / 2
+    : typeof window !== 'undefined'
+      ? window.innerHeight / 2
+      : 300;
+  const isTargetLowerHalf = typeof window !== 'undefined' && targetCenterY > window.innerHeight * 0.44;
+
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end sm:justify-center items-center overflow-hidden select-none p-3 sm:p-6 animate-fade-in">
+    <div className="fixed inset-0 z-[100] overflow-hidden select-none animate-fade-in pointer-events-auto">
       {/* SVG Spotlight Mask Cutout */}
       <svg
         className="pointer-events-none fixed inset-0 h-full w-full"
@@ -240,22 +219,23 @@ export function AppWalkthrough({ open, onClose }: Props) {
         />
       )}
 
-      {/* Floating Glassmorphic Bubble Card */}
+      {/* Compact Floating Glassmorphic Bubble Card (Positioned away from target) */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={step.title}
-        className="relative z-10 w-full max-w-[420px] rounded-[28px] bg-white/95 p-5 sm:p-6 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.35),0_0_0_0.5px_rgba(0,0,0,0.08)] ring-1 ring-white/90 ring-inset backdrop-blur-2xl backdrop-saturate-150 animate-pop mb-1 sm:mb-0"
+        style={{
+          ...(isTargetLowerHalf
+            ? { top: 'max(16px, env(safe-area-inset-top, 16px))' }
+            : { bottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }),
+        }}
+        className="fixed inset-x-3 sm:inset-x-6 mx-auto z-10 w-auto max-w-[380px] rounded-[22px] bg-white/95 p-3.5 sm:p-4 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.35),0_0_0_0.5px_rgba(0,0,0,0.08)] ring-1 ring-white/90 ring-inset backdrop-blur-2xl backdrop-saturate-150 animate-pop"
       >
         {/* Top Header: Badge, Step Counter, and Close Button */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-[11px] font-bold text-accent tracking-wide uppercase">
-              <Sparkles className="size-3" />
-              {step.badge}
-            </span>
-            <span className="text-[11px] font-semibold text-muted">
-              {stepIndex + 1} / {TOUR_STEPS.length}
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10.5px] font-bold text-accent tracking-wide uppercase">
+              Step {step.badge}
             </span>
           </div>
 
@@ -263,45 +243,30 @@ export function AppWalkthrough({ open, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Skip walkthrough"
-            title="Laktawan ang Gabay"
-            className="grid size-7 place-items-center rounded-full text-muted hover:bg-black/5 hover:text-ink active:scale-90 transition"
+            title="Close / Skip"
+            className="grid size-6 place-items-center rounded-full text-muted hover:bg-black/5 hover:text-ink active:scale-90 transition"
           >
-            <X className="size-4" strokeWidth={2.4} />
+            <X className="size-3.5" strokeWidth={2.4} />
           </button>
         </div>
 
         {/* Title and Icon */}
-        <div className="mt-3 flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent text-white shadow-md shadow-accent/25">
-            <StepIcon className="size-5" strokeWidth={2.5} />
+        <div className="mt-2 flex items-center gap-2.5">
+          <div className="grid size-7 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-xs">
+            <StepIcon className="size-3.5" strokeWidth={2.5} />
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[16px] sm:text-[17px] font-bold text-ink leading-tight">
-              {step.title}
-            </h3>
-            {step.actionHint && (
-              <p className="mt-0.5 text-[11px] font-medium text-accent">
-                {step.actionHint}
-              </p>
-            )}
-          </div>
+          <h3 className="text-[14px] font-bold text-ink leading-tight">
+            {step.title}
+          </h3>
         </div>
 
-        {/* Detailed Explanation */}
-        <div className="mt-3 text-[13px] sm:text-[13.5px] leading-relaxed text-ink/85 whitespace-pre-line">
+        {/* Short, direct explanation */}
+        <p className="mt-1.5 text-[12px] leading-relaxed text-ink/80">
           {step.description}
-        </div>
-
-        {/* Concrete Example Scenario Box */}
-        <div className="mt-3 rounded-2xl bg-amber-50/90 p-3 ring-1 ring-amber-200/80 text-[12px] sm:text-[12.5px] text-amber-950 space-y-1">
-          <p className="font-bold flex items-center gap-1.5 text-amber-900 text-[11.5px] uppercase tracking-wider">
-            <span>💡 Halimbawa (Scenario):</span>
-          </p>
-          <p className="leading-relaxed opacity-90">{step.scenario}</p>
-        </div>
+        </p>
 
         {/* Footer: Progress Dots & Action Buttons */}
-        <div className="mt-4 flex items-center justify-between gap-3 pt-2 border-t border-hairline/60">
+        <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-hairline/60">
           {/* Progress dots */}
           <div className="flex items-center gap-1">
             {TOUR_STEPS.map((_, idx) => (
@@ -309,10 +274,10 @@ export function AppWalkthrough({ open, onClose }: Props) {
                 key={idx}
                 type="button"
                 onClick={() => setStepIndex(idx)}
-                aria-label={`Pumunta sa hakbang ${idx + 1}`}
+                aria-label={`Go to step ${idx + 1}`}
                 className={`h-1.5 rounded-full transition-all duration-200 ${
                   idx === stepIndex
-                    ? 'w-5 bg-accent'
+                    ? 'w-4 bg-accent'
                     : 'w-1.5 bg-black/20 hover:bg-black/35'
                 }`}
               />
@@ -320,16 +285,16 @@ export function AppWalkthrough({ open, onClose }: Props) {
           </div>
 
           {/* Navigation Controls */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {!isFirst && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setStepIndex((i) => i - 1)}
-                className="text-[12px] h-8 px-2.5 text-muted hover:text-ink"
-                icon={<ChevronLeft className="size-3.5" />}
+                className="text-[11.5px] h-7 px-2 text-muted hover:text-ink"
+                icon={<ChevronLeft className="size-3" />}
               >
-                Bumalik
+                Back
               </Button>
             )}
 
@@ -338,20 +303,20 @@ export function AppWalkthrough({ open, onClose }: Props) {
                 size="sm"
                 variant="primary"
                 onClick={onClose}
-                className="text-[12px] h-8 px-3 font-bold shadow-md shadow-accent/25"
-                icon={<Check className="size-3.5" strokeWidth={3} />}
+                className="text-[11.5px] h-7 px-2.5 font-bold shadow-xs"
+                icon={<Check className="size-3" strokeWidth={3} />}
               >
-                Simulan na!
+                Got it!
               </Button>
             ) : (
               <Button
                 size="sm"
                 variant="primary"
                 onClick={() => setStepIndex((i) => i + 1)}
-                className="text-[12px] h-8 px-3 font-semibold shadow-md shadow-accent/25"
+                className="text-[11.5px] h-7 px-2.5 font-semibold shadow-xs"
               >
-                <span>Susunod</span>
-                <ChevronRight className="size-3.5 ml-1" />
+                <span>Next</span>
+                <ChevronRight className="size-3 ml-0.5" />
               </Button>
             )}
           </div>
