@@ -178,8 +178,12 @@ export function GroupDashboard(p: GroupDashboardProps) {
               empty={
                 <EmptyState
                   icon={<ReceiptText className="size-7" />}
-                  title={items.length ? 'Nothing here' : 'No items yet'}
-                  text={items.length ? 'Try another filter.' : isOwner ? 'Click Add item to list what people owe you.' : `No items for you yet. When ${ownerName} adds one for you, it shows here.`}
+                  title={items.length ? (isOwner ? 'Nothing here' : 'No items for you here') : (isOwner ? 'No items yet' : 'No items listed yet')}
+                  text={
+                    items.length
+                      ? (isOwner ? 'Try another filter.' : `This is where your items will appear once ${ownerName} assigns them to you.`)
+                      : (isOwner ? 'Click Add item to list what people owe you.' : `This is where your pinagkakautangan will appear once ${ownerName} lists your items on this card. Only the card lender can add items.`)
+                  }
                   action={!items.length && isOwner ? <Button size="sm" icon={<Plus className="size-4" />} onClick={p.onAdd}>Add item</Button> : undefined}
                 />
               }

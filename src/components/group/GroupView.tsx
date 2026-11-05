@@ -22,6 +22,7 @@ import { formatMoney } from '../../lib/money';
 import { confirmedPaid, firstName, matchesFilter, peopleSummary, type ItemFilter } from '../../lib/items';
 import type { Group, Item, ShareStatus } from '../../lib/types';
 import { NavBar, PageBody } from '../layout/AppHeader';
+import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBanner } from '../ui/ErrorBanner';
 import { ConfirmSheet } from '../ui/ConfirmSheet';
@@ -347,23 +348,36 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                   </div>
                 </div>
               ) : items.length === 0 ? (
-                <>
-                  <div className="flex items-center justify-center gap-2 rounded-[18px] bg-white/80 py-3.5 px-4 text-center text-[13px] text-muted ring-1 ring-hairline sm:hidden">
-                    <ReceiptText className="size-4 shrink-0 text-muted/70" />
-                    <span>No items yet. Tap <strong>Add item</strong> above.</span>
+                isOwner ? (
+                  <>
+                    <div className="flex items-center justify-center gap-2 rounded-[18px] bg-white/80 py-3.5 px-4 text-center text-[13px] text-muted ring-1 ring-hairline sm:hidden">
+                      <ReceiptText className="size-4 shrink-0 text-muted/70" />
+                      <span>No items yet. Tap <strong>Add item</strong> above.</span>
+                    </div>
+                    <div className="hidden sm:block">
+                      <EmptyState
+                        icon={<ReceiptText className="size-7" />}
+                        title="No items yet"
+                        text="Tap Add item to list what people owe you. Everyone in the list will see it."
+                        action={
+                          <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setPanel({ kind: 'add' })}>
+                            Add item
+                          </Button>
+                        }
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-[22px] bg-white p-6 text-center ring-1 ring-hairline shadow-xs">
+                    <div className="mx-auto grid size-12 place-items-center rounded-full bg-accent/8 text-accent mb-3">
+                      <ReceiptText className="size-6" />
+                    </div>
+                    <h3 className="text-[15.5px] font-bold text-ink">No items listed yet</h3>
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted max-w-sm mx-auto">
+                      This is where your pinagkakautangan will appear once {ownerName} lists your items on this card. Only the card lender can add items.
+                    </p>
                   </div>
-                  <div className="hidden sm:block">
-                    <EmptyState
-                      icon={<ReceiptText className="size-7" />}
-                      title="No items yet"
-                      text={
-                        isOwner
-                          ? 'Tap Add item to list what people owe you. Everyone in the list will see it.'
-                          : `No items for you yet. When ${ownerName} adds one for you, it shows here right away.`
-                      }
-                    />
-                  </div>
-                </>
+                )
               ) : (
                 <div className="space-y-3">
                   <FilterBar
@@ -376,9 +390,13 @@ export function GroupView({ group, uid }: { group: Group; uid: string }) {
                   />
 
                   {visible.length === 0 ? (
-                    <p className="rounded-[20px] bg-white px-4 py-10 text-center text-[14px] text-muted">
-                      Nothing here. Try another filter.
-                    </p>
+                    <div className="rounded-[20px] bg-white p-6 text-center ring-1 ring-hairline shadow-xs">
+                      <ReceiptText className="mx-auto size-6 text-muted/50 mb-2" />
+                      <p className="text-[14px] font-bold text-ink">No items for you here</p>
+                      <p className="mt-1 text-[12.5px] text-muted max-w-xs mx-auto">
+                        {isOwner ? 'Try another filter.' : `This is where your items will appear once ${ownerName} assigns them to you.`}
+                      </p>
+                    </div>
                   ) : (
                     <div className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-hairline">
                       <div className="divide-y divide-hairline">

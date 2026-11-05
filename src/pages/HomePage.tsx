@@ -19,7 +19,7 @@ import { AppIconSheet } from '../components/home/AppIconSheet';
 import { HistorySheet } from '../components/home/HistorySheet';
 import { DefaultViewSheet, type CardLayoutMode, type DefaultViewPref } from '../components/home/DefaultViewSheet';
 import { DueRemindersSheet } from '../components/home/DueRemindersSheet';
-import { evaluateDueReminders, checkAndDispatchDueReminders, checkAndDispatchFriendRequestNotification } from '../lib/notifications';
+import { evaluateDueReminders, checkAndDispatchDueReminders, checkAndDispatchFriendRequestNotification, checkAndDispatchCardInviteNotification } from '../lib/notifications';
 import { ItemSheet } from '../components/group/ItemSheet';
 import { ItemFormSheet } from '../components/group/ItemFormSheet';
 import { PaySheet } from '../components/group/PaySheet';
@@ -229,6 +229,15 @@ export function HomePage() {
       });
     }
   }, [incomingRequests]);
+
+  // Card invitation push notification dispatch
+  useEffect(() => {
+    if (pendingCardInvites && pendingCardInvites.length > 0) {
+      checkAndDispatchCardInviteNotification(pendingCardInvites).catch((err) => {
+        console.warn('Card invitation notification failed:', err);
+      });
+    }
+  }, [pendingCardInvites]);
 
   const handleSelectReminder = (targetGroup: Group, targetItem: Item) => {
     setRemindersOpen(false);

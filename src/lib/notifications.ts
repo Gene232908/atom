@@ -444,15 +444,19 @@ export async function unsubscribeFromPush(userId: string): Promise<boolean> {
 export async function showSystemNotification(title: string, options: NotificationOptions): Promise<void> {
   if (!isPushSupported() || Notification.permission !== 'granted') return;
 
+  const enrichedOptions: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
+    icon: '/apple-touch-icon.png',
+    badge: '/apple-touch-icon.png',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    ...options,
+  };
+
   try {
     let reg: ServiceWorkerRegistration | null | undefined = await navigator.serviceWorker.getRegistration();
     if (!reg) reg = await registerServiceWorker();
     if (reg) {
-      await (reg as any).showNotification(title, {
-        icon: '/icon.svg',
-        badge: '/icon.svg',
-        ...options,
-      });
+      await (reg as any).showNotification(title, enrichedOptions);
       return;
     }
   } catch (err) {
@@ -461,11 +465,7 @@ export async function showSystemNotification(title: string, options: Notificatio
 
   // Fallback if service worker is not active
   try {
-    new Notification(title, {
-      icon: '/icon.svg',
-      badge: '/icon.svg',
-      ...options,
-    });
+    new Notification(title, enrichedOptions);
   } catch (err) {
     console.warn('Fallback Notification() failed:', err);
   }
@@ -575,6 +575,42 @@ export async function checkAndDispatchFriendRequestNotification(
 
   try {
     localStorage.setItem('last_notified_friend_req', key);
+  } catch {
+    // ignore
+  }
+}
+
+/** Checks and dispatches push notification for incoming card invitations */
+export async function checkAndDispatchCardInviteNotification(
+  pendingCardInvites: Group[],
+): Promise<void> {
+  if (pendingCardInvites.length === 0 || !isPushSupported() || Notification.permission !== 'granted') {
+    return;
+  }
+  const key = `card_invite_${pendingCardInvites.map((g) => g.id).sort().join('_')}`;
+  try {
+    const stored = localStorage.getItem('last_notified_card_invite');
+    if (stored === key) return;
+  } catch {
+    // ignore
+  }
+
+  const firstCard = pendingCardInvites[0];
+  const lenderName = firstCard.members[firstCard.ownerId]?.name || 'A friend';
+  const title = pendingCardInvites.length === 1 ? 'New Card Invitation' : `${pendingCardInvites.length} Card Invitations`;
+  const body =
+    pendingCardInvites.length === 1
+      ? `${lenderName} invited you to join "${firstCard.name}". Tap to review and accept!`
+      : `You have ${pendingCardInvites.length} new card invitations from your friends. Tap to review and accept!`;
+
+  await showSystemNotification(title, {
+    body,
+    tag: 'card_invites',
+    data: { url: '/', targetTab: 'owe' },
+  });
+
+  try {
+    localStorage.setItem('last_notified_card_invite', key);
   } catch {
     // ignore
   }
