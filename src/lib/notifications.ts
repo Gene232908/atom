@@ -672,7 +672,7 @@ export async function checkAndDispatchFriendRequestNotification(
 
   await showSystemNotification(title, {
     body,
-    tag: 'friend_requests',
+    tag: incomingRequests.length === 1 ? `friend_req_${incomingRequests[0].uid}` : 'friend_requests',
     data: { url: '/' },
   });
 
@@ -708,7 +708,7 @@ export async function checkAndDispatchCardInviteNotification(
 
   await showSystemNotification(title, {
     body,
-    tag: 'card_invites',
+    tag: pendingCardInvites.length === 1 ? `card_invite_${firstCard.id}` : 'card_invites',
     data: { url: '/', targetTab: 'owe' },
   });
 

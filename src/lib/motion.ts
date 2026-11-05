@@ -7,17 +7,16 @@
  * Every card reads them in CSS, so the light moves smoothly with no extra React work.
  */
 
-type Listener = (active: boolean) => void;
-
-const STORE_KEY = 'atom_card_motion';
-const listeners = new Set<Listener>();
-
 let started = false;
 let active = false;
 let raf = 0;
 let base: { b: number; g: number } | null = null;
 const target = { x: 0, y: 0 };
 const current = { x: 0, y: 0 };
+let last: { b: number; g: number } | null = null;
+// How much the phone is moving right now (0 = still). The shine fades in and out with it.
+let energy = 0;
+let glow = 0;
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
@@ -25,14 +24,18 @@ function setVars() {
   const s = document.documentElement.style;
   s.setProperty('--tx', current.x.toFixed(3));
   s.setProperty('--ty', current.y.toFixed(3));
+  s.setProperty('--shine', glow.toFixed(3));
 }
 
 function tick() {
   raf = 0;
   current.x += (target.x - current.x) * 0.16;
   current.y += (target.y - current.y) * 0.16;
+  energy *= 0.95;
+  glow += (energy - glow) * 0.25;
+  if (glow < 0.003) glow = 0;
   setVars();
-  if (Math.abs(target.x - current.x) > 0.002 || Math.abs(target.y - current.y) > 0.002) {
+  if (glow > 0 || Math.abs(target.x - current.x) > 0.002 || Math.abs(target.y - current.y) > 0.002) {
     raf = requestAnimationFrame(tick);
   }
 }
@@ -44,10 +47,7 @@ function screenAngle(): number {
 
 function onOrientation(e: DeviceOrientationEvent) {
   if (e.beta == null || e.gamma == null) return;
-  if (!active) {
-    active = true;
-    listeners.forEach((l) => l(true));
-  }
+  active = true;
 
   // Match the screen when the phone is turned sideways.
   let beta = e.beta;
@@ -59,9 +59,16 @@ function onOrientation(e: DeviceOrientationEvent) {
 
   // However you normally hold the phone counts as "flat". The rest point slowly
   // follows your hand, so the shine reacts to movement like a real card.
+  // Small hand shake is ignored. Real tilting wakes the shine up.
+  if (last) {
+    const moved = Math.abs(beta - last.b) + Math.abs(gamma - last.g);
+    energy = Math.min(1, energy + Math.max(0, moved - 0.35) * 0.25);
+  }
+  last = { b: beta, g: gamma };
+
   if (!base) base = { b: beta, g: gamma };
-  base.b += (beta - base.b) * 0.008;
-  base.g += (gamma - base.g) * 0.008;
+  base.b += (beta - base.b) * 0.004;
+  base.g += (gamma - base.g) * 0.004;
 
   target.x = clamp((gamma - base.g) / 22);
   target.y = clamp((beta - base.b) / 22);
@@ -73,10 +80,6 @@ export function needsMotionPermission(): boolean {
   if (typeof window === 'undefined' || typeof DeviceOrientationEvent === 'undefined') return false;
   const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
   return typeof DOE.requestPermission === 'function';
-}
-
-export function isMotionActive(): boolean {
-  return active;
 }
 
 /** Start listening. Safe to call many times. */
@@ -100,38 +103,60 @@ export async function enableMotion(): Promise<boolean> {
     }
   }
   startMotion();
-  try {
-    localStorage.setItem(STORE_KEY, '1');
-  } catch {
-    // Private browsing. Nothing to save.
-  }
   return true;
 }
 
-export function onMotionChange(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
 /**
- * Call once when the app opens.
+ * Call once when the app opens. Card shine is on by default.
  * - Android: starts right away.
- * - iPhone/iPad: if allowed before, turns on again silently at the first tap.
+ * - iPhone/iPad: Apple only allows motion after a tap, so it asks on the first tap anywhere.
  */
 export function initMotion(): void {
   if (typeof window === 'undefined') return;
   startMotion();
   if (!needsMotionPermission()) return;
-  let allowedBefore = false;
-  try {
-    allowedBefore = localStorage.getItem(STORE_KEY) === '1';
-  } catch {
-    allowedBefore = false;
-  }
-  if (!allowedBefore) return;
   const once = () => {
+    window.removeEventListener('touchend', once, true);
     window.removeEventListener('click', once, true);
     if (!active) void enableMotion();
   };
+  window.addEventListener('touchend', once, true);
   window.addEventListener('click', once, true);
+}
+
+// Where each shining card sits on screen (-1 = top, +1 = bottom), kept in --py on the card.
+const tracked = new Set<HTMLElement>();
+let placeQueued = false;
+
+function placeCards() {
+  placeQueued = false;
+  const h = window.innerHeight || 1;
+  for (const el of tracked) {
+    const r = el.getBoundingClientRect();
+    const py = Math.max(-1.5, Math.min(1.5, ((r.top + r.height / 2) / h) * 2 - 1));
+    el.style.setProperty('--py', py.toFixed(3));
+  }
+}
+
+function queuePlace() {
+  if (placeQueued) return;
+  placeQueued = true;
+  requestAnimationFrame(placeCards);
+}
+
+/** Keep a card's screen position up to date while the page or a sheet scrolls. */
+export function trackCardPosition(el: HTMLElement): () => void {
+  tracked.add(el);
+  if (tracked.size === 1) {
+    window.addEventListener('scroll', queuePlace, { passive: true, capture: true });
+    window.addEventListener('resize', queuePlace);
+  }
+  queuePlace();
+  return () => {
+    tracked.delete(el);
+    if (tracked.size === 0) {
+      window.removeEventListener('scroll', queuePlace, { capture: true });
+      window.removeEventListener('resize', queuePlace);
+    }
+  };
 }

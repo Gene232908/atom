@@ -39,7 +39,6 @@ import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { HomeSkeleton } from '../components/ui/Skeleton';
 import { SummaryTile } from '../components/home/SummaryTile';
 import { LendOweToggle, type Tab } from '../components/home/LendOweToggle';
-import { MotionPrompt } from '../components/ui/MotionPrompt';
 import { HomeDashboard } from '../components/desktop/HomeDashboard';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 import { LAYOUT_KEY, PREF_KEY, getStoredLayout, getStoredPref } from '../lib/prefs';
@@ -474,7 +473,7 @@ export function HomePage() {
               onClick={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
               aria-label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
               title={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.06] backdrop-blur-md transition hover:text-accent hover:shadow-md active:scale-90"
+              className="relative grid size-9 shrink-0 place-items-center rounded-full liquid-rim bg-white/55 text-ink shadow-[0_0_0_0.5px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150 transition hover:text-accent active:scale-90"
             >
               <Plus className="size-4.5" strokeWidth={2.4} />
             </button>
@@ -485,7 +484,7 @@ export function HomePage() {
               onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="More options & profile"
               title="More options & profile"
-              className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white pl-1.5 pr-2.5 text-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.06] backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+              className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full pr-2.5 pl-1.5 liquid-rim bg-white/55 text-ink shadow-[0_0_0_0.5px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150 transition hover:bg-white/75 active:scale-95"
             >
               <Avatar name={name} photo={user.photoURL ?? ''} size="xs" ring="subtle" />
               <MoreHorizontal className="size-4 text-ink/75" strokeWidth={2.3} />
@@ -559,15 +558,15 @@ export function HomePage() {
 
               {/* Phone Alert Activation Banner for lock-screen push */}
               {shouldShowPushPrompt && (
-                <div className="rounded-[18px] bg-gradient-to-r from-accent/12 via-white to-white p-3.5 ring-1 ring-accent/20 shadow-xs flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-[18px] bg-white/45 p-3.5 ring-1 ring-white/80 ring-inset shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_0_0_0.5px_rgba(0,0,0,0.06)] backdrop-blur-xl backdrop-saturate-150">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-white shadow-xs">
-                      <Bell className="size-4" strokeWidth={2.4} />
+                    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-accent/10 text-accent ring-1 ring-white/70 ring-inset">
+                      <Bell className="size-4" strokeWidth={2.2} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-bold text-ink truncate">Receive phone alerts</p>
+                      <p className="truncate text-[13px] font-semibold text-ink">Receive phone alerts</p>
                       <p className="text-[11.5px] text-muted truncate">
-                        Get alerts for friend requests & card invites even when phone is locked.
+                        Payments, friend requests and invites, even when your phone is locked.
                       </p>
                     </div>
                   </div>
@@ -597,6 +596,7 @@ export function HomePage() {
                       }}
                       className="grid size-7 place-items-center rounded-full text-muted hover:text-ink hover:bg-fill transition"
                       title="Dismiss"
+                      aria-label="Dismiss"
                     >
                       <X className="size-4" />
                     </button>
@@ -637,8 +637,6 @@ export function HomePage() {
                   <ChevronRight className="size-4 shrink-0 opacity-60" />
                 </button>
               )}
-
-              <MotionPrompt />
 
               {error && <ErrorBanner message={error} onRetry={retry} />}
 

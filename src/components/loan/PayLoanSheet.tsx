@@ -126,7 +126,7 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
 
         const nextMsg = futureDueDate ? ` Next bill: ${formatDueDateReadable(futureDueDate)}.` : '';
         const interestMsg = lateInterestCents > 0 ? ` (Includes ${formatMoney(lateInterestCents)} late fee)` : '';
-        toast(`Payment for Month #${startTermNumber} recorded!${interestMsg}${nextMsg}`);
+        toast(`Month ${startTermNumber} payment recorded.${interestMsg}${nextMsg}`);
       } else {
         // Advance payment
         await recordLoanPayment(groupId, item, user, {
@@ -142,7 +142,7 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
         });
 
         const nextMsg = futureDueDate ? ` Next bill jumps to ${formatDueDateReadable(futureDueDate)}.` : '';
-        toast(`Advance payment for ${advanceMonths} months (Months #${startTermNumber}–#${endTermNumber}) recorded!${nextMsg}`);
+        toast(`Advance payment for ${advanceMonths} months (months ${startTermNumber}–${endTermNumber}) recorded.${nextMsg}`);
       }
 
       onClose();
@@ -158,7 +158,7 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
     <Sheet
       open={open}
       onClose={submitting ? () => undefined : onClose}
-      title={payMode === 'monthly' ? `Pay Month #${startTermNumber}` : `Pay Advance (${advanceMonths} Months)`}
+      title={payMode === 'monthly' ? `Pay month ${startTermNumber}` : `Pay ${advanceMonths} months ahead`}
       description={`${item.store ? `${item.store} · ` : ''}${item.description}`}
     >
       <form onSubmit={submit} className="space-y-4 pt-1" noValidate>
@@ -217,9 +217,9 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
                   <p className="text-[13px] font-semibold text-ink mt-0.5">{formatDueDateReadable(currentDueDate)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10.5px] font-medium text-muted uppercase tracking-wider">Installment Term</p>
+                  <p className="text-[10.5px] font-medium text-muted uppercase tracking-wider">Paying for</p>
                   <p className="text-[13px] font-semibold text-accent mt-0.5">
-                    Month #{startTermNumber} of {stats.totalTerms}
+                    Month {startTermNumber} of {stats.totalTerms}
                   </p>
                 </div>
               </div>
@@ -334,7 +334,7 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
                 <div className="flex items-center justify-between">
                   <span className="text-muted">Terms Covered:</span>
                   <span className="font-semibold text-ink">
-                    Months #{startTermNumber}–#{endTermNumber} ({advanceMonths} mos)
+                    Months {startTermNumber}–{endTermNumber} ({advanceMonths} mos)
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -418,7 +418,7 @@ export function PayLoanSheet({ open, onClose, item, groupId, onSuccess }: Props)
         {/* Simple Pay Action Button */}
         <div className="pt-2">
           <Button type="submit" size="lg" full disabled={submitting}>
-            {submitting ? 'Saving...' : 'Pay'}
+            {submitting ? 'Saving...' : 'Confirm'}
           </Button>
         </div>
       </form>

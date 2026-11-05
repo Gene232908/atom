@@ -18,6 +18,11 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       console.warn('SW registration failed:', err);
     });
   });
+  // Tapping a notification while the app is already open.
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const url = e.data?.type === 'open-url' && typeof e.data.url === 'string' ? new URL(e.data.url) : null;
+    if (url && url.origin === window.location.origin) window.location.hash = url.hash;
+  });
 }
 
 const root = document.getElementById('root');

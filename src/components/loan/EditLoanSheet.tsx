@@ -8,7 +8,7 @@ import { Button } from '../ui/Button';
 import { TextField } from '../ui/Field';
 import { ColorPicker } from '../ui/ColorPicker';
 import { WalletCard } from '../ui/WalletCard';
-import { computeLoanStats } from '../../lib/loanUtils';
+import { computeFirstDueDate, computeLoanStats } from '../../lib/loanUtils';
 import type { Group, Item } from '../../lib/types';
 
 const LOAN_SUGGESTIONS = [
@@ -45,7 +45,8 @@ export function EditLoanSheet({ open, onClose, group, item, onSuccess }: Props) 
   const [totalTermsInput, setTotalTermsInput] = useState(() =>
     String(item.totalTerms || item.installmentsCount || 1),
   );
-  const [dueDate, setDueDate] = useState(() => item.dueDate || '');
+  const startDue = currentStats.nextDueDate || item.dueDate || '';
+  const [dueDate, setDueDate] = useState(startDue);
   const [color, setColor] = useState(() => group.color || item.color || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -93,6 +94,10 @@ export function EditLoanSheet({ open, onClose, group, item, onSuccess }: Props) 
           totalTerms,
           installmentsCount: totalTerms,
           dueDate: dueDate || null,
+          // The next bill is worked out from the first due date, so moving the upcoming date moves it too.
+          ...(dueDate && dueDate !== startDue
+            ? { firstDueDate: computeFirstDueDate(dueDate, currentStats.currentPaidTerms) }
+            : {}),
           store: cleanProvider,
           color,
         },
@@ -146,9 +151,9 @@ export function EditLoanSheet({ open, onClose, group, item, onSuccess }: Props) 
           <div className="mt-auto pt-2">
             <div className="flex items-center justify-between text-[11px] font-medium text-white/85">
               <span>
-                {currentStats.currentPaidTerms} of {totalTerms} mos paid ({currentStats.progressPercent}%)
+                {currentStats.currentPaidTerms} of {totalTerms} months paid
               </span>
-              <span>{Math.max(0, totalTerms - currentStats.currentPaidTerms)} mos left</span>
+              <span>{Math.max(0, totalTerms - currentStats.currentPaidTerms)} left</span>
             </div>
           </div>
         </WalletCard>

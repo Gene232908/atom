@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { enableMotion, isMotionActive, needsMotionPermission, onMotionChange } from '../lib/motion';
+import { useCallback, useRef, type PointerEvent } from 'react';
 
 /**
  * Mouse support for laptops: the card follows the cursor.
@@ -15,8 +14,10 @@ export function useTiltReflection(enabled = true) {
       const rect = ref.current.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-      ref.current.style.setProperty('--tx', Math.max(-1, Math.min(1, x)).toFixed(3));
-      ref.current.style.setProperty('--ty', Math.max(-1, Math.min(1, y)).toFixed(3));
+      // Minus: the reflection sits under the pointer, as if the pointer were the light.
+      ref.current.style.setProperty('--tx', (-Math.max(-1, Math.min(1, x))).toFixed(3));
+      ref.current.style.setProperty('--ty', (-Math.max(-1, Math.min(1, y))).toFixed(3));
+      ref.current.style.setProperty('--shine', '1');
     },
     [enabled],
   );
@@ -24,15 +25,8 @@ export function useTiltReflection(enabled = true) {
   const onPointerLeave = useCallback(() => {
     ref.current?.style.removeProperty('--tx');
     ref.current?.style.removeProperty('--ty');
+    ref.current?.style.removeProperty('--shine');
   }, []);
 
   return { ref, onPointerMove, onPointerLeave };
-}
-
-/** For the "Turn on card shine" button on iPhone and iPad. */
-export function useMotionPrompt() {
-  const [active, setActive] = useState(isMotionActive);
-  useEffect(() => onMotionChange(setActive), []);
-  const show = needsMotionPermission() && !active;
-  return { show, enable: enableMotion };
 }

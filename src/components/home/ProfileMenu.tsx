@@ -68,29 +68,26 @@ export function ProfileMenu({
 
   return (
     <>
-      {/* Invisible backdrop to catch outside taps on mobile */}
+      {/* Blurs the page so only the menu is in focus. Also catches outside taps. */}
       <div
-        className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[2px] transition-opacity duration-200"
+        className="fixed inset-0 z-40 animate-fade-in bg-white/10 backdrop-blur-md"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Floating Glassmorphic Bubble Menu */}
+      {/* Liquid glass bubble menu */}
       <div
         ref={menuRef}
         role="dialog"
         aria-label="Actions and profile menu"
-        className="absolute right-3 sm:right-6 lg:right-10 top-14 z-50 w-72 origin-top-right overflow-hidden rounded-[26px] bg-white/85 dark:bg-zinc-900/85 p-2.5 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.08] dark:ring-white/[0.08] backdrop-blur-2xl backdrop-saturate-150 animate-pop select-none"
+        className="liquid-rim absolute top-14 right-3 z-50 w-72 origin-top-right animate-pop overflow-hidden rounded-[26px] bg-white/80 p-2.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.16),0_0_0_0.5px_rgba(0,0,0,0.07)] backdrop-blur-2xl backdrop-saturate-150 select-none sm:right-6 lg:right-10"
       >
-        {/* Specular glass top highlight */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-
         {/* User Card Header */}
-        <div className="flex items-center justify-between gap-2.5 rounded-[18px] bg-black/[0.03] p-2.5 mb-1.5">
+        <div className="mb-1.5 flex items-center justify-between gap-2.5 rounded-[18px] bg-white/50 p-2.5 ring-1 ring-white/70 ring-inset">
           <div className="flex items-center gap-2.5 min-w-0">
             <Avatar name={name} photo={user.photoURL ?? ''} size="sm" ring="subtle" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-bold text-ink leading-tight">{name}</p>
+              <p className="truncate text-[14px] leading-tight font-semibold text-ink">{name}</p>
               <p className="truncate text-[11.5px] text-muted">{user.email || 'Signed in'}</p>
             </div>
           </div>
@@ -217,7 +214,7 @@ function MenuRow({
       className={`flex w-full items-center gap-3 rounded-[16px] px-3 py-2 text-left text-[13.5px] font-medium transition active:scale-[0.98] ${
         tone === 'bad'
           ? 'text-bad hover:bg-bad/8'
-          : 'text-ink/90 hover:bg-black/[0.04] hover:text-ink'
+          : 'text-ink/90 hover:bg-white/60 hover:text-ink'
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <span className={`shrink-0 ${tone === 'bad' ? 'text-bad' : 'text-ink/70'}`}>

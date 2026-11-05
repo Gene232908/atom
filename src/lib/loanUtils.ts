@@ -57,6 +57,7 @@ export interface LoanStats {
   monthlyCents: number;
   totalTerms: number;
   initialPaidTerms: number;
+  initialPaidCents: number;
   currentPaidTerms: number;
   termsLeft: number;
   totalPaidCents: number;
@@ -129,6 +130,7 @@ export function computeLoanStats(item: Item): LoanStats {
     monthlyCents,
     totalTerms,
     initialPaidTerms,
+    initialPaidCents,
     currentPaidTerms,
     termsLeft,
     totalPaidCents,

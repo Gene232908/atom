@@ -9,7 +9,19 @@ import { WalletCard } from '../ui/WalletCard';
 import { AvatarStack } from '../ui/AvatarStack';
 
 /** One list shown as a loan card (exactly matching the user's approved layout) */
-export function GroupWalletCard({ group, uid, index, itemsInGroup = [] }: { group: Group; uid: string; index: number; itemsInGroup?: any[] }) {
+export function GroupWalletCard({
+  group,
+  uid,
+  index,
+  itemsInGroup = [],
+  shine = 'on',
+}: {
+  group: Group;
+  uid: string;
+  index: number;
+  itemsInGroup?: any[];
+  shine?: 'on' | 'off' | 'wide-only';
+}) {
   const isOwner = group.ownerId === uid;
   const ownerName = firstName(group.members[group.ownerId]?.name ?? 'the lender');
   const amount = isOwner ? sumOwed(group.totals) : (group.totals[uid] ?? 0);
@@ -33,6 +45,7 @@ export function GroupWalletCard({ group, uid, index, itemsInGroup = [] }: { grou
         seed={group.id}
         background={groupGradient(group)}
         interactive={true}
+        shine={shine}
         className="flex h-[196px] flex-col p-5"
       >
         <div className="flex items-start justify-between gap-3">
@@ -94,7 +107,13 @@ export function WalletStack({ groups, uid, onHold, items = [] }: { groups: Group
         return (
           <div key={g.id} className={`relative min-w-0 ${i > 0 ? 'max-sm:-mt-[138px]' : ''}`} style={{ zIndex: i }}>
             <HoldArea group={g} onHold={onHold}>
-              <GroupWalletCard group={g} uid={uid} index={i} itemsInGroup={groupItems} />
+              <GroupWalletCard
+                group={g}
+                uid={uid}
+                index={i}
+                itemsInGroup={groupItems}
+                shine={i === groups.length - 1 ? 'on' : 'wide-only'}
+              />
             </HoldArea>
           </div>
         );
@@ -131,7 +150,8 @@ function DeckCardItem({
       seed={group.id}
       background={groupGradient(group)}
       interactive={isFront}
-      className="flex h-[196px] flex-col p-5 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18)]"
+      shine={isFront ? 'on' : 'off'}
+      className="flex h-[196px] flex-col p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow-sm">

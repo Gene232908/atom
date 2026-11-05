@@ -22,8 +22,7 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Reminder:';
   const options = {
     body: data.body || 'Please check your active bill reminders.',
-    icon: data.icon || '/apple-touch-icon.png',
-    badge: data.badge || '/apple-touch-icon.png',
+    icon: data.icon || '/icon-192.png',
     tag: data.tag || 'due-reminder',
     renotify: true,
     data: {
@@ -33,9 +32,7 @@ self.addEventListener('push', (event) => {
       targetTab: data.targetTab,
     },
     vibrate: [200, 100, 200],
-    actions: [
-      { action: 'open', title: 'Open App' },
-    ],
+    timestamp: Date.now(),
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -44,21 +41,23 @@ self.addEventListener('push', (event) => {
 // Handle notification tap / click
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = (event.notification.data && event.notification.data.url) || '/';
+  const target = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        if ('focus' in client) {
-          if (client.url.includes(self.registration.scope)) {
-            client.navigate(urlToOpen);
-            return client.focus();
-          }
+    (async () => {
+      const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = windows.find((c) => c.url.startsWith(self.location.origin));
+      if (open) {
+        await open.focus();
+        try {
+          await open.navigate(target);
+        } catch {
+          // Not controlled by this worker yet: let the page switch itself.
+          open.postMessage({ type: 'open-url', url: target });
         }
+        return;
       }
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
+      await clients.openWindow(target);
+    })(),
   );
 });

@@ -4,6 +4,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -11,7 +12,9 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { formatMoney } from '../lib/money';
+import { sendPushNotificationToUser } from '../lib/notifications';
 import { toItem } from '../lib/convert';
 import { cleanRef, confirmedPaid, pendingClaim, withAmountTag } from '../lib/items';
 import { computeLoanStats } from '../lib/loanUtils';
@@ -40,6 +43,21 @@ export interface ItemInput {
 }
 
 const itemsRef = (groupId: string) => collection(db, 'groups', groupId, 'items');
+
+/** Push to someone else's phone right away. Never blocks or fails the save. */
+function notify(uid: string | null | undefined, groupId: string, tag: string, title: string, body: string): void {
+  if (!uid || uid === auth.currentUser?.uid) return;
+  sendPushNotificationToUser(uid, { title, body, url: `/#/g/${groupId}`, tag, groupId }).catch(() => undefined);
+}
+
+async function notifyLender(groupId: string, tag: string, title: string, body: string): Promise<void> {
+  try {
+    const snap = await getDoc(doc(db, 'groups', groupId));
+    notify(snap.data()?.ownerId, groupId, tag, title, body);
+  } catch {
+    // The payment is already saved. A missed push is not worth an error.
+  }
+}
 
 export function subscribeItems(
   groupId: string,
@@ -93,6 +111,12 @@ export async function addItem(groupId: string, input: ItemInput): Promise<string
   }
 
   const docRef = await addDoc(itemsRef(groupId), data);
+  if (!input.isPersonalLoan) {
+    const desc = String(data.description);
+    for (const uid of Object.keys(input.shares)) {
+      notify(uid, groupId, `item_${docRef.id}`, 'New item added', `${desc}: you owe ${formatMoney(Math.round(input.splitCents))}.`);
+    }
+  }
   return docRef.id;
 }
 
@@ -181,14 +205,6 @@ export async function recordLoanPayment(
 
   const termsCovered = payment.termsCovered && payment.termsCovered > 0 ? payment.termsCovered : 1;
   const startTerm = stats.nextTermNumber || stats.currentPaidTerms + 1;
-  const endTerm = startTerm + termsCovered - 1;
-
-  const defaultNote =
-    termsCovered > 1
-      ? `Advance payment for months #${startTerm}–#${endTerm} (${termsCovered} months)`
-      : payment.paymentType === 'late' && (payment.daysOverdue ?? 0) > 0
-        ? `Payment #${startTerm} of ${stats.totalTerms} (${payment.daysOverdue} days late)`
-        : `Payment #${startTerm} of ${stats.totalTerms}`;
 
   const newPayment: PaymentRecord = {
     id: `loan-pay-${now}`,
@@ -197,7 +213,7 @@ export async function recordLoanPayment(
     amountCents: Math.round(payment.amountCents),
     refNumber: payment.refNumber.trim() || 'Manual payment',
     paidAt,
-    note: payment.note?.trim() || defaultNote,
+    note: payment.note?.trim() || undefined,
     status: 'confirmed',
     termNumber: startTerm,
     termsCovered,
@@ -286,6 +302,13 @@ export async function recordPayment(
       [`shares.${payment.uid}.updatedAt`]: now,
       updatedAt: now,
     });
+    notify(
+      payment.uid,
+      groupId,
+      `pay_${item.id}_${payment.uid}`,
+      'Payment recorded',
+      `${formatMoney(payment.amountCents)} for ${item.description} was recorded.${done ? ' Fully paid.' : ''}`,
+    );
     return;
   }
 
@@ -310,6 +333,12 @@ export async function recordPayment(
   for (const updates of attempts) {
     try {
       await updateDoc(doc(db, 'groups', ref.groupId, 'items', ref.itemId), updates);
+      void notifyLender(
+        groupId,
+        `claim_${item.id}_${payment.uid}`,
+        'Payment to confirm',
+        `${payment.payerName} says they sent ${formatMoney(claim)} for ${item.description}.`,
+      );
       return;
     } catch (err) {
       lastError = err;
@@ -368,6 +397,14 @@ export async function confirmPayment(
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   });
+  const leftAfter = Math.max(0, item.splitCents - newPaid);
+  notify(
+    uid,
+    groupId,
+    `pay_${item.id}_${uid}`,
+    'Payment confirmed',
+    `${formatMoney(amount)} for ${item.description} was received.${leftAfter > 0 ? ` ${formatMoney(leftAfter)} left.` : ' Fully paid.'}`,
+  );
 }
 
 /**
@@ -386,6 +423,13 @@ export async function rejectPayment(groupId: string, item: Item, uid: string): P
     [`shares.${uid}.updatedAt`]: now,
     updatedAt: now,
   });
+  notify(
+    uid,
+    groupId,
+    `pay_${item.id}_${uid}`,
+    'Payment not received',
+    `Your payment for ${item.description} was not received. Please check and send it again.`,
+  );
 }
 
 /** Lender undoes payments for a member, reverting status to unpaid and clearing their history. */

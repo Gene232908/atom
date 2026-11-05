@@ -4,8 +4,8 @@
   "description": "Keep track of who owes what.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f2f2f7",
-  "theme_color": "#f2f2f7",
+  "background_color": "#f8f8fa",
+  "theme_color": "#f8f8fa",
   "icons": [
     {
       "src": "/apple-touch-icon.png",

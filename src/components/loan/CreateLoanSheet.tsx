@@ -382,7 +382,7 @@ export function CreateLoanSheet({ open, onClose, onCreated }: Props) {
               }`}
             >
               <p className="text-[13px] font-bold">Brand New Loan</p>
-              <p className="text-[11px] text-muted leading-tight mt-0.5">Starts from Month #1</p>
+              <p className="text-[11px] text-muted leading-tight mt-0.5">Starts from month 1</p>
             </button>
 
             <button

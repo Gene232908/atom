@@ -153,7 +153,7 @@ export async function acceptGroupInvite(groupId: string, uid: string, memberName
       sendPushNotificationToUser(data.ownerId, {
         title: 'Invitation Accepted',
         body: `${memberName || 'Your friend'} accepted your invite to "${data.name}".`,
-        url: `/g/${groupId}`,
+        url: `/#/g/${groupId}`,
         tag: `card_acc_${groupId}`,
         groupId,
       }).catch((err) => console.warn('Push error:', err));
