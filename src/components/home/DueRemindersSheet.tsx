@@ -4,7 +4,6 @@ import {
   BellOff,
   CheckCircle2,
   ChevronRight,
-  Send,
 } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
@@ -14,7 +13,6 @@ import { formatDueDateReadable } from '../../lib/loanUtils';
 import {
   getNotificationPermission,
   isPushSupported,
-  sendInstantTestNotification,
   subscribeToPush,
   type DueReminder,
 } from '../../lib/notifications';
@@ -36,7 +34,6 @@ export function DueRemindersSheet({
   onSelectReminder,
 }: Props) {
   const toast = useToast();
-  const [testing, setTesting] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [permission, setPermission] = useState(getNotificationPermission);
 
@@ -56,19 +53,6 @@ export function DueRemindersSheet({
       toast(err?.message || 'Error enabling notifications.');
     } finally {
       setEnabling(false);
-    }
-  };
-
-  const handleTestNotification = async () => {
-    setTesting(true);
-    try {
-      await sendInstantTestNotification();
-      setPermission(getNotificationPermission());
-      toast('Test notification sent to your device! 🚀');
-    } catch (err: any) {
-      toast(err?.message || 'Failed to send test alert.');
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -117,29 +101,19 @@ export function DueRemindersSheet({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 pt-1 border-t border-hairline">
-            {permission !== 'granted' && supported && (
+          {permission !== 'granted' && supported && (
+            <div className="mt-3 pt-1 border-t border-hairline">
               <Button
                 size="sm"
                 variant="primary"
-                className="flex-1"
+                className="w-full"
                 disabled={enabling}
                 onClick={handleEnableNotifications}
               >
                 {enabling ? 'Enabling...' : 'Turn on Push Alerts'}
               </Button>
-            )}
-            <Button
-              size="sm"
-              variant={permission === 'granted' ? 'primary' : 'secondary'}
-              className={permission === 'granted' ? 'w-full' : 'shrink-0'}
-              disabled={testing}
-              onClick={handleTestNotification}
-              icon={<Send className="size-3.5" />}
-            >
-              {testing ? 'Sending alert...' : 'Send Test Notification'}
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Reminders List */}

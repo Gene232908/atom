@@ -1,7 +1,7 @@
-import { ArrowDownLeft, ArrowUpRight, Check, Layers, Smartphone, Sparkles } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Check, Layers, Smartphone, Sparkles, WalletCards } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 
-export type DefaultViewPref = 'auto' | 'lend' | 'owe';
+export type DefaultViewPref = 'auto' | 'lend' | 'owe' | 'loans';
 export type CardLayoutMode = 'stack' | 'single';
 
 interface Props {
@@ -26,7 +26,7 @@ export function DefaultViewSheet({
     title: string;
     description: string;
     icon: typeof ArrowUpRight;
-    tone: 'lend' | 'owe' | 'auto';
+    tone: 'lend' | 'owe' | 'loans' | 'auto';
   }[] = [
     {
       id: 'lend',
@@ -41,6 +41,13 @@ export function DefaultViewSheet({
       description: 'Always show lists where you borrowed money first.',
       icon: ArrowDownLeft,
       tone: 'owe',
+    },
+    {
+      id: 'loans',
+      title: 'My Loans',
+      description: 'Always show your personal installment loans first.',
+      icon: WalletCards,
+      tone: 'loans',
     },
     {
       id: 'auto',
@@ -105,7 +112,9 @@ export function DefaultViewSheet({
                         ? 'bg-ok/12 text-ok-ink'
                         : opt.tone === 'owe'
                           ? 'bg-bad/10 text-bad-ink'
-                          : 'bg-accent/12 text-accent'
+                          : opt.tone === 'loans'
+                            ? 'bg-accent/15 text-accent'
+                            : 'bg-indigo-50 text-indigo-600'
                     }`}
                   >
                     <Icon className="size-4.5" strokeWidth={2.4} />

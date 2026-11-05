@@ -57,6 +57,17 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
         onClose={onClose}
         title={item.description}
         description={`Personal Loan · ${provider}`}
+        headerAction={
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Delete loan"
+            title="Delete loan"
+            className="grid size-8 place-items-center rounded-full bg-fill text-muted/70 transition hover:bg-bad/10 hover:text-bad active:scale-90"
+          >
+            <Trash2 className="size-4" strokeWidth={2.2} />
+          </button>
+        }
         footer={
           !stats.isFullyPaid ? (
             <Button
@@ -257,26 +268,15 @@ export function LoanDetailSheet({ open, onClose, group, item, onUpdated }: Props
             )}
           </div>
 
-          {/* Actions: Edit Loan & Delete Loan */}
-          <div className="pt-4 pb-1 flex items-center justify-center gap-4 border-t border-hairline">
+          {/* Actions: Edit Loan details */}
+          <div className="pt-4 pb-1 flex items-center justify-center border-t border-hairline">
             <button
               type="button"
               onClick={() => setEditOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent hover:underline transition active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent/8 px-4 py-2 text-[13px] font-semibold text-accent hover:bg-accent/15 transition active:scale-95"
             >
               <Pencil className="size-3.5" />
               <span>Edit loan details</span>
-            </button>
-
-            <span className="text-muted/40">•</span>
-
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-bad/70 hover:text-bad transition active:scale-95"
-            >
-              <Trash2 className="size-3.5" />
-              <span>Delete loan</span>
             </button>
           </div>
         </div>

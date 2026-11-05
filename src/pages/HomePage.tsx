@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, History, Plus, SlidersHorizontal, UserPlus, WalletCards } from 'lucide-react';
+import { Bell, ChevronRight, History, MoreHorizontal, Plus, UserPlus, WalletCards } from 'lucide-react';
 import { useUser } from '../hooks/useAuth';
 import { useGroups } from '../hooks/useGroups';
 import { useAllItems, type GroupItem } from '../hooks/useAllItems';
@@ -26,7 +26,6 @@ import { PaySheet } from '../components/group/PaySheet';
 import { InviteSheet } from '../components/group/InviteSheet';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
-import { IconButton } from '../components/ui/IconButton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { HomeSkeleton } from '../components/ui/Skeleton';
@@ -249,7 +248,10 @@ export function HomePage() {
   useEffect(() => {
     if (hasResolvedDefault) return;
 
-    if (pref === 'lend') {
+    if (pref === 'loans') {
+      setTab('loans');
+      setHasResolvedDefault(true);
+    } else if (pref === 'lend') {
       setTab('lend');
       setHasResolvedDefault(true);
     } else if (pref === 'owe') {
@@ -260,12 +262,14 @@ export function HomePage() {
         setTab('lend');
       } else if (owingItems.length > 0) {
         setTab('owe');
+      } else if (activeLoanItems.length > 0) {
+        setTab('loans');
       } else {
         setTab('lend');
       }
       setHasResolvedDefault(true);
     }
-  }, [groupsLoading, items.length, lendingItems.length, owingItems.length, pref, hasResolvedDefault]);
+  }, [groupsLoading, items.length, lendingItems.length, owingItems.length, activeLoanItems.length, pref, hasResolvedDefault]);
 
   const onSelectPref = (newPref: DefaultViewPref) => {
     setPref(newPref);
@@ -275,18 +279,20 @@ export function HomePage() {
       // ignore
     }
 
-    if (newPref === 'lend') setTab('lend');
+    if (newPref === 'loans') setTab('loans');
+    else if (newPref === 'lend') setTab('lend');
     else if (newPref === 'owe') setTab('owe');
     else {
       if (lendingItems.length > 0) setTab('lend');
       else if (owingItems.length > 0) setTab('owe');
+      else if (activeLoanItems.length > 0) setTab('loans');
       else setTab('lend');
     }
 
     toast(
       newPref === 'auto'
         ? 'Default view set to Auto (Smart).'
-        : `Default view set to ${newPref === 'lend' ? 'You lend' : 'You owe'}.`,
+        : `Default view set to ${newPref === 'loans' ? 'My Loans' : newPref === 'lend' ? 'You lend' : 'You owe'}.`,
     );
   };
 
@@ -420,49 +426,43 @@ export function HomePage() {
       <NavBar
         title="Wallet"
         right={
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="relative">
-              <IconButton label="Friends & Contacts" onClick={() => setPanel('friends')}>
-                <UserPlus className="size-[18px]" strokeWidth={2.2} />
-              </IconButton>
-              {friendRequestsCount > 0 && (
-                <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white shadow-xs">
-                  +{friendRequestsCount}
-                </span>
-              )}
-            </div>
-            <IconButton
-              label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
-              dark
-              onClick={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
-            >
-              <Plus className="size-5" strokeWidth={2.5} />
-            </IconButton>
+          <div className="flex items-center gap-2">
+            {/* 1. Circular Plus Button (Image 2 style) */}
             <button
               type="button"
-              onClick={() => setRemindersOpen(true)}
-              aria-label="Due date reminders"
-              title="Due date reminders"
-              className="relative grid size-9 shrink-0 place-items-center rounded-full bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-hairline transition hover:text-accent active:scale-90"
+              onClick={() => setPanel(tab === 'loans' ? 'create_loan' : 'create')}
+              aria-label={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
+              title={tab === 'loans' ? 'Add a personal loan' : 'Add a card'}
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.06] backdrop-blur-md transition hover:text-accent hover:shadow-md active:scale-90"
             >
-              <Bell className="size-4" strokeWidth={2.2} />
-              {reminders.length > 0 && (
+              <Plus className="size-4.5" strokeWidth={2.4} />
+            </button>
+
+            {/* 2. Elongated Pill Capsule with Avatar and Three Dots ••• (Image 2 style) */}
+            <button
+              type="button"
+              onClick={() => setProfileOpen((prev) => !prev)}
+              aria-label="More options & profile"
+              title="More options & profile"
+              className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white pl-1.5 pr-2.5 text-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.06] backdrop-blur-md transition hover:bg-white hover:shadow-md active:scale-95"
+            >
+              <Avatar name={name} photo={user.photoURL ?? ''} size="xs" ring="subtle" />
+              <MoreHorizontal className="size-4 text-ink/75" strokeWidth={2.3} />
+
+              {/* Notification / Alert Badge on Pill Capsule */}
+              {friendRequestsCount > 0 ? (
+                <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white shadow-xs animate-pulse">
+                  +{friendRequestsCount}
+                </span>
+              ) : reminders.length > 0 ? (
                 <span
-                  className={`absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold text-white shadow-xs ${
+                  className={`pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold text-white shadow-xs ${
                     hasUrgentReminder ? 'bg-bad animate-pulse' : 'bg-amber-500'
                   }`}
                 >
                   {reminders.length}
                 </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setProfileOpen((prev) => !prev)}
-              aria-label="Your account"
-              className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full transition active:scale-90"
-            >
-              <Avatar name={name} photo={user.photoURL ?? ''} size="nav" ring="subtle" />
+              ) : null}
             </button>
           </div>
         }
@@ -471,9 +471,14 @@ export function HomePage() {
       <ProfileMenu
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onOpenFriends={() => setPanel('friends')}
+        friendRequestsCount={friendRequestsCount}
         onOpenReminders={() => setRemindersOpen(true)}
-        onOpenAppIcon={() => setAppIconOpen(true)}
+        remindersCount={reminders.length}
+        hasUrgentReminder={hasUrgentReminder}
         onOpenHistory={() => setHistoryOpen(true)}
+        onOpenSettings={() => setDefaultViewOpen(true)}
+        onOpenAppIcon={() => setAppIconOpen(true)}
       />
 
       <PageBody>
@@ -500,7 +505,7 @@ export function HomePage() {
 
             {/* Right Column: Cards & Toggle Switch */}
             <div className="mt-5 space-y-4 lg:col-span-7 xl:col-span-8 lg:mt-0">
-              {/* Top Bar: Tabs + Settings */}
+              {/* Top Bar: Tabs Switch */}
               <div className="flex items-center justify-between gap-3">
                 <LendOweToggle
                   tab={tab}
@@ -509,16 +514,6 @@ export function HomePage() {
                   oweCount={owingGroups.length}
                   loansCount={loanGroups.length}
                 />
-
-                <button
-                  type="button"
-                  onClick={() => setDefaultViewOpen(true)}
-                  title="Display & default view settings"
-                  aria-label="Default view settings"
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-muted shadow-sm ring-1 ring-hairline transition hover:text-ink active:scale-90"
-                >
-                  <SlidersHorizontal className="size-4" strokeWidth={2.2} />
-                </button>
               </div>
 
               {/* Actionable Due Date Reminder Alert Banner */}

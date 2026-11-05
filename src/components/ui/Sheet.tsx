@@ -10,6 +10,7 @@ interface Props {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  headerAction?: ReactNode;
   zIndex?: string;
 }
 
@@ -19,7 +20,7 @@ const CLOSE_DISTANCE = 110;
  * iOS style sheet. Slides up from the bottom on phones (drag it down to close)
  * and shows as a centered card on tablets and laptops.
  */
-export function Sheet({ open, onClose, title, description, children, footer, zIndex = 'z-50' }: Props) {
+export function Sheet({ open, onClose, title, description, children, footer, headerAction, zIndex = 'z-50' }: Props) {
   const closeRef = useRef(onClose);
   // Ignore background taps right after opening (the finger that opened it may still be lifting).
   const openedAt = useRef(0);
@@ -104,14 +105,17 @@ export function Sheet({ open, onClose, title, description, children, footer, zIn
               <h2 className="text-[18px] leading-tight font-bold tracking-tight text-ink wrap-break-word">{title}</h2>
               {description && <p className="mt-1 text-[14px] leading-snug text-muted">{description}</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => closeRef.current()}
-              aria-label="Close"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-fill text-muted transition active:scale-90 hover:text-ink"
-            >
-              <X className="size-4" strokeWidth={2.5} />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {headerAction}
+              <button
+                type="button"
+                onClick={() => closeRef.current()}
+                aria-label="Close"
+                className="grid size-8 shrink-0 place-items-center rounded-full bg-fill text-muted transition active:scale-90 hover:text-ink"
+              >
+                <X className="size-4" strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
         </div>
         <div
