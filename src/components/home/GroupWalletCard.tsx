@@ -456,7 +456,6 @@ export function SingleCardCarousel({ groups, uid, onHold, items = [] }: { groups
           return (
             <div
               key={group.id}
-              id={rel === 0 ? 'tour-front-card' : undefined}
               onClick={() => handleCardClick(group, rel)}
               className={`absolute inset-x-0 top-0 h-[196px] ${
                 rel === 0

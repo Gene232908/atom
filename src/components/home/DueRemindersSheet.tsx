@@ -63,7 +63,7 @@ export function DueRemindersSheet({
 
   return (
     <Sheet open={open} onClose={onClose} title="Due Reminders">
-      <div id="tour-reminders-content" className="space-y-4">
+      <div className="space-y-4">
         {/* Compact Online Status UI */}
         {permission === 'granted' ? (
           <div className="flex items-center justify-between rounded-[16px] bg-white px-3.5 py-2.5 shadow-xs ring-1 ring-black/[0.06]">

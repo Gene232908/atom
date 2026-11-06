@@ -12,6 +12,7 @@ import { GroupPage } from './pages/GroupPage';
 import { JoinPage } from './pages/JoinPage';
 import { DesktopShell } from './components/desktop/DesktopShell';
 import { useIsDesktop } from './hooks/useIsDesktop';
+import { TutorialGate } from './components/onboarding/TutorialGate';
 
 function Screens() {
   const { user, loading, needsVerification } = useAuth();
@@ -35,6 +36,7 @@ function Screens() {
     <GroupsProvider uid={user.uid}>
       <OfflineBanner />
       {isDesktop ? <DesktopShell route={route}>{page}</DesktopShell> : page}
+      <TutorialGate uid={user.uid} />
     </GroupsProvider>
   );
 }

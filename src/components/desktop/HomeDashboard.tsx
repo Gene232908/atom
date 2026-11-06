@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, HelpCircle, KeyRound, Plus, Search, WalletCards } from 'lucide-react';
+import { Bell, KeyRound, Plus, Search, WalletCards } from 'lucide-react';
 import type { GroupItem } from '../../hooks/useAllItems';
 import { navigate } from '../../hooks/useRoute';
 import { formatMoney } from '../../lib/money';
@@ -43,7 +43,6 @@ interface Props {
   onViewAllTx: () => void;
   onOpenReminders?: () => void;
   remindersCount?: number;
-  onOpenTour?: () => void;
 }
 
 function greeting(): string {
@@ -101,22 +100,10 @@ export function HomeDashboard(props: Props) {
             {greeting()}, {firstName(props.userName)}
           </h1>
         </div>
-        <div id="tour-desktop-actions" className="flex gap-2">
-          {props.onOpenTour && (
-            <Button
-              id="tour-help-btn"
-              variant="white"
-              className="ring-1 ring-black/[0.08]"
-              icon={<HelpCircle className="size-4 text-accent" />}
-              onClick={props.onOpenTour}
-              title="Paano gamitin? (Step-by-step walkthrough)"
-            >
-              Guide
-            </Button>
-          )}
+        <div className="flex gap-2">
           {props.onOpenReminders && (
             <Button
-              id="tour-desktop-reminders"
+             
               variant="white"
               className="relative ring-1 ring-black/[0.08]"
               icon={<Bell className="size-4 text-accent" />}
@@ -133,13 +120,13 @@ export function HomeDashboard(props: Props) {
           <Button variant="white" className="ring-1 ring-black/[0.08]" icon={<KeyRound className="size-4" />} onClick={props.onJoin}>
             Join a card
           </Button>
-          <Button id="tour-add-btn" icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={props.onNewItem}>
+          <Button icon={<Plus className="size-4" strokeWidth={2.5} />} onClick={props.onNewItem}>
             {tab === 'loans' ? 'Add a loan' : 'Add a card'}
           </Button>
         </div>
       </div>
 
-      <div id="tour-summary-tiles" className="mt-6">
+      <div className="mt-6">
         <StatStrip
           items={[
             { label: 'You owe', value: formatMoney(youOwe), hint: `${owingItems.length} ${owingItems.length === 1 ? 'item' : 'items'} to pay`, tone: youOwe > 0 ? 'bad' : 'muted', onClick: () => onTab('owe') },
@@ -176,7 +163,7 @@ export function HomeDashboard(props: Props) {
             </label>
           }
         >
-          <div id="tour-tabs-toggle" className="flex flex-wrap items-end justify-between gap-3 px-6">
+          <div className="flex flex-wrap items-end justify-between gap-3 px-6">
             <UnderlineTabs
               value={tab}
               onChange={onTab}
@@ -203,7 +190,7 @@ export function HomeDashboard(props: Props) {
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : (
-            <div id="tour-wallet-cards">
+            <div>
               <ItemTable
                 rows={rows.map(toRow)}
                 uid={uid}
@@ -239,7 +226,7 @@ export function HomeDashboard(props: Props) {
           )}
         </Panel>
 
-        <div id="tour-desktop-widgets" className="grid items-start gap-6 lg:grid-cols-2 2xl:col-span-4 2xl:grid-cols-1">
+        <div className="grid items-start gap-6 lg:grid-cols-2 2xl:col-span-4 2xl:grid-cols-1">
           <Panel title="Coming up" subtitle="Next due dates" delay={80}>
             {upcoming.length === 0 ? (
               <p className="border-t border-hairline px-6 py-8 text-center text-[13px] text-muted">No upcoming due dates.</p>

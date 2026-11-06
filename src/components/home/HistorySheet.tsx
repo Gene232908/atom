@@ -127,7 +127,7 @@ export function HistorySheet({ open, onClose, items, uid, onOpenLoan, onOpenItem
       title="Completed History"
       description="All completed loans, settled debts, and finished collections."
     >
-      <div id="tour-history-content" className="space-y-4 pt-1">
+      <div className="space-y-4 pt-1">
         {/* Filter Pills */}
         <div className="grid grid-cols-4 rounded-[14px] bg-fill p-1 ring-1 ring-hairline text-center">
           <button

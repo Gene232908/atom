@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Bell,
-  HelpCircle,
+  CirclePlay,
   History,
   LogOut,
   SlidersHorizontal,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth, useUser } from '../../hooks/useAuth';
 import { Avatar } from '../ui/Avatar';
+import { openTutorial } from '../onboarding/TutorialGate';
 
 interface Props {
   open: boolean;
@@ -23,7 +24,6 @@ interface Props {
   onOpenHistory?: () => void;
   onOpenSettings?: () => void;
   onOpenAppIcon?: () => void;
-  onStartTour?: () => void;
 }
 
 export function ProfileMenu({
@@ -37,7 +37,6 @@ export function ProfileMenu({
   onOpenHistory,
   onOpenSettings,
   onOpenAppIcon,
-  onStartTour,
 }: Props) {
   const user = useUser();
   const { signOut } = useAuth();
@@ -51,10 +50,6 @@ export function ProfileMenu({
       if (e.key === 'Escape') onClose();
     };
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest('[data-tour-walkthrough], [role="dialog"][aria-label*="walkthrough"], [aria-label*="Walkthrough"]')) {
-        return;
-      }
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -84,7 +79,7 @@ export function ProfileMenu({
 
       {/* Liquid glass bubble menu */}
       <div
-        id="tour-profile-menu"
+       
         ref={menuRef}
         role="dialog"
         aria-label="Actions and profile menu"
@@ -113,7 +108,7 @@ export function ProfileMenu({
         <div className="space-y-0.5">
           {onOpenFriends && (
             <MenuRow
-              id="tour-profile-friends"
+             
               icon={<UserPlus className="size-[17px]" strokeWidth={2.2} />}
               label="Friends & Contacts"
               badge={friendRequestsCount > 0 ? `+${friendRequestsCount}` : undefined}
@@ -127,7 +122,7 @@ export function ProfileMenu({
 
           {onOpenReminders && (
             <MenuRow
-              id="tour-profile-reminders"
+             
               icon={<Bell className="size-[17px]" strokeWidth={2.2} />}
               label="Due Reminders"
               badge={remindersCount > 0 ? String(remindersCount) : undefined}
@@ -141,7 +136,7 @@ export function ProfileMenu({
 
           {onOpenHistory && (
             <MenuRow
-              id="tour-profile-history"
+             
               icon={<History className="size-[17px]" strokeWidth={2.2} />}
               label="Completed History"
               onClick={() => {
@@ -153,7 +148,7 @@ export function ProfileMenu({
 
           {onOpenSettings && (
             <MenuRow
-              id="tour-profile-settings"
+             
               icon={<SlidersHorizontal className="size-[17px]" strokeWidth={2.2} />}
               label="Wallet Settings"
               onClick={() => {
@@ -163,16 +158,6 @@ export function ProfileMenu({
             />
           )}
 
-          {onStartTour && (
-            <MenuRow
-              icon={<HelpCircle className="size-[17px]" strokeWidth={2.2} />}
-              label="App Walkthrough / Guide"
-              onClick={() => {
-                onClose();
-                onStartTour();
-              }}
-            />
-          )}
         </div>
 
         {/* Thin divider */}
@@ -180,6 +165,15 @@ export function ProfileMenu({
 
         {/* Customization & Sign Out */}
         <div className="space-y-0.5">
+          <MenuRow
+            icon={<CirclePlay className="size-[17px]" strokeWidth={2.2} />}
+            label="Watch Tutorial"
+            onClick={() => {
+              onClose();
+              openTutorial();
+            }}
+          />
+
           {onOpenAppIcon && (
             <MenuRow
               icon={<Sparkles className="size-[17px]" strokeWidth={2.2} />}

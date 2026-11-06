@@ -5,7 +5,6 @@ export interface QuickAction {
   icon: ReactNode;
   onClick: () => void;
   highlight?: boolean;
-  id?: string;
 }
 
 // Liquid glass: clear body with a soft tint, a light-catching rim (liquid-rim) and no drop shadow.
@@ -24,7 +23,6 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
       {actions.map((a) => (
         <button
           key={a.label}
-          id={a.id}
           type="button"
           onClick={a.onClick}
           className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl py-1 outline-none"
