@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, Play, Volume2, X } from 'lucide-react';
+import { ArrowRight, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { lockScroll } from '../../lib/scrollLock';
@@ -32,6 +32,7 @@ export function TutorialGate({ uid }: { uid: string }) {
   const [muted, setMuted] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [replay, setReplay] = useState(false);
+  const [remind, setRemind] = useState(false);
   const video = useRef<HTMLVideoElement | null>(null);
   const closing = useRef(false);
   const phaseRef = useRef(phase);
@@ -82,7 +83,13 @@ export function TutorialGate({ uid }: { uid: string }) {
 
   useEffect(() => {
     if (!showing) return;
-    return lockScroll();
+    // Lets other parts of the app (like reminder notifications) wait until the video is done.
+    document.body.dataset.tutorial = 'on';
+    const unlock = lockScroll();
+    return () => {
+      delete document.body.dataset.tutorial;
+      unlock();
+    };
   }, [showing]);
 
   // Start with sound if the browser allows it, otherwise muted, otherwise wait for a tap.
@@ -91,13 +98,28 @@ export function TutorialGate({ uid }: { uid: string }) {
     const v = video.current;
     if (!v) return;
     v.muted = false;
-    v.play()
-      .then(() => setMuted(false))
-      .catch(() => {
-        v.muted = true;
-        setMuted(true);
-        v.play().catch(() => setNeedsTap(true));
+    let tries = 0;
+    const start = () =>
+      v.play().catch((err: unknown) => {
+        // Only a real "sound not allowed" means muted. Other errors (a hiccup while loading) just retry with sound.
+        if ((err as { name?: string })?.name === 'NotAllowedError') {
+          v.muted = true;
+          v.play().catch(() => setNeedsTap(true));
+        } else if (tries++ < 3) {
+          window.setTimeout(start, 400);
+        } else {
+          setNeedsTap(true);
+        }
       });
+    start();
+  }, [phase]);
+
+  // Websites cannot read the phone's volume, so remind everyone for the first few seconds.
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    setRemind(true);
+    const id = window.setTimeout(() => setRemind(false), 5000);
+    return () => window.clearTimeout(id);
   }, [phase]);
 
   // Keep it playing: switching apps or tabs pauses video, so resume when the page is back.
@@ -196,6 +218,7 @@ export function TutorialGate({ uid }: { uid: string }) {
               if (!v.ended && !closing.current && phase === 'playing' && document.visibilityState === 'visible')
                 v.play().catch(() => setNeedsTap(true));
             }}
+            onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
             onEnded={() => {
               setProgress(1);
               setPhase('ended');
@@ -208,11 +231,22 @@ export function TutorialGate({ uid }: { uid: string }) {
           <div className="h-full bg-sky-300/90" style={{ width: `${progress * 100}%` }} />
         </div>
 
-        {phase === 'playing' && muted && !needsTap && (
-          <div className="liquid-rim pointer-events-none absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] flex animate-fade-in items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-[13px] font-medium text-white backdrop-blur-xl [--rim:0.6]">
-            <Volume2 className="size-4" />
-            Tap for sound
+        {phase === 'playing' && muted && !needsTap ? (
+          <div className="pointer-events-none absolute bottom-[max(3.25rem,calc(env(safe-area-inset-bottom)+2.5rem))] left-1/2 flex -translate-x-1/2 animate-fade-in items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap text-ink shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+            <span className="grid size-6 place-items-center rounded-full bg-bad/10 text-bad">
+              <VolumeX className="size-3.5" strokeWidth={2.4} />
+            </span>
+            Sound is off · Tap to turn on
           </div>
+        ) : (
+          phase === 'playing' &&
+          remind &&
+          !needsTap && (
+            <div className="liquid-rim pointer-events-none absolute top-[max(1rem,env(safe-area-inset-top))] left-1/2 flex -translate-x-1/2 animate-fade-in items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap text-white backdrop-blur-xl [--rim:0.6]">
+              <Volume2 className="size-4" />
+              Please turn on your volume
+            </div>
+          )
         )}
 
         {phase === 'playing' && needsTap && (

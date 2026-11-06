@@ -546,6 +546,10 @@ export async function sendPushNotificationToUser(
 /** Shows a native system notification via the Service Worker */
 export async function showSystemNotification(title: string, options: NotificationOptions): Promise<void> {
   if (!isPushSupported() || Notification.permission !== 'granted') return;
+  // A notification sound can cut the tutorial video's audio on phones, so wait until it is finished.
+  for (let i = 0; i < 120 && document.body.dataset.tutorial === 'on'; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
 
   const enrichedOptions: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
     icon: '/apple-touch-icon.png',
